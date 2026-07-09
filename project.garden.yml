@@ -7,18 +7,18 @@ variables:
   smtp:
     host: smtp.gmail.com
     port: "587"
-    fromDisplayName: TEEHR Hub
-    replyToDisplayName: TEEHR Support
+    fromDisplayName: FVED
+    replyToDisplayName: FVED Support
     starttls: "true"
     ssl: "false"
   aws:
-    region: us-east-2
+    region: us-east-1
   remoteCluster:
-    contextArn: arn:aws:eks:us-east-2:935462133478:cluster/teehr-hub
-    ecrRegistry: 935462133478.dkr.ecr.us-east-2.amazonaws.com
+    contextArn: arn:aws:eks:us-east-1:794457362858:cluster/fved-cluster
+    ecrRegistry: 794457362858.dkr.ecr.us-east-1.amazonaws.com
   irsa:
-    icebergReadOnlyRoleArn: arn:aws:iam::935462133478:role/teehr-hub-iceberg-s3-warehouse-readonly-irsa
-    icebergReadWriteRoleArn: arn:aws:iam::935462133478:role/teehr-hub-iceberg-s3-warehouse-irsa
+    icebergReadOnlyRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
+    icebergReadWriteRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-irsa
 
 environments:
   - name: local
@@ -44,7 +44,7 @@ environments:
   - name: remote
     defaultNamespace: ${project.name}
     variables:
-      hostname: teehr.rtiamanzi.org
+      hostname: dev.low.amzifved.aws.rti.org
       devTeehrVersion: 267f8a75034132aefe84749af10ab1562a6ac169
       stableTeehrVersion: v0.6.5
       previousTeehrVersion: v0.5.3
@@ -54,8 +54,8 @@ environments:
         catalogS3Endpoint: ""
         catalogUri: http://iceberg-rest:8181
         catalogType: rest
-        catalogWarehouse: s3://dev-teehr-iceberg-warehouse/
-      nfsServerDns: "fs-0cb715f5b7a76e862.efs.us-east-2.amazonaws.com"
+        catalogWarehouse: s3://dev-fved-iceberg-warehouse-rti-use1/
+      nfsServerDns: "fs-0d53828f401595456.efs.us-east-1.amazonaws.com"
       trino:
         host: trino
         port: "8080"
@@ -78,10 +78,10 @@ providers:
     environments: ["remote"]
     imagePullSecrets:
       - name: ecr-config
-        namespace: default
+        namespace: ecr-secrets
     deploymentRegistry:
       hostname: ${var.remoteCluster.ecrRegistry}
       namespace: ${project.name}
     context: ${var.remoteCluster.contextArn}
     buildMode: cluster-buildkit
-    defaultHostname: teehr.rtiamanzi.org
+    defaultHostname: dev.low.amzifved.aws.rti.org
