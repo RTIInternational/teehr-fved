@@ -1,0 +1,89 @@
+# Development build
+kind: Build
+type: container
+name: teehr-frontend
+environments:
+  - local
+
+spec:
+  dockerfile: Dockerfile.dev
+  localId: teehr-frontend
+
+---
+
+# Production build
+kind: Build
+type: container
+name: teehr-frontend-prod
+environments:
+  - remote
+
+spec:
+  dockerfile: Dockerfile.prod
+  localId: teehr-frontend
+  buildArgs:
+    VITE_API_BASE_URL: "https://api.${var.hostname}"
+    VITE_KEYCLOAK_URL: "https://auth.${var.hostname}"
+    VITE_PREFECT_URL: "https://prefect.${var.hostname}"
+    VITE_JUPYTERHUB_URL: "https://hub.${var.hostname}/hub/spawn"
+    VITE_KEYCLOAK_REALM: "teehr"
+    VITE_KEYCLOAK_CLIENT_ID: "teehr-frontend"
+
+---
+
+# Development deployment
+kind: Deploy
+type: kubernetes
+name: teehr-frontend
+environments:
+  - local
+
+dependencies:
+  - build.teehr-frontend
+  - deploy.teehr-api
+  - deploy.auth-ingress
+
+spec:
+
+  manifestFiles:
+    - manifests/service-dev.yaml
+
+  manifestTemplates:
+    - manifests/deployment-dev.yaml.tpl
+    - manifests/configmap-dev.yaml.tpl
+    
+  
+  defaultTarget:
+    kind: Deployment
+    name: teehr-frontend
+
+  sync:
+    paths:
+      - containerPath: /app/src
+        sourcePath: ./src
+        mode: one-way
+    overrides:
+      - command: [ npm, run, dev ]
+
+---
+
+# Production deployment
+kind: Deploy
+type: kubernetes
+name: teehr-frontend-prod
+environments:
+  - remote
+
+dependencies:
+  - build.teehr-frontend-prod
+
+spec:
+  manifestTemplates:
+    - manifests/deployment-prod.yaml.tpl
+
+  manifestFiles:
+    - manifests/service-prod.yaml
+  
+  defaultTarget:
+    kind: Deployment
+    name: teehr-frontend-prod

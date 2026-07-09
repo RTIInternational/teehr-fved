@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teehr-frontend
+  labels:
+    app: teehr-frontend
+    version: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: teehr-frontend
+  template:
+    metadata:
+      labels:
+        app: teehr-frontend
+        version: production
+    spec:
+      # nodeSelector:
+      #   teehr-hub/nodegroup-name: core-a
+      containers:
+      - name: frontend
+        image: ${actions.build.teehr-frontend-prod.outputs.deployment-image-id}
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10

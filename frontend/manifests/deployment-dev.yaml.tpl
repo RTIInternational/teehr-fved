@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: teehr-frontend
+  labels:
+    app: teehr-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: teehr-frontend
+  template:
+    metadata:
+      labels:
+        app: teehr-frontend
+    spec:
+      # nodeSelector:
+      #   teehr-hub/nodegroup-name: core-a
+      containers:
+      - name: frontend
+        image: ${actions.build.teehr-frontend.outputs.deployment-image-id}
+        ports:
+        - containerPort: 8080
+        env:
+        - name: NODE_ENV
+          value: "development"
+        - name: VITE_API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: teehr-frontend-config
+              key: VITE_API_BASE_URL
+        - name: VITE_ALLOWED_HOSTS
+          valueFrom:
+            configMapKeyRef:
+              name: teehr-frontend-config
+              key: VITE_ALLOWED_HOSTS
+        - name: VITE_KEYCLOAK_URL
+          valueFrom:
+            configMapKeyRef:
+              name: teehr-frontend-config
+              key: VITE_KEYCLOAK_URL
+        - name: VITE_PREFECT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: teehr-frontend-config
+              key: VITE_PREFECT_URL
+        - name: VITE_JUPYTERHUB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: teehr-frontend-config
+              key: VITE_JUPYTERHUB_URL
+        - name: VITE_KEYCLOAK_REALM
+          valueFrom:
+            configMapKeyRef:
+              name: teehr-frontend-config
+              key: VITE_KEYCLOAK_REALM
+        - name: VITE_KEYCLOAK_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              name: teehr-frontend-config
+              key: VITE_KEYCLOAK_CLIENT_ID
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10

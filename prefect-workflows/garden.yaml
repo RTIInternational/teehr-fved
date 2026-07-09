@@ -1,0 +1,69 @@
+kind: Build
+type: container
+name: teehr-prefect-image
+description: Build TEEHR Prefect workflow deployer image
+environments:
+  - local
+  - remote
+spec:
+  dockerfile: Dockerfile.prefect-teehr
+  localId: teehr-prefect
+  publishId: teehr-prefect:${var.devTeehrVersion}
+  buildArgs:
+      TEEHR_VERSION: ${var.devTeehrVersion}
+---
+kind: Deploy
+type: kubernetes
+name: prefect-workflow-deploy
+description: K8s Deploy Prefect Workflows
+dependencies:
+  - deploy.prefect-server
+  - deploy.prefect-worker
+  - deploy.update-job-template
+  - deploy.load-secrets
+  - build.teehr-prefect-image
+  - build.teehr-spark-executor-image
+environments:
+  - local
+  - remote
+spec:
+  manifestTemplates:
+  - ./manifests/prefect-deployer-job.yaml
+---
+kind: Deploy
+type: kubernetes
+name: update-job-template
+description: Update job template
+dependencies:
+  - deploy.prefect-server
+  - deploy.prefect-worker
+  - build.teehr-prefect-image
+environments:
+  - local
+  - remote
+spec:
+  manifestTemplates:
+  - ./manifests/update-job-template.yaml.tpl
+---
+kind: Deploy
+type: kubernetes
+name: prefect-job-sa
+description: Create Prefect job service account
+environments:
+  - remote
+spec:
+  manifestTemplates:
+  - ./manifests/prefect-job-sa.yaml
+---
+kind: Deploy
+type: kubernetes
+name: load-secrets
+description: K8s Load Prefect Secrets
+dependencies:
+  - deploy.prefect-server
+environments:
+  - local
+  - remote
+spec:
+  manifestFiles:
+  - ./manifests/load-secrets.yaml

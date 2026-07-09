@@ -1,0 +1,140 @@
+from pathlib import Path
+from datetime import datetime, timedelta, UTC
+from typing import Union, Optional
+import logging
+import os
+
+from prefect.blocks.system import Secret
+from prefect import flow, get_run_logger
+from prefect.futures import wait
+import pandas as pd
+
+from teehr import Configuration
+from teehr.fetching.models.utils import (
+    USGSChunkByEnum,
+    USGSServiceEnum,
+)
+from teehr.models.table_enums import TableWriteEnum
+from teehr.fetching.const import (
+    USGS_CONFIGURATION_NAME,
+    USGS_VARIABLE_MAPPER,
+    VARIABLE_NAME,
+)
+from teehr.utils.utils import remove_dir_if_exists
+from utils import usgs_utils
+from workflows.utils.common_utils import initialize_evaluation
+
+logging.getLogger("teehr").setLevel(logging.INFO)
+logging.getLogger("dataretrieval").setLevel(logging.INFO)
+
+
+LOOKBACK_DAYS = 1
+CHUNK_SIZE = 100  # Number of sites to fetch per api call
+
+
+@flow(
+    flow_run_name="ingest-usgs-streamflow-obs",
+    timeout_seconds=60 * 60
+)
+def ingest_usgs_streamflow_obs(
+    temp_dir_path: Union[str, Path],
+    end_dt: Union[str, datetime, pd.Timestamp, None] = None,
+    num_lookback_days: Union[int, None] = LOOKBACK_DAYS,
+    service: USGSServiceEnum = "iv",
+    chunk_by: Union[USGSChunkByEnum, None] = "week",
+    filter_to_hourly: bool = True,
+    filter_no_data: bool = True,
+    convert_to_si: bool = True,
+    overwrite_output: Optional[bool] = True,
+    write_mode: TableWriteEnum = "append",
+    drop_duplicates: bool = True,
+    start_spark_cluster: bool = False,
+) -> None:
+    """USGS Streamflow Ingestion from NWIS.
+
+    Notes
+    -----
+    - To test this locally you need to set your USGS API key in secrets.local.yaml.
+    - Sets the start date as end date
+      minus the number of lookback days.
+    - End date defaults to current date and time.
+    """
+    logger = get_run_logger()
+
+    # Read the USGS API key from prefect and set as an env variable
+    os.environ["API_USGS_PAT"] = Secret.load("api-usgs-pat").get()
+    if os.environ.get("API_USGS_PAT"):
+        logger.info("✅ Successfully loaded 'api-usgs-pat' secret and set API_USGS_PAT env variable.")
+    else:
+        logger.warning("⚠️ API_USGS_PAT env variable is empty after loading 'api-usgs-pat' secret.")
+
+    if end_dt is None:
+        end_dt = datetime.now(UTC).replace(tzinfo=None)
+    elif isinstance(end_dt, str):
+        # Assumes UTC
+        end_dt = datetime.fromisoformat(end_dt)
+
+    ev = initialize_evaluation(
+        temp_dir_path=temp_dir_path,
+        start_spark_cluster=start_spark_cluster,
+        update_configs={
+            "spark.sql.shuffle.partitions": "4"
+        }
+    )
+
+    if (
+        not ev.fetch._configuration_name_exists(USGS_CONFIGURATION_NAME)
+    ):
+        ev.configurations.add(
+            Configuration(
+                name=USGS_CONFIGURATION_NAME,
+                type="primary",
+                description="USGS streamflow gauge observations"
+            )
+        )
+    usgs_sites = usgs_utils.get_usgs_location_ids(ev=ev)
+
+    # Break usgs_sites into chunks
+    usgs_site_chunks = [
+        usgs_sites[i:i + CHUNK_SIZE]
+        for i in range(0, len(usgs_sites), CHUNK_SIZE)
+    ]
+
+    usgs_variable_name = USGS_VARIABLE_MAPPER[VARIABLE_NAME][service]
+    output_parquet_dir = Path(
+        ev.fetch.usgs_cache_dir,
+        USGS_CONFIGURATION_NAME,
+        usgs_variable_name
+    )
+
+    start_dt = end_dt - timedelta(days=num_lookback_days)
+
+    remove_dir_if_exists(ev.fetch.usgs_cache_dir)
+
+    for i, chunk in enumerate(usgs_site_chunks):
+        usgs_utils.fetch_usgs_data_to_cache(
+            usgs_sites=chunk,
+            output_parquet_dir=Path(output_parquet_dir, f"part_{i}"),
+            start_date=start_dt,
+            end_date=end_dt,
+            service=service,
+            chunk_by=chunk_by,
+            filter_to_hourly=filter_to_hourly,
+            filter_no_data=filter_no_data,
+            convert_to_si=convert_to_si,
+            overwrite_output=overwrite_output,
+        )
+        logger.info(f"✅ Completed fetching chunk {i+1}/{len(usgs_site_chunks)} to cache")
+    logger.info("✅ Completed fetching USGS data to cache")
+
+    # Todo: Coalesce cache files for better write performance?
+
+    logger.info("⏰ Loading USGS data from the cache")
+    ev._load.from_cache(
+        in_path=Path(ev.fetch.usgs_cache_dir),
+        write_mode=write_mode,
+        drop_duplicates=drop_duplicates,
+        table_name="primary_timeseries",
+    )
+    logger.info("✅ Completed loading USGS data into the warehouse")
+    ev.spark.stop()
