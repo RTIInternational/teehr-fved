@@ -1,0 +1,21 @@
+kind: Deploy
+type: kubernetes
+name: certs
+description: Deploy-specific K8s certificates
+spec:
+  manifestTemplates:
+    - "./manifests/cert.yaml.tpl"
+environments:
+  - remote
+---
+kind: Deploy
+type: kubernetes
+name: certs
+description: Deploy-specific K8s certificates
+spec:
+  manifestTemplates:
+    - "./manifests/cert.yaml.tpl"
+dependencies:
+  - deploy.letsencrypt
+environments:
+  - local
