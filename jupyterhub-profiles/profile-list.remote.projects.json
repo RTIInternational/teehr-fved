@@ -1,0 +1,10 @@
+[
+  {
+    "project_id": "FVED",
+    "display_name": "Forecast Visualization and Evaluation Dashboard (FVED)",
+    "description": "Choose this profile for work related to the FVED Project.",
+    "default": true,
+    "nodegroup_suffix": "",
+    "include_hefs_choices": false
+  }
+]
