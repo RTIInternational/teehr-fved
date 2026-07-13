@@ -1,0 +1,573 @@
+# Welcome to your prefect.yaml file! You can you this file for storing and managing
+# configuration for deploying your flows. We recommend committing this file to source
+# control along with your flow code.
+
+# Generic metadata about this project
+name: teehr-hub
+prefect-version: 3.4.24
+
+# build section allows you to manage and build docker images
+build: null
+
+# push section allows you to manage if and how this project is uploaded to remote locations
+push: null
+
+# pull section allows you to provide instructions for cloning this project in remote locations
+pull: null
+
+# the definitions section allows you to define reusable components for your deployments
+definitions:
+  temp_dir_path: &temp_dir_path "/data/temp-spark"
+  log_level: &log_level INFO
+  tags: &common_tags
+    - k8s
+  work_pool: &work_pool
+    name: kubernetes-pool
+    job_variables:
+      image: "{{ $PREFECT_TEEHR_IMAGE }}"
+      image_pull_policy: Always
+      namespace: "{{ $TEEHR_NAMESPACE }}"
+      finished_job_ttl: 300
+      job_watch_timeout_seconds: 900
+      pod_watch_timeout_seconds: 300
+      env:
+        PREFECT_LOGGING_LEVEL: *log_level
+        TEEHR_SPARK_IMAGE: "{{ $TEEHR_SPARK_IMAGE }}"
+        TEEHR_NAMESPACE: "{{ $TEEHR_NAMESPACE }}"
+        PREFECT_LOGGING_EXTRA_LOGGERS: teehr
+        # Start Local Only
+        AWS_ACCESS_KEY_ID: "{{ $AWS_ACCESS_KEY_ID }}"
+        AWS_SECRET_ACCESS_KEY: "{{ $AWS_SECRET_ACCESS_KEY }}"
+        REMOTE_CATALOG_S3_ENDPOINT: "{{ $REMOTE_CATALOG_S3_ENDPOINT }}"
+        REMOTE_CATALOG_S3_PATH_STYLE_ACCESS: "{{ $REMOTE_CATALOG_S3_PATH_STYLE_ACCESS }}"
+        # End Local Only
+        AWS_REGION: "{{ $AWS_REGION }}"
+        REMOTE_CATALOG_REST_URI: "{{ $REMOTE_CATALOG_REST_URI }}"
+        REMOTE_CATALOG_TYPE: "{{ $REMOTE_CATALOG_TYPE }}"
+        REMOTE_WAREHOUSE_S3_PATH: "{{ $REMOTE_WAREHOUSE_S3_PATH }}"
+        IN_CLUSTER: "{{ $IN_CLUSTER }}"
+      node_selector:
+        teehr-hub/nodegroup-name: spark-r5-4xlarge
+      tolerations:
+        - key: teehr-hub/dedicated
+          operator: Equal
+          value: worker
+          effect: NoSchedule
+        - key: teehr-hub_dedicated
+          operator: Equal
+          value: worker
+          effect: NoSchedule
+
+# the deployments section allows you to provide configuration for deploying flows
+deployments:
+  # Workflows that are configured for local KIND cluster
+  - name: ingest-usgs-streamflow-obs
+    version:
+    tags: []
+    description: Ingest USGS streamflow data from NWIS
+    entrypoint: workflows/ingests/usgs_streamflow_obs.py:ingest_usgs_streamflow_obs
+    parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
+    work_pool: *work_pool
+
+  # NWM Short and Medium Range Ingests
+  - name: ingest-nwm-short-range-streamflow-forecasts
+    version:
+    tags: []
+    description: Ingest NWM short range streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "short_range",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-short-range-alaska-streamflow-forecasts
+    version:
+    tags: []
+    description: Ingest NWM short range Alaska streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "short_range_alaska",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-short-range-hawaii-streamflow-forecasts
+    version:
+    tags: []
+    description: Ingest NWM short range Hawaii streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "short_range_hawaii",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-short-range-puertorico-streamflow-forecasts
+    version:
+    tags: []
+    description: Ingest NWM short range Puerto Rico streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "short_range_puertorico",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-medium-range-streamflow-forecasts
+    version:
+    tags: []
+    description: Ingest NWM medium range member 1 streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "medium_range_mem1",
+      "output_type": "channel_rt_1",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-medium-range-blend-streamflow-forecasts
+    version:
+    tags: []
+    description: Ingest NWM medium range blend streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "medium_range_blend",
+      "output_type": "channel_rt",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-medium-range-alaska-streamflow-forecasts
+    version:
+    tags: []
+    description: Ingest NWM medium range Alaska streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "medium_range_alaska_mem1",
+      "output_type": "channel_rt_1",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-medium-range-alaska-blend-streamflow-forecasts
+    version:
+    tags: []
+    description: Ingest NWM medium range Alaska blend streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "medium_range_blend_alaska",
+      "output_type": "channel_rt",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  # NWM Assimilation Ingests
+  - name: ingest-nwm-analysis-assim-no-da
+    version:
+    tags: []
+    description: Ingest NWM analysis assimilation (no DA) streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "analysis_assim_no_da",
+      "output_type": "channel_rt",
+      "start_spark_cluster": false,
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-analysis-assim-alaska-no-da
+    version:
+    tags: []
+    description: Ingest NWM analysis assimilation (no DA) Alaska streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "analysis_assim_alaska_no_da",
+      "output_type": "channel_rt",
+      "start_spark_cluster": false,
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-analysis-assim-extend-no-da
+    version:
+    tags: []
+    description: Ingest NWM analysis assimilation (no DA) extended streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "analysis_assim_extend_no_da",
+      "output_type": "channel_rt",
+      "start_spark_cluster": false,
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-analysis-assim-extend-alaska-no-da
+    version:
+    tags: []
+    description: Ingest NWM analysis assimilation (no DA) extended Alaska streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "analysis_assim_extend_alaska_no_da",
+      "output_type": "channel_rt",
+      "start_spark_cluster": false,
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-analysis-assim-hawaii-no-da
+    version:
+    tags: []
+    description: Ingest NWM analysis assimilation (no DA) Hawaii streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "analysis_assim_hawaii_no_da",
+      "output_type": "channel_rt",
+      "start_spark_cluster": false,
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-analysis-assim-puertorico-no-da
+    version:
+    tags: []
+    description: Ingest NWM analysis assimilation (no DA) Puerto Rico streamflow forecasts from GCS
+    entrypoint: workflows/ingests/nwm_streamflow_forecasts.py:ingest_nwm_streamflow_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "analysis_assim_puertorico_no_da",
+      "output_type": "channel_rt",
+      "start_spark_cluster": false,
+    }
+    work_pool: *work_pool
+
+  # NWM Forcing Analysis MAP Ingests
+  - name: ingest-nwm-forcing-analysis-assim
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing analysis/assimilation grids
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_analysis_assim",
+      "start_spark_cluster": false,
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-analysis-assim-alaska
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing analysis/assimilation grids
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_analysis_assim_alaska",
+      "start_spark_cluster": false,
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-analysis-assim-extend
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing analysis/assimilation grids
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_analysis_assim_extend",
+      "start_spark_cluster": false,
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-analysis-assim-extend-alaska
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing analysis/assimilation grids
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_analysis_assim_extend_alaska",
+      "start_spark_cluster": false,
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-analysis-assim-hawaii
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing analysis/assimilation grids
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_analysis_assim_hawaii",
+      "start_spark_cluster": false,
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-analysis-assim-puertorico
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing analysis/assimilation grids
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_analysis_assim_puertorico",
+      "start_spark_cluster": false,
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  # NWM Forcing Short Range MAP Ingests
+  - name: ingest-nwm-forcing-short-range
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing short range
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_short_range",
+      "start_spark_cluster": false,
+      "target_table_name": "secondary_timeseries",
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-short-range-alaska
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing short range Alaska
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_short_range_alaska",
+      "start_spark_cluster": false,
+      "target_table_name": "secondary_timeseries",
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-short-range-hawaii
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing short range Hawaii
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_short_range_hawaii",
+      "start_spark_cluster": false,
+      "target_table_name": "secondary_timeseries",
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-short-range-puertorico
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing short range Puerto Rico
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_short_range_puertorico",
+      "start_spark_cluster": false,
+      "target_table_name": "secondary_timeseries",
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  # NWM Forcing Medium Range MAP Ingests
+  - name: ingest-nwm-forcing-medium-range
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing medium range
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_medium_range",
+      "start_spark_cluster": false,
+      "target_table_name": "secondary_timeseries",
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-medium-range-alaska
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing medium range Alaska
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_medium_range_alaska",
+      "start_spark_cluster": false,
+      "target_table_name": "secondary_timeseries",
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-medium-range-hawaii
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing medium range Hawaii
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_medium_range_hawaii",
+      "start_spark_cluster": false,
+      "target_table_name": "secondary_timeseries",
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  - name: ingest-nwm-forcing-medium-range-puertorico
+    version:
+    tags: []
+    description: Calculate Mean Areal Precipitation from NWM forcing medium range Puerto Rico
+    entrypoint: workflows/ingests/nwm_forcing_map.py:ingest_nwm_forcing_map
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "nwm_configuration": "forcing_medium_range_puertorico",
+      "start_spark_cluster": false,
+      "target_table_name": "secondary_timeseries",
+      "file_chunk_size": 2
+    }
+    work_pool: *work_pool
+
+  # DataStream Ingests
+  - name: ingest-datastream-short-range-cfe-forecasts
+    version:
+    tags: []
+    description: Ingest DataStream streamflow forecasts from S3
+    entrypoint: workflows/ingests/datastream_streamflow_forecasts.py:ingest_datastream_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "forecast_configuration": "short_range",
+      "datastream_name": "cfe_nom",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-datastream-medium-range-cfe-forecasts
+    version:
+    tags: []
+    description: Ingest DataStream streamflow forecasts from S3
+    entrypoint: workflows/ingests/datastream_streamflow_forecasts.py:ingest_datastream_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "forecast_configuration": "medium_range",
+      "datastream_name": "cfe_nom",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-datastream-short-range-lstm-forecasts
+    version:
+    tags: []
+    description: Ingest DataStream streamflow forecasts from S3
+    entrypoint: workflows/ingests/datastream_streamflow_forecasts.py:ingest_datastream_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "forecast_configuration": "short_range",
+      "datastream_name": "lstm_0",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  - name: ingest-datastream-medium-range-lstm-forecasts
+    version:
+    tags: []
+    description: Ingest DataStream streamflow forecasts from S3
+    entrypoint: workflows/ingests/datastream_streamflow_forecasts.py:ingest_datastream_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "forecast_configuration": "medium_range",
+      "datastream_name": "lstm_0",
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  # NWPS RFC Ingest
+  - name: ingest-nwps-rfc-streamflow-forecasts
+    version:
+    tags: []
+    description: Ingest NWPS RFC streamflow forecasts from NOAA servers
+    entrypoint: workflows/ingests/nwps_rfc_streamflow_forecasts.py:ingest_nwps_rfc_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  # Maintenance and Metrics Workflows
+  - name: update-joined-forecast-table
+    version:
+    tags: []
+    description: Create the joined forecast timeseries table
+    entrypoint: workflows/metrics/update_joined_forecasts.py:update_joined_forecast_table
+    parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
+    work_pool: *work_pool
+
+  - name: update-joined-forecast-table-incremental
+    version:
+    tags: []
+    description: Create the joined forecast timeseries table
+    entrypoint: workflows/metrics/update_joined_forecasts.py:update_joined_forecast_table_incremental
+    parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
+    work_pool: *work_pool
+
+  - name: update-forecast-metrics-table
+    version:
+    tags: []
+    description: Create the forecast metrics table
+    entrypoint: workflows/metrics/update_forecast_metrics.py:update_forecast_metrics_table
+    parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
+    work_pool: *work_pool
+
+  - name: routine-table-maintenance
+    version:
+    tags: []
+    description: Run routine Iceberg table maintenance (expire snapshots, remove orphan files, compact data files, rewrite manifests)
+    entrypoint: workflows/maintenance/routine_table_maintenance.py:routine_table_maintenance
+    parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
+    work_pool: *work_pool
+
+  - name: cleanup-old-flow-runs
+    version:
+    tags: []
+    description: Delete old Prefect flow runs (status=COMPLETED, older than 14 days)
+    entrypoint: workflows/maintenance/prefect_cleanup.py:rm_completed_flow_runs
+    parameters: {"age_limit_days": 14}
+    work_pool: *work_pool
+
+  - name: update-completeness-summary
+    version:
+    tags: []
+    description: Calculate data completeness summary statistics and update the completeness summary table
+    entrypoint: workflows/data_management/update_completeness_summary.py:update_completeness_summary_table
+    parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
+    work_pool: *work_pool
+
+  - name: update-locations-summary
+    version:
+    tags: []
+    description: Calculate location summary statistics and update the locations summary table
+    entrypoint: workflows/data_management/update_locations_summary.py:update_locations_summary_table
+    parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
+    work_pool: *work_pool
+
+  - name: update-configurations-summary
+    version:
+    tags: []
+    description: Calculate configuration summary statistics and update the configuration summary table
+    entrypoint: workflows/data_management/update_configurations_summary.py:update_configurations_summary_table
+    parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
+    work_pool: *work_pool

@@ -1,0 +1,249 @@
+from typing import List
+from pathlib import Path
+
+from prefect import task, get_run_logger
+from prefect.cache_policies import NO_CACHE
+
+from teehr.fetching.utils import write_timeseries_parquet_file
+
+import requests
+import pandas as pd
+
+from prefect.runtime import task_run
+
+NO_DATA_VALUES = [-9999, -999]
+HTTP_CONNECT_TIMEOUT_SECONDS = 5
+HTTP_READ_TIMEOUT_SECONDS = 30
+TASK_TIMEOUT_SECONDS = 180
+
+
+@task(cache_policy=NO_CACHE)
+def query_last_reference_times(
+    stripped_ids: List[str],
+    ev: object,
+) -> dict:
+    """Query the most recent reference time for all gages at once."""
+    logger = get_run_logger()
+
+    # reformat stripped_ids for query
+    formatted_ids = [f'nwpsrfc-{id}' for id in stripped_ids]
+
+    # build filter condition
+    id_list = ','.join([f"'{id}'" for id in formatted_ids])
+    filter_condition = f"location_id IN ({id_list})"
+
+    # Query once for all locations
+    result_df = ev.secondary_timeseries.to_sdf().filter(
+        filter_condition
+    ).groupby("location_id").agg(
+        {"reference_time": "max"}
+    ).withColumnRenamed(
+        "max(reference_time)",
+        "reference_time"
+    ).toPandas()
+
+    # Build dict mapping stripped_id -> last_reference_time
+    ref_times_dict = {}
+    for idx, row in result_df.iterrows():
+        # Strip the 'nwpsrfc-' prefix to get back to stripped_id
+        stripped_id = row['location_id'].replace('nwpsrfc-', '')
+        ref_times_dict[stripped_id] = pd.to_datetime(
+            row['reference_time'],
+            utc=True
+            )
+
+    logger.info(f"Queried reference times for {len(ref_times_dict)} gages.")
+    return ref_times_dict
+
+
+@task(cache_policy=NO_CACHE)
+def generate_nwps_endpoints(
+    gage_ids: List[str],
+    root_url: str,
+    last_reference_times: dict,
+) -> List[dict]:
+    """Generate API endpoints for NWPS RFC forecasts."""
+    logger = get_run_logger()
+    logger.info("Generating NWPS RFC API endpoints...")
+
+    endpoints = []
+    for id in gage_ids:
+        metadata_endpoint = f"{root_url}/nwps/v1/gauges/{id}"
+        fcst_endpoint = f"{root_url}/nwps/v1/gauges/{id}/stageflow/forecast"
+        endpoint = {
+            "RFC_lid": id,
+            "metadata": metadata_endpoint,
+            "forecast": fcst_endpoint,
+            "last_reference_time": last_reference_times.get(id)
+        }
+        endpoints.append(endpoint)
+
+    logger.info(f"Generated {len(endpoints)} NWPS RFC API endpoints.")
+    return endpoints
+
+def generate_task_name():
+    task_name = task_run.task_name
+    parameters = task_run.parameters
+    endpoint = parameters["endpoint"]
+    return f"{task_name}-for-{endpoint['RFC_lid']}"
+
+
+@task(
+    task_run_name=generate_task_name,
+    tags=["nwps"],
+    # retries=3,
+    # retry_delay_seconds=60,
+    timeout_seconds=TASK_TIMEOUT_SECONDS,
+)
+def fetch_nwps_rfc_fcst_to_cache(
+    endpoint: dict,
+    output_cache_dir: str,
+    field_mapping: dict,
+    units_mapping: dict,
+    variable_names: list,
+    configuration_name: str,
+    location_id_prefix: str,
+):
+    """Fetch NWPS RFC forecast data and write to parquet cache."""
+    logger = get_run_logger()
+    RFC_lid = endpoint["RFC_lid"]
+    logger.info(f"Fetching NWPS RFC forecast for RFC LID: {RFC_lid}...")
+
+    # create cache directory if it doesn't exist
+    cache_dir_path = Path(output_cache_dir)
+    if not cache_dir_path.exists():
+        cache_dir_path.mkdir(parents=True, exist_ok=True)
+
+    # Fetch forecast data
+    fcst_url = endpoint["forecast"]
+    logger.info(f"Fetching forecast data from URL: {fcst_url}")
+    try:
+        response = requests.get(
+            fcst_url,
+            timeout=(HTTP_CONNECT_TIMEOUT_SECONDS, HTTP_READ_TIMEOUT_SECONDS),
+        )
+        response.raise_for_status()
+        fcst_data = response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(
+            f"Failed to fetch NWPS RFC forecast data for RFC LID: {RFC_lid} "
+            f"- Error: {str(e)}")
+        raise
+
+    # extract data to dataframe
+    df = pd.DataFrame(fcst_data['data'])
+   
+    # check if dataframe is empty after filtering
+    if df.empty:
+        logger.warning(f"No forecast data available for RFC LID: {RFC_lid}")
+        return None
+    
+    # trim to required fields
+    field_list = [field for field in field_mapping if field in df.columns]
+    df = df[field_list]
+    df.rename(columns=field_mapping, inplace=True)
+
+    # filter out no data values
+    df = df[~df["value"].isin(NO_DATA_VALUES)]
+
+    # check if dataframe is empty after filtering
+    if df.empty:
+        logger.error(f"No valid forecast data for RFC LID: {RFC_lid} after filtering no data values.")
+        raise ValueError(f"No valid forecast data for RFC LID: {RFC_lid} after filtering no data values.")
+    
+    # convert flow units (kcfs to cms)
+    df["value"] = df["value"] * 28.3168
+
+    # Add prefix to location ID (nwpsrfc)
+    df["location_id"] = location_id_prefix + "-" + RFC_lid
+
+    # determine timestep to inform variable_name
+    df['value_time'] = pd.to_datetime(df['value_time'])
+    df = df.sort_values(by="value_time")
+    time_diffs = df["value_time"].diff().dropna().unique()
+    time_diffs_hours = time_diffs / pd.Timedelta(hours=1)
+    if len(time_diffs_hours) == 1:
+        timestep_hours = int(time_diffs_hours[0])
+        if timestep_hours == 1:
+            variable_name = variable_names[0]
+        elif timestep_hours == 6:
+            variable_name = variable_names[1]
+        else:
+            logger.error(
+                f"Unexpected timestep of {timestep_hours} hours "
+                f"for RFC LID: {RFC_lid}."
+            )
+            raise ValueError(f"Unexpected timestep of {timestep_hours} hours for RFC LID: {RFC_lid}.")
+    else:
+        logger.error(
+            f"Multiple timesteps detected for RFC LID: {RFC_lid}. "
+            f"Cannot determine variable name. "
+            f"Timesteps detected: {time_diffs}"
+        )
+        raise ValueError(f"Multiple timesteps detected for RFC LID: {RFC_lid}")
+
+    # assume reference_time is one timestep before first forecast value time
+    reference_time = df["value_time"].min()
+    logger.info(f"Determined reference time {reference_time} for RFC LID: {RFC_lid}.")
+    reference_time = pd.Timestamp(reference_time)
+    if variable_name == "streamflow_hourly_inst":
+        reference_time = reference_time - pd.Timedelta(hours=1)
+    else:
+        reference_time = reference_time - pd.Timedelta(hours=6)
+
+    # Add check to skip if reference_time is not newer than last
+    # reference_time in warehouse for this gage
+    last_reference_time = endpoint["last_reference_time"]
+    logger.info(
+        f"Comparing reference time {reference_time} to last cached reference time "
+        f"{last_reference_time} for RFC LID: {RFC_lid}."
+    )
+    if (last_reference_time is not None and
+       reference_time <= last_reference_time):
+        logger.info(
+            f"Skipping insert for RFC LID: {RFC_lid} - "
+            f"Reference time {reference_time} is not newer than last cached "
+            f"reference time {last_reference_time}."
+        )
+        return None
+
+    # Assemble dataframe
+    unit_name = units_mapping[variable_name]
+    df["reference_time"] = reference_time
+    df["variable_name"] = variable_name
+    df["configuration_name"] = configuration_name
+    df["unit_name"] = unit_name
+    df["member"] = None
+    df = df[[
+        "reference_time",
+        "value_time",
+        "value",
+        "variable_name",
+        "configuration_name",
+        "unit_name",
+        "location_id",
+        "member"
+    ]]
+
+    # write to the cache as parquet with unique filename
+    parquet_filename = f"nwpsrfc_forecast_{RFC_lid}_{reference_time.strftime('%Y%m%d%H%M')}.parquet"
+    cache_filepath = cache_dir_path / parquet_filename
+    logger.info(
+        f"Caching fetched data to: {cache_filepath}"
+    )
+    write_timeseries_parquet_file(
+        filepath=cache_filepath,
+        data=df,
+        timeseries_type="secondary",
+        overwrite_output=False
+    )
+    return True
+
+
+@task()
+def has_cache_data(cache_dir: Path) -> bool:
+    """Check if cache directory contains any parquet files."""
+    if not cache_dir.exists():
+        return False
+    parquet_files = list(cache_dir.rglob("*.parquet"))
+    return len(parquet_files) > 0
