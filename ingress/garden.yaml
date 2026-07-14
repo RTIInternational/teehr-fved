@@ -1,0 +1,9 @@
+kind: Deploy
+type: kubernetes
+name: dashboards-ingress
+spec:
+  manifestTemplates:
+    - manifests/dashboards.yaml.tpl
+environments:
+  - local
+  - remote
