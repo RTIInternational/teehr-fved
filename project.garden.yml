@@ -25,6 +25,7 @@ environments:
     defaultNamespace: ${project.name}
     variables:
       hostname: teehr.local.app.garden
+      certificateIssuerName: letsencrypt-prod
       devTeehrVersion: 267f8a75034132aefe84749af10ab1562a6ac169
       stableTeehrVersion: place-holder # Needed for sync to work for some reason.
       iceberg:
