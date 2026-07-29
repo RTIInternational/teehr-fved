@@ -45,6 +45,7 @@ environments:
       icechunk:
         bucket: "warehouse"
         prefix: "icechunk-ingests"
+        repos: "ua-swann-4km,snodas-4km,cu-swe-4km"
   - name: remote
     defaultNamespace: ${project.name}
     variables:
@@ -68,6 +69,10 @@ environments:
         catalog: iceberg
         schema: teehr
       allowedOrigins: "https://dashboards.${var.hostname},https://api.${var.hostname}"
+      icechunk:
+        bucket: "teehr_icechunk_warehouse"
+        prefix: "icechunk-ingests"
+        repos: "ua-swann-4km,snodas-4km,cu-swe-4km"
 providers:
   # The name of the provider plugin to use.
   - name: local-kubernetes
