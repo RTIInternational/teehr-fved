@@ -91,6 +91,7 @@ const Navbar = () => {
       '/forecast': 'Forecast Analysis',
       '/data': 'Data Availability',
       '/nwmd': 'National Water Model Diagnostics',
+      '/gridded': 'Snow Dashboard',
       '/admin': 'Admin Page',
       '/admin/api-keys': 'API Keys',
       '/admin/keycloak': 'Keycloak Admin',
@@ -174,6 +175,11 @@ const Navbar = () => {
               <li>
                 <Link className="dropdown-item ps-4" to="/forecast" onClick={() => setIsDashboardsOpen(false)}>
                   Forecast Analysis
+                </Link>
+              </li>
+              <li>
+                <Link className="dropdown-item ps-4" to="/gridded" onClick={() => setIsDashboardsOpen(false)}>
+                  Snow Dashboard
                 </Link>
               </li>
             </ul>

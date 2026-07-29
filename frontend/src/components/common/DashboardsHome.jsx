@@ -48,6 +48,21 @@ const DashboardsHome = () => {
       image: '/api/static/preview-forecast.png', // placeholder
       color: 'secondary'
     },
+    {
+      id: 'snow-dashboard',
+      title: 'Snow Dashboard',
+      description: 'Explore gridded snow data including SWE, snow depth, and precipitation rate from icechunk datasets.',
+      features: [
+        'Interactive raster tile map',
+        'Variable and timestep selection',
+        'Point-based timeseries query',
+        'Overlay layers (NWS CPC, SMAP, VIIRS)'
+      ],
+      path: '/gridded',
+      status: 'available',
+      image: '/api/static/preview-snow.png',
+      color: 'info'
+    },
     // Future dashboards
     {
       id: 'retrospective-model-comparisons',

@@ -42,6 +42,9 @@ environments:
         catalog: iceberg
         schema: teehr
       allowedOrigins: "https://dashboards.${var.hostname},https://api.${var.hostname}"
+      icechunk:
+        bucket: "warehouse"
+        prefix: "icechunk-ingests"
   - name: remote
     defaultNamespace: ${project.name}
     variables:
