@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Form, Row, Col, Button, InputGroup } from 'react-bootstrap';
 import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
 import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching.js';
@@ -25,6 +25,45 @@ const GriddedControls = () => {
   const currentTimestep = timesteps[timestepIndex] ?? '';
   const canStepBack = timestepIndex > 0;
   const canStepForward = timestepIndex < timesteps.length - 1;
+
+  const [timestepInput, setTimestepInput] = useState(currentTimestep);
+  const [timestepEditing, setTimestepEditing] = useState(false);
+  const [timestepInputError, setTimestepInputError] = useState(false);
+
+  // Keep display in sync when stepping with buttons
+  useEffect(() => {
+    if (!timestepEditing) {
+      setTimestepInput(currentTimestep);
+      setTimestepInputError(false);
+    }
+  }, [currentTimestep, timestepEditing]);
+
+  const commitTimestepInput = () => {
+    setTimestepEditing(false);
+    if (!timestepInput || timesteps.length === 0) return;
+    const entered = new Date(timestepInput);
+    if (isNaN(entered.getTime())) {
+      setTimestepInputError(true);
+      return;
+    }
+    let closestIdx = 0;
+    let closestDiff = Infinity;
+    timesteps.forEach((ts, i) => {
+      const diff = Math.abs(new Date(ts).getTime() - entered.getTime());
+      if (diff < closestDiff) { closestDiff = diff; closestIdx = i; }
+    });
+    setTimestepInputError(false);
+    dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { timestepIndex: closestIdx } });
+  };
+
+  const handleTimestepKeyDown = (e) => {
+    if (e.key === 'Enter') commitTimestepInput();
+    if (e.key === 'Escape') {
+      setTimestepEditing(false);
+      setTimestepInput(currentTimestep);
+      setTimestepInputError(false);
+    }
+  };
 
   const handleDatasetChange = async (e) => {
     const selected = e.target.value || null;
@@ -147,10 +186,16 @@ const GriddedControls = () => {
                 &#9664;
               </Button>
               <Form.Control
-                readOnly
-                value={currentTimestep || (variable ? 'No timesteps available' : '—')}
+                value={timestepInput}
+                placeholder={variable ? 'No timesteps' : '—'}
+                onChange={(e) => { setTimestepEditing(true); setTimestepInput(e.target.value); setTimestepInputError(false); }}
+                onBlur={commitTimestepInput}
+                onKeyDown={handleTimestepKeyDown}
+                disabled={timesteps.length === 0}
+                isInvalid={timestepInputError}
                 className="text-center"
                 style={{ fontSize: '0.8rem' }}
+                title="Enter a datetime string or use arrows to step"
               />
               <Button
                 variant="outline-secondary"
@@ -161,7 +206,12 @@ const GriddedControls = () => {
                 &#9654;
               </Button>
             </InputGroup>
-            {timesteps.length > 0 && (
+            {timestepInputError && (
+              <div style={{ fontSize: '0.7rem', color: '#dc3545', marginTop: '2px' }}>
+                Invalid datetime — try e.g. 2024-01-15T12:00:00
+              </div>
+            )}
+            {!timestepInputError && timesteps.length > 0 && (
               <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
                 {timestepIndex + 1} / {timesteps.length}
               </div>

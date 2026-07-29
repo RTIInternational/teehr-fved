@@ -60,7 +60,7 @@ const Dashboard = () => {
           className="dashboard-grid h-100"
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: '13fr 7fr',
             gridTemplateRows: 'auto minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.8fr)',
             gap: '12px',
             padding: '12px',
