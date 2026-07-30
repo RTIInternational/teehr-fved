@@ -120,7 +120,7 @@ const Dashboard = () => {
           <div
             style={{
               gridColumn: '1 / -1',
-              gridRow: state.error ? '5 / 6' : '4 / 5',
+              gridRow: '4 / 5',
               minHeight: 0,
             }}
           >
