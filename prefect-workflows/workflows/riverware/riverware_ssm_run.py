@@ -1,7 +1,7 @@
 import logging
 import time
 
-import boto3
+import botocore.session
 from botocore.exceptions import ClientError
 from prefect import flow, get_run_logger, task
 
@@ -24,7 +24,8 @@ def run_ssm_python_script(
 ) -> dict:
     """Send an SSM RunPowerShellScript command to run a Python script and wait for it to finish."""
     log = get_run_logger()
-    ssm = boto3.client("ssm", region_name=AWS_REGION)
+    session = botocore.session.get_session()
+    ssm = session.create_client("ssm", region_name=AWS_REGION)
 
     command = f'python "{script_path}"'
     log.info(
