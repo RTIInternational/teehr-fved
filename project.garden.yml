@@ -51,7 +51,7 @@ environments:
     variables:
       hostname: dev.low.amzifved.aws.rti.org
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 267f8a75034132aefe84749af10ab1562a6ac169
+      devTeehrVersion: 86a4e506a794699b2b1546da9ed5ecda98f318ec
       stableTeehrVersion: v0.6.5
       previousTeehrVersion: v0.5.3
       iceberg:
