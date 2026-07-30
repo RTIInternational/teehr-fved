@@ -8,8 +8,7 @@ from prefect import flow, get_run_logger, task
 logger = logging.getLogger(__name__)
 
 AWS_REGION = "us-east-1"
-RIVERWARE_NAME_TAG = "fved-riverware-windows-dev"
-RIVERWARE_ROLE_TAG = "riverware-windows-dev"
+RIVERWARE_INSTANCE_ID = "i-0e66f3a0f2bd8d411"
 SSM_DOCUMENT = "AWS-RunPowerShellScript"
 POLL_INTERVAL_SECONDS = 10
 COMMAND_TIMEOUT_SECONDS = 600
@@ -28,28 +27,15 @@ def run_ssm_python_script(
     ssm = session.create_client("ssm", region_name=AWS_REGION)
 
     command = f'python "{script_path}"'
-    log.info(
-        "Sending SSM command to target tags "
-        f"Name={RIVERWARE_NAME_TAG}, fved/role={RIVERWARE_ROLE_TAG}: {command}"
-    )
+    log.info(f"Sending SSM command to {RIVERWARE_INSTANCE_ID}: {command}")
 
     send_response = ssm.send_command(
-        Targets=[
-            {"Key": "tag:Name", "Values": [RIVERWARE_NAME_TAG]},
-            {"Key": "tag:fved/role", "Values": [RIVERWARE_ROLE_TAG]},
-        ],
+        InstanceIds=[RIVERWARE_INSTANCE_ID],
         DocumentName=SSM_DOCUMENT,
         Parameters={"commands": [command]},
         TimeoutSeconds=command_timeout_seconds,
         Comment=f"Prefect: {command[:100]}",
     )
-
-    target_count = send_response["Command"].get("TargetCount", 0)
-    if target_count != 1:
-        raise RuntimeError(
-            "Expected exactly one SSM target instance for "
-            f"Name={RIVERWARE_NAME_TAG}, fved/role={RIVERWARE_ROLE_TAG}; got {target_count}."
-        )
 
     command_id = send_response["Command"]["CommandId"]
     log.info(f"SSM command submitted. CommandId: {command_id}")
@@ -64,26 +50,14 @@ def run_ssm_python_script(
     }
     elapsed = 0
     poll_timeout = command_timeout_seconds + 60
-    target_instance_id = None
     while elapsed < poll_timeout:
         time.sleep(POLL_INTERVAL_SECONDS)
         elapsed += POLL_INTERVAL_SECONDS
 
-        invocations = ssm.list_command_invocations(
-            CommandId=command_id,
-            Details=False,
-        ).get("CommandInvocations", [])
-        if not invocations:
-            log.debug("Command invocation not yet available, continuing to poll...")
-            continue
-
-        invocation = invocations[0]
-        target_instance_id = invocation.get("InstanceId")
-
         try:
             result = ssm.get_command_invocation(
                 CommandId=command_id,
-                InstanceId=target_instance_id,
+                InstanceId=RIVERWARE_INSTANCE_ID,
             )
         except ClientError as e:
             if e.response["Error"]["Code"] == "InvocationDoesNotExist":
@@ -129,10 +103,7 @@ def run_riverware_python_script(
         How long (in seconds) SSM will wait for the command to complete before timing out.
     """
     log = get_run_logger()
-    log.info(
-        "Targeting EC2 instance by tags "
-        f"Name={RIVERWARE_NAME_TAG}, fved/role={RIVERWARE_ROLE_TAG} (region: {AWS_REGION})"
-    )
+    log.info(f"Targeting EC2 instance {RIVERWARE_INSTANCE_ID} (region: {AWS_REGION})")
 
     run_ssm_python_script(
         script_path=script_path,
