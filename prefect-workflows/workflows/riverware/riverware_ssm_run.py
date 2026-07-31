@@ -75,14 +75,24 @@ def run_ssm_python_script(
         if status in terminal_states:
             stdout = result.get("StandardOutputContent", "")
             stderr = result.get("StandardErrorContent", "")
+            response_code = result.get("ResponseCode", -1)
             if stdout:
                 log.info(f"stdout:\n{stdout}")
             if stderr:
                 log.warning(f"stderr:\n{stderr}")
+
+            # Check for failures in priority order, fail fast on first error
             if status != "Success":
                 raise RuntimeError(
-                    f"SSM command {command_id} finished with status '{status}'.\n"
-                    f"stderr: {stderr}"
+                    f"SSM command {command_id} finished with status '{status}'\n{stderr}"
+                )
+            if stderr:
+                raise RuntimeError(
+                    f"SSM command {command_id} produced error output:\n{stderr}"
+                )
+            if response_code != 0:
+                raise RuntimeError(
+                    f"SSM command {command_id} exited with code {response_code}\n{stderr}"
                 )
             return result
 
