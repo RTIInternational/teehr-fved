@@ -8,11 +8,13 @@ from prefect import flow, get_run_logger, task
 logger = logging.getLogger(__name__)
 
 AWS_REGION = "us-east-1"
-RIVERWARE_NAME_TAG = "fved-riverware-windows-dev"
-RIVERWARE_ROLE_TAG = "riverware-windows-dev"
+RIVERWARE_INSTANCE_ID = "i-0e66f3a0f2bd8d411"
 SSM_DOCUMENT = "AWS-RunPowerShellScript"
 POLL_INTERVAL_SECONDS = 10
 COMMAND_TIMEOUT_SECONDS = 600
+# Python Launcher (py.exe) is always on the SYSTEM PATH on Windows;
+# override with a full path (e.g. C:\Python312\python.exe) if needed.
+PYTHON_EXECUTABLE = "py"
 
 
 @task(
@@ -20,6 +22,7 @@ COMMAND_TIMEOUT_SECONDS = 600
 )
 def run_ssm_python_script(
     script_path: str,
+    python_executable: str = PYTHON_EXECUTABLE,
     command_timeout_seconds: int = COMMAND_TIMEOUT_SECONDS,
 ) -> dict:
     """Send an SSM RunPowerShellScript command to run a Python script and wait for it to finish."""
@@ -27,29 +30,16 @@ def run_ssm_python_script(
     session = botocore.session.get_session()
     ssm = session.create_client("ssm", region_name=AWS_REGION)
 
-    command = f'python "{script_path}"'
-    log.info(
-        "Sending SSM command to target tags "
-        f"Name={RIVERWARE_NAME_TAG}, fved/role={RIVERWARE_ROLE_TAG}: {command}"
-    )
+    command = f'& "{python_executable}" "{script_path}"'
+    log.info(f"Sending SSM command to {RIVERWARE_INSTANCE_ID}: {command}")
 
     send_response = ssm.send_command(
-        Targets=[
-            {"Key": "tag:Name", "Values": [RIVERWARE_NAME_TAG]},
-            {"Key": "tag:fved/role", "Values": [RIVERWARE_ROLE_TAG]},
-        ],
+        InstanceIds=[RIVERWARE_INSTANCE_ID],
         DocumentName=SSM_DOCUMENT,
         Parameters={"commands": [command]},
         TimeoutSeconds=command_timeout_seconds,
         Comment=f"Prefect: {command[:100]}",
     )
-
-    target_count = send_response["Command"].get("TargetCount", 0)
-    if target_count != 1:
-        raise RuntimeError(
-            "Expected exactly one SSM target instance for "
-            f"Name={RIVERWARE_NAME_TAG}, fved/role={RIVERWARE_ROLE_TAG}; got {target_count}."
-        )
 
     command_id = send_response["Command"]["CommandId"]
     log.info(f"SSM command submitted. CommandId: {command_id}")
@@ -64,26 +54,14 @@ def run_ssm_python_script(
     }
     elapsed = 0
     poll_timeout = command_timeout_seconds + 60
-    target_instance_id = None
     while elapsed < poll_timeout:
         time.sleep(POLL_INTERVAL_SECONDS)
         elapsed += POLL_INTERVAL_SECONDS
 
-        invocations = ssm.list_command_invocations(
-            CommandId=command_id,
-            Details=False,
-        ).get("CommandInvocations", [])
-        if not invocations:
-            log.debug("Command invocation not yet available, continuing to poll...")
-            continue
-
-        invocation = invocations[0]
-        target_instance_id = invocation.get("InstanceId")
-
         try:
             result = ssm.get_command_invocation(
                 CommandId=command_id,
-                InstanceId=target_instance_id,
+                InstanceId=RIVERWARE_INSTANCE_ID,
             )
         except ClientError as e:
             if e.response["Error"]["Code"] == "InvocationDoesNotExist":
@@ -97,14 +75,24 @@ def run_ssm_python_script(
         if status in terminal_states:
             stdout = result.get("StandardOutputContent", "")
             stderr = result.get("StandardErrorContent", "")
+            response_code = result.get("ResponseCode", -1)
             if stdout:
                 log.info(f"stdout:\n{stdout}")
             if stderr:
                 log.warning(f"stderr:\n{stderr}")
+
+            # Check for failures in priority order, fail fast on first error
             if status != "Success":
                 raise RuntimeError(
-                    f"SSM command {command_id} finished with status '{status}'.\n"
-                    f"stderr: {stderr}"
+                    f"SSM command {command_id} finished with status '{status}'\n{stderr}"
+                )
+            if stderr:
+                raise RuntimeError(
+                    f"SSM command {command_id} produced error output:\n{stderr}"
+                )
+            if response_code != 0:
+                raise RuntimeError(
+                    f"SSM command {command_id} exited with code {response_code}\n{stderr}"
                 )
             return result
 
@@ -116,6 +104,7 @@ def run_ssm_python_script(
 @flow
 def run_riverware_python_script(
     script_path: str,
+    python_executable: str = PYTHON_EXECUTABLE,
     command_timeout_seconds: int = COMMAND_TIMEOUT_SECONDS,
 ) -> None:
     """Run a Python script on the RiverWare Windows EC2 instance via AWS SSM.
@@ -125,17 +114,19 @@ def run_riverware_python_script(
     script_path:
         Full Windows path of the Python script to execute on the instance
         (e.g. ``C:\\FVED\\Scripts\\my_script.py``).
+    python_executable:
+        Python executable to invoke. Defaults to ``py`` (Windows Python Launcher).
+        Override with a full path if ``py`` is not available
+        (e.g. ``C:\\Python312\\python.exe``).
     command_timeout_seconds:
         How long (in seconds) SSM will wait for the command to complete before timing out.
     """
     log = get_run_logger()
-    log.info(
-        "Targeting EC2 instance by tags "
-        f"Name={RIVERWARE_NAME_TAG}, fved/role={RIVERWARE_ROLE_TAG} (region: {AWS_REGION})"
-    )
+    log.info(f"Targeting EC2 instance {RIVERWARE_INSTANCE_ID} (region: {AWS_REGION})")
 
     run_ssm_python_script(
         script_path=script_path,
+        python_executable=python_executable,
         command_timeout_seconds=command_timeout_seconds,
     )
     log.info(f"RiverWare Python script '{script_path}' completed successfully.")
