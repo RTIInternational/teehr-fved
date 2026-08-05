@@ -1,11 +1,8 @@
-from asyncio import subprocess
-
 from prefect import flow, get_run_logger
 import icechunk as ic
 from icechunk.xarray import to_icechunk
 import virtualizarr as vz
 import xarray as xr
-import zarr
 
 from utils import grid_utils as gu
 from models.ingest_gridded_data_input import (

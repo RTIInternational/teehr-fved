@@ -41,14 +41,16 @@ def create_objectstore_registry(bucket: str, **kwargs) -> ObjectStoreRegistry:
     Parameters
     ----------
     bucket : str
-        The name of the bucket. Must contain the trailing slash (e.g., "s3://my-bucket/").
+        The name of the bucket. Must contain the trailing slash (e.g., "s3://my-bucket/"),
+        will be added if missing.
     **kwargs : dict
         Additional keyword arguments to pass to from_url.
     """
     logger = get_run_logger()
-    logger.info(f"Creating ObjectStoreRegistry for bucket: {bucket} and kwargs: {kwargs}")
-    store = from_url(bucket, **kwargs)
-    registry = ObjectStoreRegistry({bucket: store})
+    bucket_key = bucket if bucket.endswith("/") else f"{bucket}/"
+    logger.info(f"Creating ObjectStoreRegistry for bucket: {bucket_key} and kwargs: {kwargs}")
+    store = from_url(bucket_key, **kwargs)
+    registry = ObjectStoreRegistry({bucket_key: store})
     return registry
 
 
@@ -504,8 +506,12 @@ def group_contains_data(
     """
     logger = get_run_logger()
     group_path = group_path.removeprefix("/")
-    existing_store = zarr.open_group(store, mode="a", zarr_format=3)
-    if not group_path in list(existing_store.group_keys()):
+    try:
+        existing_store = zarr.open_group(store, mode="r", zarr_format=3)
+    except Exception:
+        logger.info("Unable to open IceChunk store; treating as empty.")
+        return False
+    if group_path not in list(existing_store.group_keys()):
         logger.info(f"Group {group_path} does not exist in the IceChunk repository.")
         return False
     if sub_group_name is not None:
