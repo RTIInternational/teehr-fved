@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
-import { getVariableStyle } from './variableStyles.js';
+import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
+import { getVariableStyle } from './variableStyles';
 
 export const useGriddedVariableStyles = () => {
   const { dispatch } = useGriddedDashboard();

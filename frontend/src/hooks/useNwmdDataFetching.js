@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useNwmdDashboard, ActionTypes } from '../context/NwmdDashboardContext.jsx';
+import { useNwmdDashboard, ActionTypes } from '../context/NwmdDashboardContext';
 import { apiService } from '../services/api';
 import { extractTableProperties } from '../utils/ogcTransformers';
 

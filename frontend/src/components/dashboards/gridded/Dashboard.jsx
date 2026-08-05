@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
-import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching.js';
-import { useGriddedVariableStyles } from './useGriddedVariableStyles.js';
-import DashboardPanel from '../../common/dashboard/DashboardPanel.jsx';
-import GriddedMapComponent from './GriddedMapComponent.jsx';
-import GriddedControls from './GriddedControls.jsx';
-import GriddedTimeseriesPanel from './GriddedTimeseriesPanel.jsx';
+import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
+import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching';
+import DashboardPanel from '../../common/dashboard/DashboardPanel';
+import GriddedControls from './GriddedControls';
+import GriddedMapComponent from './GriddedMapComponent';
+import GriddedTimeseriesPanel from './GriddedTimeseriesPanel';
+import { useGriddedVariableStyles } from './useGriddedVariableStyles';
 
 const Dashboard = () => {
   const { state, dispatch } = useGriddedDashboard();

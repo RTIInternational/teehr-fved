@@ -1,7 +1,7 @@
 import Plotly from 'plotly.js-dist-min';
 import { useEffect, useMemo, useRef } from 'react';
 import { Card, Spinner } from 'react-bootstrap';
-import { getMetricLabel } from '../../common/dashboard/utils.js';
+import { getMetricLabel } from '../../common/dashboard/utils';
 
 const parseDurationToHours = (duration) => {
   if (typeof duration !== 'string' || !duration.startsWith('P')) return null;
