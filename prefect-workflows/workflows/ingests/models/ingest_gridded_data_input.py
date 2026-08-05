@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 PYRAMID_GROUP_PATH = "/pyramids"
 RAW_DATA_GROUP_PATH = "/raw_data"
 REFERENCES_GROUP_PATH = "/references"
-ICECHUNK_BUCKET = os.environ["ICECHUNK_BUCKET"]
-ICECHUNK_PREFIX = os.environ["ICECHUNK_PREFIX"]
+ICECHUNK_BUCKET = os.getenv("ICECHUNK_BUCKET")
+ICECHUNK_PREFIX = os.getenv("ICECHUNK_PREFIX")
 
 class ParserType(str, Enum):
     """Supported parsers for reading virtual datasets."""

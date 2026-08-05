@@ -522,7 +522,6 @@ deployments:
         "source_bucket": "https://climate.arizona.edu",
         "configuration_name": "ua-swann-4km",
         "factors": [1],
-        "concat_dim": "time",
         "parser_type": "hdf",
         "fsspec_kwargs": {},
         "obstore_kwargs": {},
