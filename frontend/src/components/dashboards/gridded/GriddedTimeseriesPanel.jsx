@@ -11,6 +11,8 @@ const GriddedTimeseriesPanel = () => {
   useEffect(() => {
     if (!plotRef.current || !timeseriesData) return;
     const { times, values, lon, lat, variable } = timeseriesData;
+    const latHem = lat >= 0 ? 'N' : 'S';
+    const lonHem = lon >= 0 ? 'E' : 'W';
     Plotly.react(
       plotRef.current,
       [
@@ -26,7 +28,7 @@ const GriddedTimeseriesPanel = () => {
       ],
       {
         title: {
-          text: `${variable} at (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`,
+          text: `${variable} at (${Math.abs(lat).toFixed(4)}°${latHem}, ${Math.abs(lon).toFixed(4)}°${lonHem})`,
           font: { size: 13 },
         },
         xaxis: { title: 'Time', type: 'date' },
