@@ -533,7 +533,7 @@ def open_zarr_group(
     group_path: str,
     decode_coords: str = "all",
     consolidated: bool = False
-) -> zarr.Group:
+) -> xr.Dataset:
     """Open a Zarr group from the IceChunk repository.
 
     Parameters
@@ -542,15 +542,15 @@ def open_zarr_group(
         The IceChunk storage configuration.
     group_path : str
         The group path in the IceChunk repository to open.
-    mode : str, optional
-        The mode to open the Zarr group (default is "r" for read-only).
+    decode_coords : str, optional
+        Controls which variables are set as coordinate variables.
     consolidated : bool, optional
         Whether to use consolidated metadata (default is False).
 
     Returns
     -------
-    zarr.Group
-        The opened Zarr group.
+    xr.Dataset
+        The opened Xarray dataset.
     """
     logger = get_run_logger()
     logger.info(
