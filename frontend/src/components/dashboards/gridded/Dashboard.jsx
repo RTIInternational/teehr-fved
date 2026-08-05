@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
-import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching.js';
-import { useGriddedVariableStyles } from './useGriddedVariableStyles.js';
-import DashboardPanel from '../../common/dashboard/DashboardPanel.jsx';
-import GriddedMapComponent from './GriddedMapComponent.jsx';
-import GriddedControls from './GriddedControls.jsx';
-import GriddedPolygonPanel from './GriddedPolygonPanel.jsx';
-import GriddedTimeseriesPanel from './GriddedTimeseriesPanel.jsx';
+import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
+import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching';
+import { useGriddedVariableStyles } from './useGriddedVariableStyles';
+import DashboardPanel from '../../common/dashboard/DashboardPanel';
+import GriddedMapComponent from './GriddedMapComponent';
+import GriddedControls from './GriddedControls';
+import GriddedPolygonPanel from './GriddedPolygonPanel';
+import GriddedTimeseriesPanel from './GriddedTimeseriesPanel';
 
 const TABS = [
   { id: 'dataset',  label: 'Dataset' },
