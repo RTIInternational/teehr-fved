@@ -542,12 +542,8 @@ deployments:
     entrypoint: workflows/ingests/build_geozarr_pyramids.py:build_pyramids
     parameters: {
       "args": {
-        "dest_bucket": "warehouse",
-        "source_bucket": "https://climate.arizona.edu",
-        "glob_pattern": "",
         "configuration_name": "ua-swann-4km",
-        "factors": [1],
-        "base_prefix": "icechunk-ingests"
+        "factors": [1]
       }
     }
     work_pool: *work_pool
