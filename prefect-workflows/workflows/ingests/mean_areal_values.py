@@ -3,6 +3,7 @@ from prefect.cache_policies import NO_CACHE
 import numpy as np
 import xarray as xr
 import pandas as pd
+import pyspark.sql.functions as F
 
 from teehr import Evaluation
 
@@ -13,7 +14,7 @@ from pixel_coverage_weights import get_readonly_repo_store, write_dataframe_to_w
 
 @task(timeout_seconds=60 * 10)
 def format_to_teehr_timeseries(
-    results: pd.DataFrame,
+    results: list[dict],
     value_time_array: np.ndarray,
     configuration_name: str,
     variable_name: str,
@@ -116,13 +117,16 @@ def read_weights_from_warehouse(
         f"and locations '{location_id_prefix}' and variable '{weights_variable_name}' "
         "from the iceberg warehouse table."
     )
-    df = ev.spark.sql(f"""
-        SELECT fraction_covered, location_id, position_index
-        FROM iceberg.teehr.grid_pixel_coverage_weights
-        WHERE location_id LIKE '{location_id_prefix}-%'
-          AND domain_name = '{weights_domain_name}'
-          AND variable_name = '{weights_variable_name}'
-    """).toPandas()
+    df = (
+        ev.spark.table("iceberg.teehr.grid_pixel_coverage_weights")
+        .filter(
+            F.col("location_id").startswith(f"{location_id_prefix}-") &
+            (F.col("domain_name") == weights_domain_name) &
+            (F.col("variable_name") == weights_variable_name)
+        )
+        .select("fraction_covered", "location_id", "position_index")
+        .toPandas()
+    )
     logger.info(f"Retrieved {len(df)} rows of pixel coverage weights from the warehouse table.")
     if len(df) == 0:
         logger.error(
