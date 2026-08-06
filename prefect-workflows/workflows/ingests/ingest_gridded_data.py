@@ -1,10 +1,13 @@
 from prefect import flow, get_run_logger
+from datetime import datetime, timedelta, UTC
 import icechunk as ic
 from icechunk.xarray import to_icechunk
 import virtualizarr as vz
 import xarray as xr
+import pandas as pd
 
 from utils import grid_utils as gu
+from utils.gridded_source_builders import GriddedSourceConfig, build_ua_swann_4km_file_list
 from models.ingest_gridded_data_input import (
     StorageType,
     IngestGriddedDataInput,
@@ -14,6 +17,8 @@ from models.ingest_gridded_data_input import (
 )
 from build_geozarr_pyramids import build_pyramids as build_pyramids_flow
 
+
+DEFAULT_LOOKBACK_DAYS = 1
 
 _PARSER_MAP = {
     ParserType.hdf: vz.parsers.HDFParser,
@@ -26,13 +31,20 @@ _VIRTUAL_CONTAINER_MAP = {
     StorageType.gcs: lambda: ic.storage.gcs_store(opts={}),
 }
 
+_FILE_LIST_BUILDER_MAP: dict[str, GriddedSourceConfig] = {
+    "ua-swann-4km": GriddedSourceConfig(
+        source_bucket="https://climate.arizona.edu",
+        build_file_list=build_ua_swann_4km_file_list,
+    ),
+}
+
 
 @flow(
     flow_run_name="ingest-gridded-data",
     timeout_seconds=60 * 60
 )
 def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
-    """Ingest gridded data from a specified storage type and glob pattern, and configure an IceChunk S3 repository.
+    """Ingest gridded data for a known configuration over a derived date range, and write to an IceChunk S3 repository.
 
     Parameters
     ----------
@@ -41,19 +53,32 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
     """
     logger = get_run_logger()
 
+    if args.configuration_name not in _FILE_LIST_BUILDER_MAP:
+        valid = list(_FILE_LIST_BUILDER_MAP.keys())
+        raise ValueError(
+            f"Unknown configuration_name '{args.configuration_name}'. "
+            f"Valid options: {valid}"
+        )
+    source_config = _FILE_LIST_BUILDER_MAP[args.configuration_name]
+    source_bucket = source_config.source_bucket
+
     parser = _PARSER_MAP[args.parser_type]()
     virtual_store = _VIRTUAL_CONTAINER_MAP[args.source_data_storage]()
 
-    # Create a list of files to ingest
-    file_list = gu.create_file_list(args.source_data_storage, args.glob_pattern, **args.fsspec_kwargs)
-    if len(file_list) == 0:
-        logger.warning(f"No files found matching the glob pattern: {args.glob_pattern}.")
-        raise ValueError(f"No files found matching the glob pattern: {args.glob_pattern}.")
-    logger.info(f"Found {len(file_list)} files to ingest.")
+    # Resolve end_dt — handle all types that arrive from Prefect UI and programmatic callers
+    end_dt = args.end_dt
+    if end_dt is None:
+        end_dt = datetime.now(UTC).replace(tzinfo=None)
+    elif isinstance(end_dt, str):
+        end_dt = datetime.fromisoformat(end_dt)
+    elif isinstance(end_dt, pd.Timestamp):
+        end_dt = end_dt.to_pydatetime().replace(tzinfo=None)
+    elif end_dt.tzinfo is not None:
+        end_dt = end_dt.replace(tzinfo=None)
 
     # Configure the IceChunk S3 repository with a virtual chunk container
     repo = gu.configure_icechunk_s3_repo(
-        args.source_bucket,
+        source_bucket,
         args.dest_bucket,
         prefix=f"{args.base_prefix}/{args.configuration_name}",
         virtual_store=virtual_store,
@@ -63,14 +88,39 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
         f"IceChunk S3 repo configured at: {args.dest_bucket}/{args.base_prefix}/{args.configuration_name}."
     )
 
+    # Determine start_dt from lookback days or latest value in store
+    if args.num_lookback_days is None:
+        logger.info("No lookback days provided, determining start date from latest data in store.")
+        ro_session = repo.writable_session("main")
+        if gu.group_contains_data(ro_session.store, RAW_DATA_GROUP_PATH):
+            existing_ds = gu.open_zarr_group(store=ro_session.store, group_path=RAW_DATA_GROUP_PATH)
+            latest_val = pd.Timestamp(existing_ds[args.append_dim].values.max()).to_pydatetime().replace(tzinfo=None)
+            start_dt = latest_val + timedelta(days=1)
+            logger.info(f"Latest {args.append_dim} in store: {latest_val}. Setting start_dt to {start_dt}.")
+        else:
+            start_dt = end_dt - timedelta(days=DEFAULT_LOOKBACK_DAYS)
+            logger.info(f"No existing data found. Falling back to {DEFAULT_LOOKBACK_DAYS}-day lookback: start_dt={start_dt}.")
+    else:
+        start_dt = end_dt - timedelta(days=args.num_lookback_days)
+        logger.info(f"Setting start_dt to {args.num_lookback_days} days before end_dt: start_dt={start_dt}.")
+
+    logger.info(f"Ingesting {args.configuration_name} from {start_dt} to {end_dt}.")
+
     # Create the ObjectStoreRegistry for the source data files
     registry = gu.create_objectstore_registry(
-        args.source_bucket,
+        source_bucket,
         **args.obstore_kwargs
     )
     logger.info(
-        f"ObjectStoreRegistry created for source_bucket: {args.source_bucket}."
+        f"ObjectStoreRegistry created for source_bucket: {source_bucket}."
     )
+
+    # Build the list of files for the resolved date range
+    file_list = source_config.build_file_list(start_dt, end_dt)
+    if len(file_list) == 0:
+        logger.warning(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
+        raise ValueError(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
+    logger.info(f"Found {len(file_list)} files to ingest.")
 
     # Read the data into a virtual (lazy) xarray dataset
     virtual_ds = gu.create_virtual_xarray_dataset(

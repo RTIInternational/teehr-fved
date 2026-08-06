@@ -518,12 +518,9 @@ deployments:
     parameters: {
       "args": {
         "source_data_storage": "http",
-        "glob_pattern": "https://climate.arizona.edu/data/UA_SWE/DailyData_4km/WY2026/UA_SWE_Depth_4km_v1_202510*_stable.nc",
-        "source_bucket": "https://climate.arizona.edu",
         "configuration_name": "ua-swann-4km",
         "factors": [1],
         "parser_type": "hdf",
-        "fsspec_kwargs": {},
         "obstore_kwargs": {},
         "xconcat_kwargs": {
           "coords": "minimal",

@@ -1,4 +1,3 @@
-import fsspec
 import xarray as xr
 from obstore.store import from_url
 from obspec_utils.registry import ObjectStoreRegistry
@@ -11,27 +10,6 @@ import os
 
 from prefect import task, get_run_logger
 from prefect.cache_policies import NO_CACHE
-
-
-@task(cache_policy=NO_CACHE)
-def create_file_list(source_data_storage: str, glob_pattern: str, **kwargs) -> list:
-    """Create a list of files from a source_data_storage and path.
-
-    Parameters
-    ----------
-    source_data_storage : str
-        The source_data_storage to use (e.g., "s3", "gcs", "local", "http").
-    glob_pattern : str
-        The glob pattern to match files.
-    **kwargs : dict
-        Additional keyword arguments to pass to the fsspec filesystem.
-    """
-    fs = fsspec.filesystem(source_data_storage, **kwargs)
-    file_list = fs.glob(glob_pattern)
-    # If source_data_storage is gcs, prepend "gs://" to each file path
-    if source_data_storage == "gcs":
-        file_list = [f"gs://{file}" for file in file_list]
-    return file_list
 
 
 @task(cache_policy=NO_CACHE)
