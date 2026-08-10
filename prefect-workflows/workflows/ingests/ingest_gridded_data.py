@@ -7,7 +7,7 @@ import xarray as xr
 import pandas as pd
 
 from utils import grid_utils as gu
-from utils.gridded_source_builders import GriddedSourceConfig, build_ua_swann_4km_file_list
+from utils.gridded_source_builders import GriddedSource, UASwan4km
 from models.ingest_gridded_data_input import (
     StorageType,
     IngestGriddedDataInput,
@@ -31,11 +31,8 @@ _VIRTUAL_CONTAINER_MAP = {
     StorageType.gcs: lambda: ic.storage.gcs_store(opts={}),
 }
 
-_FILE_LIST_BUILDER_MAP: dict[str, GriddedSourceConfig] = {
-    "ua-swann-4km": GriddedSourceConfig(
-        source_bucket="https://climate.arizona.edu",
-        build_file_list=build_ua_swann_4km_file_list,
-    ),
+_FILE_LIST_BUILDER_MAP: dict[str, GriddedSource] = {
+    "ua-swann-4km": UASwan4km(),
 }
 
 
@@ -106,6 +103,13 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
 
     logger.info(f"Ingesting {args.configuration_name} from {start_dt} to {end_dt}.")
 
+    # Build the list of files for the resolved date range
+    file_list = source_config.build_file_list(start_dt, end_dt)
+    if len(file_list) == 0:
+        logger.warning(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
+        raise ValueError(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
+    logger.info(f"Found {len(file_list)} files to ingest.")
+
     # Create the ObjectStoreRegistry for the source data files
     registry = gu.create_objectstore_registry(
         source_bucket,
@@ -114,13 +118,6 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
     logger.info(
         f"ObjectStoreRegistry created for source_bucket: {source_bucket}."
     )
-
-    # Build the list of files for the resolved date range
-    file_list = source_config.build_file_list(start_dt, end_dt)
-    if len(file_list) == 0:
-        logger.warning(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
-        raise ValueError(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
-    logger.info(f"Found {len(file_list)} files to ingest.")
 
     # Read the data into a virtual (lazy) xarray dataset
     virtual_ds = gu.create_virtual_xarray_dataset(
