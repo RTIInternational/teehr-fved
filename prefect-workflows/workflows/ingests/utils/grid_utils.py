@@ -146,12 +146,35 @@ def configure_icechunk_s3_repo(
     return repo
 
 
+def _open_virtual_safe(
+    url: str,
+    registry: ObjectStoreRegistry,
+    parser: vz.parsers,
+    ignore_missing_file: bool,
+) -> xr.Dataset | None:
+    """Open a virtual dataset safely, handling missing or unreadable files."""
+    logger = get_run_logger()
+    try:
+        return open_virtual_dataset(url, registry=registry, parser=parser)
+    except FileNotFoundError:
+        if not ignore_missing_file:
+            raise
+        logger.warning(f"Missing file skipped: {url}")
+        return None
+    except Exception as e:
+        if not ignore_missing_file:
+            raise
+        logger.warning(f"Corrupt or unreadable file skipped: {url} ({e})")
+        return None
+
+
 @task(cache_policy=NO_CACHE)
 def create_virtual_xarray_dataset(
     file_list: list,
     registry: ObjectStoreRegistry,
     parser: vz.parsers,
     concat_dim: str,
+    ignore_missing_file: bool = True,
     **kwargs
 ) -> xr.Dataset:
     """Create a virtual xarray dataset from a list of files.
@@ -166,14 +189,22 @@ def create_virtual_xarray_dataset(
         The parser to use for reading the files.
     concat_dim : str
         The dimension along which to concatenate the datasets.
+    ignore_missing_file : bool, optional
+        Whether to ignore missing or unreadable files. Default is True.
     **kwargs : dict
         Additional keyword arguments to pass to xr.concat.
     """
+    logger = get_run_logger()
     virtual_datasets = [
-        open_virtual_dataset(url, registry=registry, parser=parser) for url in file_list
+        ds for ds in (
+            _open_virtual_safe(url, registry, parser, ignore_missing_file)
+            for url in file_list
+        )
+        if ds is not None
     ]
     if len(virtual_datasets) == 0:
         raise ValueError("No virtual datasets were created. Check the file list and registry of the source data.")
+    logger.info(f"Found {len(virtual_datasets)} virtual datasets from {len(file_list)} files.")
     virtual_ds = xr.concat(
         virtual_datasets,
         dim=concat_dim,

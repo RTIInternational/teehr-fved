@@ -108,7 +108,7 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
     if len(file_list) == 0:
         logger.warning(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
         raise ValueError(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
-    logger.info(f"Found {len(file_list)} files to ingest.")
+    logger.info(f"Attempting to ingest {len(file_list)} files.")
 
     # Create the ObjectStoreRegistry for the source data files
     registry = gu.create_objectstore_registry(
@@ -148,9 +148,9 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
         append_dim=initial_append_dim
     )
     snapshot_id = rw_session.commit(
-        f"Wrote virtual references for {len(file_list)} files into {args.dest_bucket}/{args.base_prefix}/{args.configuration_name}"
+        f"Wrote virtual references into {args.dest_bucket}/{args.base_prefix}/{args.configuration_name}"
     )
-    logger.info(f"Wrote virtual references for {len(file_list)} files into {args.dest_bucket}/{args.base_prefix}/{args.configuration_name} with snapshot ID: {snapshot_id}")
+    logger.info(f"Wrote virtual references into {args.dest_bucket}/{args.base_prefix}/{args.configuration_name} with snapshot ID: {snapshot_id}")
 
     if args.write_materialized:
         rw_session = repo.writable_session("main")  # After any commit a session is reset to read-only
