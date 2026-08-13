@@ -4,4 +4,4 @@ metadata:
   name: prefect-job
   namespace: ${environment.namespace}
   annotations:
-    eks.amazonaws.com/role-arn: ${var.irsa.icebergReadWriteRoleArn}
+    eks.amazonaws.com/role-arn: ${var.irsa.prefectJobRoleArn}
