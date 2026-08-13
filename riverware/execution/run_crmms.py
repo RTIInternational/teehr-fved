@@ -113,6 +113,11 @@ def run_crmms(
     rcl_path = model_dir / "run_esp_mrm.rcl"
     log_path = model_dir / "run.log"
 
+    for stale in (log_path, rcl_path):
+        if stale.exists():
+            stale.unlink()
+            print(f"Removed stale file: {stale}")
+
     write_rcl(mdl_path, mrm_run_name, rcl_path)
     proc = launch_riverware(riverware_exe, rcl_path, log_path)
     monitor_log(log_path, proc)

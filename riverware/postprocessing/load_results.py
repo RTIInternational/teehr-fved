@@ -24,8 +24,13 @@ def run_postprocessing(
     configuration_name: str,
     parquet_path: Path | None = None,
     location_id_prefix: str = "crmms",
+    variable_name_map: dict[str, str] | None = None,
 ) -> pd.DataFrame:
-    """Extract all RDF outputs from model_dir; optionally write Parquet. Returns the DataFrame."""
+    """Extract all RDF outputs from model_dir; optionally write Parquet. Returns the DataFrame.
+
+    variable_name_map: optional overrides for slot-name → variable-name on top of
+    the built-in CRMMS_VARIABLE_MAP (see extract_outputs.py).
+    """
     from riverware.postprocessing.extract_outputs import extract_rdf_outputs
 
     model_dir = Path(model_dir)
@@ -34,6 +39,7 @@ def run_postprocessing(
         log_path=model_dir / "run.log",
         configuration_name=configuration_name,
         location_id_prefix=location_id_prefix,
+        variable_name_map=variable_name_map,
     )
 
     if parquet_path is not None:
