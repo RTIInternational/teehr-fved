@@ -58,6 +58,7 @@ environments:
         prefectJobRoleArn: arn:aws:iam::794457362858:role/fved-prefect-jobs-irsa
         sparkRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
         trinoRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-irsa
+        xpublishRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
       iceberg:
         inCluster: "false"
         catalogS3PathStyleAccess: "false"
