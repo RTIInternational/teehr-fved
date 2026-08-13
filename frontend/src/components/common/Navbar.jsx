@@ -91,6 +91,7 @@ const Navbar = () => {
       '/forecast': 'Forecast Analysis',
       '/data': 'Data Availability',
       '/nwmd': 'National Water Model Diagnostics',
+      '/gridded': 'Snow Dashboard',
       '/admin': 'Admin Page',
       '/admin/api-keys': 'API Keys',
       '/admin/keycloak': 'Keycloak Admin',
@@ -135,12 +136,12 @@ const Navbar = () => {
               className="d-inline-block align-text-top navbar-teehr-logo"
             />
           </Link>
-          <Link to="https://ciroh.ua.edu/" className="d-inline-flex align-items-center" aria-label="CIROH Home">
+          <Link to="https://www.usbr.gov/" className="d-inline-flex align-items-center" aria-label="USBR Home">
             <img
-              src="https://raw.githubusercontent.com/RTIInternational/teehr/main/docs/images/readme/CIROHLogo_200x200.png"
-              alt="CIROH logo"
+              src="/usbr-seal-white.png"
+              alt="USBR logo"
               height="32"
-              className="navbar-ciroh-logo"
+              className="navbar-usbr-logo"
             />
           </Link>
           <div className="dropdown" ref={dashboardsDropdownRef}>
@@ -174,6 +175,11 @@ const Navbar = () => {
               <li>
                 <Link className="dropdown-item ps-4" to="/forecast" onClick={() => setIsDashboardsOpen(false)}>
                   Forecast Analysis
+                </Link>
+              </li>
+              <li>
+                <Link className="dropdown-item ps-4" to="/gridded" onClick={() => setIsDashboardsOpen(false)}>
+                  Snow Dashboard
                 </Link>
               </li>
             </ul>

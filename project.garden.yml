@@ -23,7 +23,7 @@ environments:
     variables:
       hostname: teehr.local.app.garden
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 267f8a75034132aefe84749af10ab1562a6ac169
+      devTeehrVersion: da04e8836bcbfac77f079a2d94b20592f28c15ca
       stableTeehrVersion: place-holder # Needed for sync to work for some reason.
       previousTeehrVersion: place-holder
       iceberg:
@@ -40,12 +40,16 @@ environments:
         catalog: iceberg
         schema: teehr
       allowedOrigins: "https://dashboards.${var.hostname},https://api.${var.hostname}"
+      icechunk:
+        bucket: "warehouse"
+        prefix: "icechunk-ingests"
+        repos: "ua-swann-4km,snodas-4km,cu-swe-4km"
   - name: remote
     defaultNamespace: ${project.name}
     variables:
       hostname: dev.low.amzifved.aws.rti.org
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 267f8a75034132aefe84749af10ab1562a6ac169
+      devTeehrVersion: da04e8836bcbfac77f079a2d94b20592f28c15ca
       stableTeehrVersion: v0.6.5
       previousTeehrVersion: v0.5.3
       irsa:
@@ -54,6 +58,7 @@ environments:
         prefectJobRoleArn: arn:aws:iam::794457362858:role/fved-prefect-jobs-irsa
         sparkRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
         trinoRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-irsa
+        xpublishRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
       iceberg:
         inCluster: "false"
         catalogS3PathStyleAccess: "false"
@@ -69,6 +74,10 @@ environments:
         catalog: iceberg
         schema: teehr
       allowedOrigins: "https://dashboards.${var.hostname},https://api.${var.hostname}"
+      icechunk:
+        bucket: "dev-fved-icechunk-warehouse-rti-use1"
+        prefix: "icechunk-ingests"
+        repos: "ua-swann-4km,snodas-4km,cu-swe-4km"
 providers:
   # The name of the provider plugin to use.
   - name: local-kubernetes

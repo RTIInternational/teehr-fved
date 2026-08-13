@@ -46,6 +46,8 @@ definitions:
         REMOTE_CATALOG_TYPE: "{{ $REMOTE_CATALOG_TYPE }}"
         REMOTE_WAREHOUSE_S3_PATH: "{{ $REMOTE_WAREHOUSE_S3_PATH }}"
         IN_CLUSTER: "{{ $IN_CLUSTER }}"
+        ICECHUNK_BUCKET: "{{ $ICECHUNK_BUCKET }}"
+        ICECHUNK_PREFIX: "{{ $ICECHUNK_PREFIX }}"
       node_selector:
         teehr-hub/nodegroup-name: spark-r5-4xlarge
       tolerations:
@@ -504,6 +506,42 @@ deployments:
     parameters: {
       "temp_dir_path": *temp_dir_path,
       "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
+  # Gridded Data Ingests
+  - name: ingest-ua-4km-grids
+    version:
+    tags: []
+    description: Ingest UA 4km SWE and DEPTH variables into an IceChunk S3 repository using VirtualiZarr
+    entrypoint: workflows/ingests/ingest_gridded_data.py:ingest_gridded_data
+    parameters: {
+      "args": {
+        "source_data_storage": "http",
+        "configuration_name": "ua-swann-4km",
+        "factors": [1],
+        "parser_type": "hdf",
+        "obstore_kwargs": {},
+        "xconcat_kwargs": {
+          "coords": "minimal",
+          "compat": "override",
+          "combine_attrs": "override"
+        }
+      }
+    }
+    work_pool: *work_pool
+
+  # Gridded Pyramid Builds
+  - name: build-ua-4km-grids-pyramids
+    version:
+    tags: []
+    description: Build multiscale pyramids for the UA 4km SWE/DEPTH IceChunk repository
+    entrypoint: workflows/ingests/build_geozarr_pyramids.py:build_pyramids
+    parameters: {
+      "args": {
+        "configuration_name": "ua-swann-4km",
+        "factors": [1]
+      }
     }
     work_pool: *work_pool
 

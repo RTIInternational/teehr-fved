@@ -707,6 +707,42 @@ deployments:
       cron: "29 * * * *"
       active: false
 
+  # Gridded Data Ingests
+  - name: ingest-ua-4km-grids
+    version:
+    tags: []
+    description: Ingest UA 4km SWE and DEPTH variables into an IceChunk S3 repository using VirtualiZarr
+    entrypoint: workflows/ingests/ingest_gridded_data.py:ingest_gridded_data
+    parameters: {
+      "args": {
+        "source_data_storage": "http",
+        "configuration_name": "ua-swann-4km",
+        "factors": [1],
+        "parser_type": "hdf",
+        "obstore_kwargs": {},
+        "xconcat_kwargs": {
+          "coords": "minimal",
+          "compat": "override",
+          "combine_attrs": "override"
+        }
+      }
+    }
+    work_pool: *work_pool
+
+  # Gridded Pyramid Builds
+  - name: build-ua-4km-grids-pyramids
+    version:
+    tags: []
+    description: Build multiscale pyramids for the UA 4km SWE/DEPTH IceChunk repository
+    entrypoint: workflows/ingests/build_geozarr_pyramids.py:build_pyramids
+    parameters: {
+      "args": {
+        "configuration_name": "ua-swann-4km",
+        "factors": [1]
+      }
+    }
+    work_pool: *work_pool
+
   # Maintenance and Metrics Workflows
   - name: update-joined-forecast-table
     version:
@@ -832,4 +868,3 @@ deployments:
     entrypoint: workflows/riverware/riverware_ssm_run.py:run_riverware_python_script
     parameters: {"script_path": 'C:\FVED\Scripts\ssm_test.py'}
     work_pool: *work_pool
-    
