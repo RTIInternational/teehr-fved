@@ -7,7 +7,7 @@
 // belowmincolor=transparent parameter.
 
 export const DEFAULT_VARIABLE_STYLE = {
-  colorRamp: 'raster/plasma',
+  colorRamp: 'raster/turbo',
   min: 0,
   max: 100,
   units: null,
@@ -15,15 +15,15 @@ export const DEFAULT_VARIABLE_STYLE = {
 
 export const VARIABLE_STYLES = {
   SWE: {
-    colorRamp: 'raster/Blues',
+    colorRamp: 'raster/turbo',
     min: 0.001,
-    max: 40,
+    max: 100,
     units: 'mm',
   },
   DEPTH: {
-    colorRamp: 'raster/viridis',
+    colorRamp: 'raster/turbo',
     min: 0.001,
-    max: 40,
+    max: 100,
     units: 'mm',
   },
   RAINRATE: {
