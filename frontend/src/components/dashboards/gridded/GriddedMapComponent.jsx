@@ -61,8 +61,8 @@ const GriddedMapComponent = () => {
         sources: {},
         layers: [],
       },
-      center: [-95.7129, 37.0902],
-      zoom: 4,
+      center: [-111.2, 40.48],
+      zoom: 4.5,
       attributionControl: false,
       // Add the Bearer token to every tile request aimed at the xpublish-api.
       // transformRequest is synchronous — tokenRef is kept current by updateTileLayer.
