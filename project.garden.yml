@@ -75,7 +75,7 @@ environments:
         schema: teehr
       allowedOrigins: "https://dashboards.${var.hostname},https://api.${var.hostname}"
       icechunk:
-        bucket: "teehr_icechunk_warehouse"
+        bucket: "dev-fved-icechunk-warehouse-rti-use1"
         prefix: "icechunk-ingests"
         repos: "ua-swann-4km,snodas-4km,cu-swe-4km"
 providers:

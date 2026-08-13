@@ -13,8 +13,8 @@ class UASwan4km(GriddedSource):
     source_bucket = "https://climate.arizona.edu"
 
     def __init__(self, status: list[str] = None):
-        # status controls which product variant to fetch: "stable", "provisional", etc.
-        self.status = status or ["stable"]
+        # status controls which data variant to fetch: "stable", "provisional", or "early".
+        self.status = status or ["stable", "provisional", "early"]
 
     def build_file_list(self, start_dt: datetime, end_dt: datetime) -> list[str]:
         """Build UA SWANN 4km daily SWE/depth file URLs for the given date range and status(es)."""
