@@ -91,7 +91,7 @@ const griddedDashboardReducer = (state, action) => {
       const id = action.payload;
       const next = state.activeOverlays.includes(id)
         ? state.activeOverlays.filter((x) => x !== id)
-        : [...state.activeOverlays, id];
+        : [id];
       return { ...state, activeOverlays: next };
     }
 

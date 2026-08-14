@@ -28,6 +28,10 @@ const GriddedMapComponent = () => {
   const [overlayLegends, setOverlayLegends] = useState({});
   const fetchedLegends = useRef(new Set());
 
+  const [legendBlobUrl, setLegendBlobUrl] = useState(null);
+  // Kept in a ref so the cleanup closure always sees the latest URL to revoke
+  const prevLegendBlobUrl = useRef(null);
+
   // Fetch ArcGIS legend JSON for newly-activated overlays that declare a legendUrl.
   useEffect(() => {
     const toFetch = OVERLAY_LAYERS.filter(
@@ -49,6 +53,44 @@ const GriddedMapComponent = () => {
       }
     });
   }, [activeOverlays]);
+
+  useEffect(() => {
+    if (!dataset || !variable || !mapLoaded) {
+      setLegendBlobUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const token = await ensureFreshToken();
+      const params = new URLSearchParams({
+        variables: variable,
+        style: colorRamp,
+        colorscalerange: `${colorRampMin},${colorRampMax}`,
+        belowmincolor: 'transparent',
+        f: 'image/png',
+        background_color: 'white',
+        width: '80',   // px
+        height: '200', // px
+      });
+      const url = `${GRIDDED_API_BASE_URL}/api/datasets/${encodeURIComponent(dataset)}/tiles/legend?${params}`;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      try {
+        const res = await fetch(url, { headers });
+        if (!res.ok || cancelled) return;
+        const blob = await res.blob();
+        if (cancelled) return;
+        const blobUrl = URL.createObjectURL(blob);
+        if (prevLegendBlobUrl.current) URL.revokeObjectURL(prevLegendBlobUrl.current);
+        prevLegendBlobUrl.current = blobUrl;
+        setLegendBlobUrl(blobUrl);
+      } catch {
+        // Legend fetch failure is non-critical; silently skip.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [mapLoaded, dataset, variable, colorRamp, colorRampMin, colorRampMax]);
 
   // Initialize map once on mount
   useEffect(() => {
@@ -233,25 +275,31 @@ const GriddedMapComponent = () => {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />
-      {activeLegendEntries.length > 0 && (
+      {(legendBlobUrl || activeLegendEntries.length > 0) && (
         <div
           style={{
             position: 'absolute',
-            bottom: '28px',
+            bottom: '8px',
             right: '8px',
             background: 'rgba(255,255,255,0.92)',
             border: '1px solid #ccc',
             borderRadius: '4px',
             padding: '6px 8px',
-            fontSize: '0.72rem',
             maxHeight: '40vh',
             overflowY: 'auto',
             pointerEvents: 'none',
             zIndex: 1,
           }}
         >
+          {legendBlobUrl && (
+            <img
+              src={legendBlobUrl}
+              alt="Legend"
+              style={{ display: 'block', marginBottom: activeLegendEntries.length > 0 ? '8px' : 0 }}
+            />
+          )}
           {activeLegendEntries.map(({ label, entries }) => (
-            <div key={label} style={{ marginBottom: entries.length > 1 ? '6px' : 0 }}>
+            <div key={label} style={{ fontSize: '0.72rem', marginBottom: entries.length > 1 ? '6px' : 0 }}>
               <div style={{ fontWeight: 600, marginBottom: '2px' }}>{label}</div>
               {entries.map((entry, i) => (
                 <div key={i} className="d-flex align-items-center gap-1">

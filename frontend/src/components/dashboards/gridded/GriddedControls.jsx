@@ -196,7 +196,8 @@ const GriddedControls = () => {
           <Col md={12}>
             <button
               type="button"
-              className="small fw-bold btn btn-link p-0 text-decoration-none text-reset d-flex align-items-center gap-1"
+              className="small btn btn-link p-0 text-decoration-none d-flex align-items-center gap-1"
+              style={{ color: '#555658', fontWeight: 700 }}
               onClick={() => setOverlaysExpanded((v) => !v)}
               aria-expanded={overlaysExpanded}
             >
@@ -224,7 +225,8 @@ const GriddedControls = () => {
           <Col md={12}>
             <button
               type="button"
-              className="small fw-bold btn btn-link p-0 text-decoration-none text-reset d-flex align-items-center gap-1"
+              className="small btn btn-link p-0 text-decoration-none d-flex align-items-center gap-1"
+              style={{ color: '#555658', fontWeight: 700 }}
               onClick={() => setMapControlsExpanded((v) => !v)}
               aria-expanded={mapControlsExpanded}
             >
