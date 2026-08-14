@@ -5,7 +5,7 @@ import DashboardPanel from '../../common/dashboard/DashboardPanel.jsx';
 
 const GriddedTimeseriesPanel = () => {
   const { state } = useGriddedDashboard();
-  const { timeseriesData, timeseriesLoading, timeseriesError, clickedPoint } = state;
+  const { timeseriesData, timeseriesLoading, timeseriesError, clickedPoint, variableAttrs } = state;
   const plotRef = useRef(null);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ const GriddedTimeseriesPanel = () => {
       ],
       {
         title: {
-          text: `${variable} at (${Math.abs(lat).toFixed(4)}°${latHem}, ${Math.abs(lon).toFixed(4)}°${lonHem})`,
+          text: `${variable}${variableAttrs[variable]?.units ? ` (${variableAttrs[variable].units})` : ''} at (${Math.abs(lat).toFixed(4)}°${latHem}, ${Math.abs(lon).toFixed(4)}°${lonHem})`,
           font: { size: 13 },
         },
         xaxis: { title: 'Time', type: 'date' },

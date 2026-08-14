@@ -16,6 +16,7 @@ from models.ingest_gridded_data_input import (
     REFERENCES_GROUP_PATH
 )
 from build_geozarr_pyramids import build_pyramids as build_pyramids_flow
+from models.mean_areal_inputs import VARIABLE_AND_UNIT_MAPPER
 
 
 DEFAULT_LOOKBACK_DAYS = 1
@@ -134,10 +135,21 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
     rw_session = repo.writable_session("main")
     if gu.group_contains_data(rw_session.store, REFERENCES_GROUP_PATH):
         initial_append_dim = args.append_dim
+        existing_ds = gu.open_zarr_group(
+            store=rw_session.store,
+            group_path=REFERENCES_GROUP_PATH
+        )
+        virtual_ds = gu.filter_for_new_data(
+            incoming_ds=virtual_ds,
+            existing_ds=existing_ds,
+            append_dim=args.append_dim,
+        )
     else:
         initial_append_dim = None
 
-    # TODO: Upsert manually (use zarr's "region" for append dim)
+    if virtual_ds is None:
+        logger.info(f"No new data steps found in {REFERENCES_GROUP_PATH}. Shutting down.")
+        return
 
     # Write virtual references to the IceChunk repository
     logger.info(f"Writing virtual references.")
@@ -172,6 +184,7 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
             source_crs=args.source_crs,
             x_dim=args.x_dim,
             y_dim=args.y_dim,
+            variable_and_unit_mapper=VARIABLE_AND_UNIT_MAPPER,
         )
 
         # Check to see if data exists

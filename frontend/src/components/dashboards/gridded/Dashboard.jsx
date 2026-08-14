@@ -109,9 +109,10 @@ const Dashboard = () => {
               gridColumn: '2 / 3',
               gridRow: state.error ? '2 / 3' : '1 / 2',
               minHeight: 0,
+              height: '680px',
             }}
           >
-            <DashboardPanel header={<span className="small fw-bold">Display Options</span>} bodyStyle={{ padding: '8px' }}>
+            <DashboardPanel>
               <GriddedControls />
             </DashboardPanel>
           </div>

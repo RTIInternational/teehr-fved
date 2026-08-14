@@ -14,7 +14,8 @@ const COLOR_RAMPS = [
 ];
 
 const GriddedControls = () => {
-  const [overlaysExpanded, setOverlaysExpanded] = useState(true);
+  const [overlaysExpanded, setOverlaysExpanded] = useState(false);
+  const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const { state, dispatch } = useGriddedDashboard();
   const { loadVariables, loadTimesteps } = useGriddedDataFetching();
   const { datasets, variables, timesteps, mapFilters, activeOverlays, variableAttrs } = state;
@@ -109,33 +110,6 @@ const GriddedControls = () => {
     <div className="h-100 d-flex flex-column overflow-auto p-1">
       <Form>
         <Row className="g-2">
-          {/* Overlay layer toggles */}
-          <Col md={12}>
-            <button
-              type="button"
-              className="small fw-bold btn btn-link p-0 text-decoration-none text-reset d-flex align-items-center gap-1"
-              onClick={() => setOverlaysExpanded((v) => !v)}
-              aria-expanded={overlaysExpanded}
-            >
-              <span style={{ fontSize: '0.65rem' }}>{overlaysExpanded ? '▼' : '▶'}</span>
-              <span>Overlay Layers</span>
-            </button>
-            {overlaysExpanded && (
-              <div className="mt-1">
-                {OVERLAY_LAYERS.map((overlay) => (
-                  <Form.Check
-                    key={overlay.id}
-                    type="checkbox"
-                    id={`overlay-${overlay.id}`}
-                    label={<span style={{ fontSize: '0.8rem' }}>{overlay.label}</span>}
-                    checked={activeOverlays.includes(overlay.id)}
-                    onChange={() => dispatch({ type: ActionTypes.TOGGLE_OVERLAY, payload: overlay.id })}
-                    className="mb-1"
-                  />
-                ))}
-              </div>
-            )}
-          </Col>
 
           {/* Dataset selector */}
           <Col md={12}>
@@ -218,44 +192,87 @@ const GriddedControls = () => {
             )}
           </Col>
 
-          {/* Color ramp */}
+          {/* Overlay layer toggles */}
           <Col md={12}>
-            <Form.Group>
-              <Form.Label className="small fw-bold">Color Scale</Form.Label>
-              <Form.Select
-                size="sm"
-                value={colorRamp}
-                onChange={handleColorRampChange}
-              >
-                {COLOR_RAMPS.map((cr) => (
-                  <option key={cr.value} value={cr.value}>{cr.label}</option>
+            <button
+              type="button"
+              className="small btn btn-link p-0 text-decoration-none d-flex align-items-center gap-1"
+              style={{ color: '#555658', fontWeight: 700 }}
+              onClick={() => setOverlaysExpanded((v) => !v)}
+              aria-expanded={overlaysExpanded}
+            >
+              <span style={{ fontSize: '0.65rem' }}>{overlaysExpanded ? '▼' : '▶'}</span>
+              <span>Overlay Layers</span>
+            </button>
+            {overlaysExpanded && (
+              <div className="mt-1">
+                {OVERLAY_LAYERS.map((overlay) => (
+                  <Form.Check
+                    key={overlay.id}
+                    type="checkbox"
+                    id={`overlay-${overlay.id}`}
+                    label={<span style={{ fontSize: '0.8rem' }}>{overlay.label}</span>}
+                    checked={activeOverlays.includes(overlay.id)}
+                    onChange={() => dispatch({ type: ActionTypes.TOGGLE_OVERLAY, payload: overlay.id })}
+                    className="mb-1"
+                  />
                 ))}
-              </Form.Select>
-            </Form.Group>
+              </div>
+            )}
           </Col>
 
-          {/* Color ramp range */}
-          <Col md={6}>
-            <Form.Group>
-              <Form.Label className="small fw-bold">Min{units ? ` (${units})` : ''}</Form.Label>
-              <Form.Control
-                size="sm"
-                type="number"
-                value={colorRampMin}
-                onChange={(e) => handleRangeChange('colorRampMin', e.target.value)}
-              />
-            </Form.Group>
-          </Col>
-          <Col md={6}>
-            <Form.Group>
-              <Form.Label className="small fw-bold">Max{units ? ` (${units})` : ''}</Form.Label>
-              <Form.Control
-                size="sm"
-                type="number"
-                value={colorRampMax}
-                onChange={(e) => handleRangeChange('colorRampMax', e.target.value)}
-              />
-            </Form.Group>
+          {/* Map controls (color ramp + range) */}
+          <Col md={12}>
+            <button
+              type="button"
+              className="small btn btn-link p-0 text-decoration-none d-flex align-items-center gap-1"
+              style={{ color: '#555658', fontWeight: 700 }}
+              onClick={() => setMapControlsExpanded((v) => !v)}
+              aria-expanded={mapControlsExpanded}
+            >
+              <span style={{ fontSize: '0.65rem' }}>{mapControlsExpanded ? '▼' : '▶'}</span>
+              <span>Map Controls</span>
+            </button>
+            {mapControlsExpanded && (
+              <Row className="g-2 mt-0">
+                <Col md={12}>
+                  <Form.Group>
+                    <Form.Label className="small fw-bold">Color Scale</Form.Label>
+                    <Form.Select
+                      size="sm"
+                      value={colorRamp}
+                      onChange={handleColorRampChange}
+                    >
+                      {COLOR_RAMPS.map((cr) => (
+                        <option key={cr.value} value={cr.value}>{cr.label}</option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label className="small fw-bold">Min{units ? ` (${units})` : ''}</Form.Label>
+                    <Form.Control
+                      size="sm"
+                      type="number"
+                      value={colorRampMin}
+                      onChange={(e) => handleRangeChange('colorRampMin', e.target.value)}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label className="small fw-bold">Max{units ? ` (${units})` : ''}</Form.Label>
+                    <Form.Control
+                      size="sm"
+                      type="number"
+                      value={colorRampMax}
+                      onChange={(e) => handleRangeChange('colorRampMax', e.target.value)}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            )}
           </Col>
         </Row>
       </Form>
