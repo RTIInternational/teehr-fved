@@ -14,19 +14,19 @@ export const DEFAULT_VARIABLE_STYLE = {
 };
 
 export const VARIABLE_STYLES = {
-  SWE: {
+  swe_daily_mean: {
     colorRamp: 'raster/turbo',
     min: 0.001,
     max: 100,
     units: 'mm',
   },
-  DEPTH: {
+  depth_daily_mean: {
     colorRamp: 'raster/turbo',
     min: 0.001,
     max: 100,
     units: 'mm',
   },
-  RAINRATE: {
+  rainrate_hourly_mean: {
     colorRamp: 'raster/turbo',
     min: 0.001,
     max: 0.005,

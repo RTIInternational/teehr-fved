@@ -16,6 +16,7 @@ from models.ingest_gridded_data_input import (
     REFERENCES_GROUP_PATH
 )
 from build_geozarr_pyramids import build_pyramids as build_pyramids_flow
+from models.mean_areal_inputs import VARIABLE_AND_UNIT_MAPPER
 
 
 DEFAULT_LOOKBACK_DAYS = 1
@@ -172,6 +173,7 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
             source_crs=args.source_crs,
             x_dim=args.x_dim,
             y_dim=args.y_dim,
+            variable_and_unit_mapper=VARIABLE_AND_UNIT_MAPPER,
         )
 
         # Check to see if data exists
