@@ -135,10 +135,21 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
     rw_session = repo.writable_session("main")
     if gu.group_contains_data(rw_session.store, REFERENCES_GROUP_PATH):
         initial_append_dim = args.append_dim
+        existing_ds = gu.open_zarr_group(
+            store=rw_session.store,
+            group_path=REFERENCES_GROUP_PATH
+        )
+        virtual_ds = gu.filter_for_new_data(
+            incoming_ds=virtual_ds,
+            existing_ds=existing_ds,
+            append_dim=args.append_dim,
+        )
     else:
         initial_append_dim = None
 
-    # TODO: Upsert manually (use zarr's "region" for append dim)
+    if virtual_ds is None:
+        logger.info(f"No new data steps found in {REFERENCES_GROUP_PATH}. Shutting down.")
+        return
 
     # Write virtual references to the IceChunk repository
     logger.info(f"Writing virtual references.")
