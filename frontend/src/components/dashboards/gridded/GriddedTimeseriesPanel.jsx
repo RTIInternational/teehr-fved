@@ -36,7 +36,7 @@ const GriddedTimeseriesPanel = () => {
         margin: { t: 40, r: 20, b: 50, l: 60 },
         autosize: true,
       },
-      { responsive: true, displayModeBar: false },
+      { responsive: true, displayModeBar: false }
     );
   }, [timeseriesData]);
 

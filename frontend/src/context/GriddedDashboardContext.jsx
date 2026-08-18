@@ -2,9 +2,9 @@
 import { createContext, useContext, useReducer } from 'react';
 
 const initialGriddedState = {
-  datasets: [],       // string[] — available dataset names from xpublish
-  variables: [],      // string[] — variables for the selected dataset
-  timesteps: [],      // string[] — ISO datetime strings for selected dataset+variable
+  datasets: [], // string[] — available dataset names from xpublish
+  variables: [], // string[] — variables for the selected dataset
+  timesteps: [], // string[] — ISO datetime strings for selected dataset+variable
 
   mapFilters: {
     dataset: null,
@@ -15,14 +15,14 @@ const initialGriddedState = {
     colorRampMax: 100,
   },
 
-  activeOverlays: [],   // string[] of overlay IDs currently shown on the map
+  activeOverlays: [], // string[] of overlay IDs currently shown on the map
 
-  variableAttrs: {},    // { [varName]: { units, long_name, ... } } — from /variable-attrs endpoint
+  variableAttrs: {}, // { [varName]: { units, long_name, ... } } — from /variable-attrs endpoint
 
-  clickedPoint: null,       // { lon, lat } | null — last point clicked on the map
+  clickedPoint: null, // { lon, lat } | null — last point clicked on the map
   timeseriesLoading: false,
   timeseriesError: null,
-  timeseriesData: null,     // { times: string[], values: number[], lon, lat, variable } | null
+  timeseriesData: null, // { times: string[], values: number[], lon, lat, variable } | null
 
   mapLoaded: false,
   loading: false,
@@ -107,7 +107,12 @@ const griddedDashboardReducer = (state, action) => {
       return { ...state, timeseriesLoading: action.payload };
 
     case ActionTypes.SET_TIMESERIES_DATA:
-      return { ...state, timeseriesData: action.payload, timeseriesLoading: false, timeseriesError: null };
+      return {
+        ...state,
+        timeseriesData: action.payload,
+        timeseriesLoading: false,
+        timeseriesError: null,
+      };
 
     case ActionTypes.SET_TIMESERIES_ERROR:
       return { ...state, timeseriesError: action.payload, timeseriesLoading: false };

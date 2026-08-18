@@ -7,7 +7,10 @@ import { ensureFreshToken } from '../../../auth/keycloak.js';
 import { OVERLAY_LAYERS } from './overlayLayers.js';
 
 const escapeHtml = (str) =>
-  String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  String(str).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
 
 const GriddedMapComponent = () => {
   const { state, dispatch } = useGriddedDashboard();
@@ -35,7 +38,7 @@ const GriddedMapComponent = () => {
   // Fetch ArcGIS legend JSON for newly-activated overlays that declare a legendUrl.
   useEffect(() => {
     const toFetch = OVERLAY_LAYERS.filter(
-      (o) => activeOverlays.includes(o.id) && o.legendUrl && !fetchedLegends.current.has(o.id),
+      (o) => activeOverlays.includes(o.id) && o.legendUrl && !fetchedLegends.current.has(o.id)
     );
     if (toFetch.length === 0) return;
 
@@ -70,7 +73,7 @@ const GriddedMapComponent = () => {
         belowmincolor: 'transparent',
         f: 'image/png',
         background_color: 'white',
-        width: '80',   // px
+        width: '80', // px
         height: '200', // px
       });
       const url = `${GRIDDED_API_BASE_URL}/api/datasets/${encodeURIComponent(dataset)}/tiles/legend?${params}`;
@@ -89,7 +92,9 @@ const GriddedMapComponent = () => {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [mapLoaded, dataset, variable, colorRamp, colorRampMin, colorRampMax]);
 
   // Initialize map once on mount
@@ -138,7 +143,10 @@ const GriddedMapComponent = () => {
       console.error('GriddedMapComponent: MapLibre error:', e);
       // e.sourceId is set for tile/source errors (e.g. 404 for areas with no data); only surface fatal map errors.
       if (!e.sourceId) {
-        dispatch({ type: ActionTypes.SET_ERROR, payload: `Map error: ${e.error?.message || 'Unknown error'}` });
+        dispatch({
+          type: ActionTypes.SET_ERROR,
+          payload: `Map error: ${e.error?.message || 'Unknown error'}`,
+        });
       }
     });
 
@@ -170,7 +178,7 @@ const GriddedMapComponent = () => {
       currentTimestep,
       colorRamp,
       colorRampMin,
-      colorRampMax,
+      colorRampMax
     );
 
     mapInstance.addSource('gridded-tiles', {
@@ -241,7 +249,7 @@ const GriddedMapComponent = () => {
           variable,
           currentTimestep,
           lng,
-          lat,
+          lat
         );
         popup.current.setHTML(`
           <div style="padding:8px; font-size:0.85rem;">
@@ -254,7 +262,9 @@ const GriddedMapComponent = () => {
         `);
       } catch (err) {
         console.error('GriddedMapComponent: EDR point query failed:', err);
-        popup.current.setHTML('<div style="padding:6px; font-size:0.8rem; color:#dc3545;">Failed to retrieve value.</div>');
+        popup.current.setHTML(
+          '<div style="padding:6px; font-size:0.8rem; color:#dc3545;">Failed to retrieve value.</div>'
+        );
       }
     };
 
@@ -268,9 +278,9 @@ const GriddedMapComponent = () => {
     };
   }, [mapLoaded, dataset, variable, currentTimestep]);
 
-  const activeLegendEntries = OVERLAY_LAYERS
-    .filter((o) => activeOverlays.includes(o.id) && overlayLegends[o.id])
-    .map((o) => ({ label: o.label, entries: overlayLegends[o.id] }));
+  const activeLegendEntries = OVERLAY_LAYERS.filter(
+    (o) => activeOverlays.includes(o.id) && overlayLegends[o.id]
+  ).map((o) => ({ label: o.label, entries: overlayLegends[o.id] }));
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -299,7 +309,10 @@ const GriddedMapComponent = () => {
             />
           )}
           {activeLegendEntries.map(({ label, entries }) => (
-            <div key={label} style={{ fontSize: '0.72rem', marginBottom: entries.length > 1 ? '6px' : 0 }}>
+            <div
+              key={label}
+              style={{ fontSize: '0.72rem', marginBottom: entries.length > 1 ? '6px' : 0 }}
+            >
               <div style={{ fontWeight: 600, marginBottom: '2px' }}>{label}</div>
               {entries.map((entry, i) => (
                 <div key={i} className="d-flex align-items-center gap-1">

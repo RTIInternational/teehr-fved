@@ -9,22 +9,24 @@
  */
 export const formatVariableName = (variableName) => {
   if (!variableName) return 'Value';
-  
+
   // Lookup table for variable name overrides
   const variableLookup = {
-    'streamflow_hourly_inst': 'Streamflow (Hourly Instantaneous)',
-    'streamflow_daily_mean': 'Streamflow (Daily Mean)',
-    'precipitation': 'Precipitation',
-    'temperature': 'Temperature',
-    'water_temperature': 'Water Temperature'
+    streamflow_hourly_inst: 'Streamflow (Hourly Instantaneous)',
+    streamflow_daily_mean: 'Streamflow (Daily Mean)',
+    precipitation: 'Precipitation',
+    temperature: 'Temperature',
+    water_temperature: 'Water Temperature',
   };
-  
+
   // Return override if exists, otherwise convert snake_case to Title Case
-  return variableLookup[variableName] || 
+  return (
+    variableLookup[variableName] ||
     variableName
       .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  );
 };
 
 /**
@@ -34,25 +36,25 @@ export const formatVariableName = (variableName) => {
  */
 export const formatUnitName = (unitName) => {
   if (!unitName) return '';
-  
+
   // Lookup table for unit overrides
   const unitLookup = {
     'm3/s': 'm³/s',
     'm^3/s': 'm³/s',
-    'cubic_meters_per_second': 'm³/s',
-    'cms': 'm³/s',
-    'cfs': 'ft³/s',
-    'cubic_feet_per_second': 'ft³/s',
-    'deg_c': '°C',
-    'celsius': '°C',
-    'deg_f': '°F',
-    'fahrenheit': '°F',
-    'millimeters': 'mm',
-    'inches': 'in',
-    'meters': 'm',
-    'feet': 'ft'
+    cubic_meters_per_second: 'm³/s',
+    cms: 'm³/s',
+    cfs: 'ft³/s',
+    cubic_feet_per_second: 'ft³/s',
+    deg_c: '°C',
+    celsius: '°C',
+    deg_f: '°F',
+    fahrenheit: '°F',
+    millimeters: 'mm',
+    inches: 'in',
+    meters: 'm',
+    feet: 'ft',
   };
-  
+
   // Return override if exists, otherwise return raw string
   return unitLookup[unitName.toLowerCase()] || unitName;
 };
@@ -68,7 +70,7 @@ export const getYAxisTitle = (primaryData, secondaryData, filters) => {
   // Try to get unit from the data first
   let unit = null;
   let variable = null;
-  
+
   if (primaryData?.length > 0 && primaryData[0]?.unit_name) {
     unit = primaryData[0].unit_name;
     variable = primaryData[0].variable_name || filters.variable;
@@ -76,15 +78,15 @@ export const getYAxisTitle = (primaryData, secondaryData, filters) => {
     unit = secondaryData[0].unit_name;
     variable = secondaryData[0].variable_name || filters.variable;
   }
-  
+
   // Format the variable and unit names
   const formattedVariable = formatVariableName(variable || filters.variable);
   const formattedUnit = formatUnitName(unit);
-  
+
   // Return formatted title
   if (formattedUnit) {
     return `${formattedVariable} (${formattedUnit})`;
   }
-  
+
   return formattedVariable;
 };

@@ -1,7 +1,8 @@
 // Gridded / xpublish API service backed by VITE_XPUBLISH_API_BASE_URL
 import { ensureFreshToken } from '../auth/keycloak';
 
-export const GRIDDED_API_BASE_URL = import.meta.env.VITE_XPUBLISH_API_BASE_URL || 'http://127.0.0.1:8001';
+export const GRIDDED_API_BASE_URL =
+  import.meta.env.VITE_XPUBLISH_API_BASE_URL || 'http://127.0.0.1:8001';
 
 export const MAX_TIMESERIES_POINTS = 365;
 
@@ -18,7 +19,10 @@ const griddedApiCall = async (path, { raw = false } = {}) => {
 };
 
 function parseTimeseriesCsv(csvText, variable) {
-  const lines = csvText.trim().split('\n').filter((l) => l.trim());
+  const lines = csvText
+    .trim()
+    .split('\n')
+    .filter((l) => l.trim());
   if (lines.length < 2) return { times: [], values: [] };
   const headers = lines[0].split(',').map((h) => h.trim().replace(/^["']|["']$/g, ''));
   let timeColIdx = -1;
@@ -54,7 +58,14 @@ export const griddedApiService = {
     griddedApiCall(`/api/datasets/${encodeURIComponent(datasetId)}/variable-attrs`),
 
   // Note: {z}/{y}/{x} order (y before x) is required by TilesPlugin.
-  buildGriddedTileUrl: (datasetId, variable, timestep, colorRamp = 'raster/plasma', min = 0, max = 100) => {
+  buildGriddedTileUrl: (
+    datasetId,
+    variable,
+    timestep,
+    colorRamp = 'raster/plasma',
+    min = 0,
+    max = 100
+  ) => {
     const params = new URLSearchParams({
       variables: variable,
       style: colorRamp,
@@ -79,14 +90,22 @@ export const griddedApiService = {
     const data = await griddedApiCall(path);
     try {
       const properties = data?.features?.[0]?.properties ?? {};
-      const value = properties[variable] ?? Object.values(properties).find(v => typeof v === 'number');
+      const value =
+        properties[variable] ?? Object.values(properties).find((v) => typeof v === 'number');
       return value !== undefined ? value : null;
     } catch {
       return null;
     }
   },
 
-  fetchGriddedEdrTimeseries: async (datasetId, variable, lon, lat, timesteps, maxPoints = MAX_TIMESERIES_POINTS) => {
+  fetchGriddedEdrTimeseries: async (
+    datasetId,
+    variable,
+    lon,
+    lat,
+    timesteps,
+    maxPoints = MAX_TIMESERIES_POINTS
+  ) => {
     const slice = maxPoints > 0 ? timesteps.slice(0, maxPoints) : timesteps;
     if (slice.length === 0) throw new Error('No timesteps available for timeseries query');
     const datetimeRange = slice.length === 1 ? slice[0] : `${slice[0]}/${slice[slice.length - 1]}`;

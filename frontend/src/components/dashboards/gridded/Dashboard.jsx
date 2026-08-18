@@ -9,7 +9,8 @@ import GriddedTimeseriesPanel from './GriddedTimeseriesPanel.jsx';
 
 const Dashboard = () => {
   const { state, dispatch } = useGriddedDashboard();
-  const { loadDatasets, loadVariables, loadTimesteps, loadVariableAttrs, runTimeseriesQuery } = useGriddedDataFetching();
+  const { loadDatasets, loadVariables, loadTimesteps, loadVariableAttrs, runTimeseriesQuery } =
+    useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
 
   // Load datasets on mount
