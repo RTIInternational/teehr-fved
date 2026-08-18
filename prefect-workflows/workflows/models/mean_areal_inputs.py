@@ -1,6 +1,7 @@
+"""Define arguments and defaults for the mean_areal Prefect flow."""
 from pydantic import Field, BaseModel
 
-from models.ingest_gridded_data_input import BaseGriddedDataInput
+from workflows.models.ingest_gridded_data_input import BaseGriddedDataInput
 
 VARIABLE_AND_UNIT_MAPPER = {
     "variable_name": {

@@ -1,4 +1,5 @@
 import maplibregl from 'maplibre-gl';
+import { Protocol } from 'pmtiles';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
@@ -6,12 +7,14 @@ import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/gridd
 import { ensureFreshToken } from '../../../auth/keycloak.js';
 import { OVERLAY_LAYERS } from './overlayLayers.js';
 
+maplibregl.addProtocol('pmtiles', new Protocol().tile);
+
 const escapeHtml = (str) =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const GriddedMapComponent = () => {
   const { state, dispatch } = useGriddedDashboard();
-  const { mapFilters, mapLoaded, activeOverlays } = state;
+  const { mapFilters, mapLoaded, activeOverlays, activePolygonLayer, availablePolygonLayers } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
   const mapContainer = useRef(null);
@@ -213,6 +216,90 @@ const GriddedMapComponent = () => {
     });
   }, [mapLoaded, activeOverlays]);
 
+  // Sync polygon layer from pmtiles when activePolygonLayer changes
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !mapLoaded) return;
+
+    const s3Endpoint = import.meta.env.VITE_S3_ENDPOINT;
+    const pmtilesBucket = import.meta.env.VITE_PMTILES_BUCKET;
+    const polygonLayerId = 'polygon-layer';
+    const polygonSourceId = 'polygon-source';
+
+    const removePolygonLayer = () => {
+      const polygonOutlineLayerId = `${polygonLayerId}-outline`;
+
+      if (mapInstance.getLayer(polygonOutlineLayerId)) {
+        mapInstance.removeLayer(polygonOutlineLayerId);
+      }
+      if (mapInstance.getLayer(polygonLayerId)) {
+        mapInstance.removeLayer(polygonLayerId);
+      }
+      if (mapInstance.getSource(polygonSourceId)) {
+        mapInstance.removeSource(polygonSourceId);
+      }
+    };
+
+    if (!activePolygonLayer) {
+      removePolygonLayer();
+      return;
+    }
+
+    if (!s3Endpoint || !pmtilesBucket) {
+      console.error('VITE_S3_ENDPOINT and VITE_PMTILES_BUCKET are required to load polygon layers');
+      removePolygonLayer();
+      return;
+    }
+
+    // Find the layer metadata
+    const selectedLayer = availablePolygonLayers.find((l) => l.id === activePolygonLayer);
+    if (!selectedLayer) {
+      removePolygonLayer();
+      return;
+    }
+
+    try {
+      // Remove old layer/source if they exist
+      removePolygonLayer();
+
+      const s3Origin = s3Endpoint.replace(/\/+$/, '');
+      const objectPath = selectedLayer.path.replace(/^\/+/, '');
+
+      // Add new pmtiles source
+      mapInstance.addSource(polygonSourceId, {
+        type: 'vector',
+        url: `pmtiles://${s3Origin}/${pmtilesBucket}/${objectPath}`,
+      });
+
+      // Add layer with semi-transparent blue fill and dark outline
+      mapInstance.addLayer({
+        id: polygonLayerId,
+        type: 'fill',
+        source: polygonSourceId,
+        'source-layer': selectedLayer.source_layer,
+        paint: {
+          'fill-color': '#3388ff',
+          'fill-opacity': 0.5,
+          'fill-outline-color': '#1a3d6d',
+        },
+      });
+
+      // Add an outline layer on top for better visibility
+      mapInstance.addLayer({
+        id: `${polygonLayerId}-outline`,
+        type: 'line',
+        source: polygonSourceId,
+        'source-layer': selectedLayer.source_layer,
+        paint: {
+          'line-color': '#1a3d6d',
+          'line-width': 2,
+        },
+      });
+    } catch (err) {
+      console.error('GriddedMapComponent: Failed to load polygon layer:', err);
+    }
+  }, [mapLoaded, activePolygonLayer, availablePolygonLayers]);
+
   // Update EDR click handler when active filters change
   useEffect(() => {
     const mapInstance = map.current;
@@ -224,9 +311,50 @@ const GriddedMapComponent = () => {
     }
 
     const handleClick = async (e) => {
-      if (!dataset || !variable || !currentTimestep) return;
-
       const { lng, lat } = e.lngLat;
+
+      // First, try to query polygon features if there's an active polygon layer
+      if (activePolygonLayer) {
+        const features = mapInstance.queryRenderedFeatures(e.point, {
+          layers: ['polygon-layer'],
+        });
+        if (features.length > 0) {
+          const feature = features[0];
+          const properties = feature.properties || {};
+          let popupContent = `<div style="padding:8px; font-size:0.85rem;">`;
+          popupContent += `<div style="font-weight:600; margin-bottom:4px; color:#495057;">${escapeHtml(activePolygonLayer)}</div>`;
+
+          if (Object.keys(properties).length > 0) {
+            popupContent += '<table style="width:100%; border-collapse:collapse;">';
+            Object.entries(properties).forEach(([key, value]) => {
+              popupContent += `
+                <tr style="border-bottom:1px solid #e0e0e0;">
+                  <td style="padding:2px 4px; font-weight:500; color:#495057;">${escapeHtml(key)}:</td>
+                  <td style="padding:2px 4px;">${value !== null && value !== undefined ? escapeHtml(String(value)) : 'N/A'}</td>
+                </tr>
+              `;
+            });
+            popupContent += '</table>';
+          } else {
+            popupContent += '<div style="color:#6c757d;">No attributes available</div>';
+          }
+
+          popupContent += `
+            <div style="margin-top:4px; font-size:0.75rem; color:#6c757d;">
+              Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}
+            </div>
+          </div>`;
+
+          popup.current
+            .setLngLat([lng, lat])
+            .setHTML(popupContent)
+            .addTo(mapInstance);
+          return;
+        }
+      }
+
+      // Otherwise, query the gridded data if available
+      if (!dataset || !variable || !currentTimestep) return;
 
       dispatch({ type: ActionTypes.SET_CLICKED_POINT, payload: { lon: lng, lat } });
 
@@ -266,7 +394,7 @@ const GriddedMapComponent = () => {
         mapInstance.off('click', clickHandlerRef.current);
       }
     };
-  }, [mapLoaded, dataset, variable, currentTimestep]);
+  }, [mapLoaded, dataset, variable, currentTimestep, activePolygonLayer, dispatch]);
 
   const activeLegendEntries = OVERLAY_LAYERS
     .filter((o) => activeOverlays.includes(o.id) && overlayLegends[o.id])

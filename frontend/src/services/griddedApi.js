@@ -44,6 +44,11 @@ function parseTimeseriesCsv(csvText, variable) {
 export const griddedApiService = {
   getGriddedDatasets: () => griddedApiCall('/api/dataset-keys'),
 
+  discoverPolygonLayers: (bucket, prefix, extension = '.pmtiles') => {
+    const params = new URLSearchParams({ bucket, prefix, extension });
+    return griddedApiCall(`/api/storage/contents?${params.toString()}`);
+  },
+
   getGriddedVariables: (datasetId) =>
     griddedApiCall(`/api/dataset-variables/${encodeURIComponent(datasetId)}`),
 

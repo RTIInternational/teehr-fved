@@ -8,7 +8,7 @@ import pandas as pd
 
 from utils import grid_utils as gu
 from utils.gridded_source_builders import GriddedSource, UASwan4km
-from models.ingest_gridded_data_input import (
+from workflows.models.ingest_gridded_data_input import (
     StorageType,
     IngestGriddedDataInput,
     ParserType,
@@ -16,7 +16,7 @@ from models.ingest_gridded_data_input import (
     REFERENCES_GROUP_PATH
 )
 from build_geozarr_pyramids import build_pyramids as build_pyramids_flow
-from models.mean_areal_inputs import VARIABLE_AND_UNIT_MAPPER
+from workflows.models.mean_areal_inputs import VARIABLE_AND_UNIT_MAPPER
 
 
 DEFAULT_LOOKBACK_DAYS = 1

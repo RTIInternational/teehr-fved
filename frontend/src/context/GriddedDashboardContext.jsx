@@ -19,6 +19,12 @@ const initialGriddedState = {
 
   variableAttrs: {},    // { [varName]: { units, long_name, ... } } — from /variable-attrs endpoint
 
+  // Polygon layers from S3/pmtiles
+  availablePolygonLayers: [],  // [{ id, path, source_layer }, ...] — from discovery endpoint
+  activePolygonLayer: null,     // string (layer id) | null — exclusive selection
+  polygonLayerLoading: false,
+  polygonLayerError: null,
+
   clickedPoint: null,       // { lon, lat } | null — last point clicked on the map
   timeseriesLoading: false,
   timeseriesError: null,
@@ -35,6 +41,10 @@ export const ActionTypes = {
   SET_TIMESTEPS: 'SET_TIMESTEPS',
   UPDATE_MAP_FILTERS: 'UPDATE_MAP_FILTERS',
   TOGGLE_OVERLAY: 'TOGGLE_OVERLAY',
+  SET_POLYGON_LAYERS: 'SET_POLYGON_LAYERS',
+  SET_ACTIVE_POLYGON_LAYER: 'SET_ACTIVE_POLYGON_LAYER',
+  SET_POLYGON_LAYER_LOADING: 'SET_POLYGON_LAYER_LOADING',
+  SET_POLYGON_LAYER_ERROR: 'SET_POLYGON_LAYER_ERROR',
   SET_CLICKED_POINT: 'SET_CLICKED_POINT',
   SET_TIMESERIES_LOADING: 'SET_TIMESERIES_LOADING',
   SET_TIMESERIES_DATA: 'SET_TIMESERIES_DATA',
@@ -94,6 +104,33 @@ const griddedDashboardReducer = (state, action) => {
         : [id];
       return { ...state, activeOverlays: next };
     }
+
+    case ActionTypes.SET_POLYGON_LAYERS:
+      return {
+        ...state,
+        availablePolygonLayers: Array.isArray(action.payload) ? action.payload : [],
+        polygonLayerLoading: false,
+        polygonLayerError: null,
+      };
+
+    case ActionTypes.SET_ACTIVE_POLYGON_LAYER:
+      return {
+        ...state,
+        activePolygonLayer: action.payload,
+      };
+
+    case ActionTypes.SET_POLYGON_LAYER_LOADING:
+      return {
+        ...state,
+        polygonLayerLoading: action.payload,
+      };
+
+    case ActionTypes.SET_POLYGON_LAYER_ERROR:
+      return {
+        ...state,
+        polygonLayerError: action.payload,
+        polygonLayerLoading: false,
+      };
 
     case ActionTypes.SET_CLICKED_POINT:
       return {

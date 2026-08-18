@@ -7,7 +7,7 @@ import rioxarray  # noqa: rio accessor
 import zarr
 
 from utils import grid_utils as gu
-from models.ingest_gridded_data_input import (
+from workflows.models.ingest_gridded_data_input import (
     BuildPyramidsDataInput,
     RAW_DATA_GROUP_PATH,
     PYRAMID_GROUP_PATH
