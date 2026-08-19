@@ -5,6 +5,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { ensureFreshToken } from '../../../auth/keycloak';
 import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi';
+import { useTimesteps } from '../../../shared/queries/gridded/timesteps';
 import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
@@ -54,6 +55,8 @@ const GriddedMapComponent = () => {
   } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
+  const timesteps = useTimesteps(dataset);
+
   const mapContainer = useRef(null);
   const map = useRef(null);
   const popup = useRef(null);
@@ -67,7 +70,7 @@ const GriddedMapComponent = () => {
   // Track the click handler so it can be removed when dependencies change
   const clickHandlerRef = useRef(null);
 
-  const currentTimestep = state.timesteps[timestepIndex] ?? null;
+  const currentTimestep = timesteps.data[timestepIndex] ?? null;
 
   // Prime the token so a polygon layer selected before the first tile load
   // still builds its FetchSource with an Authorization header.

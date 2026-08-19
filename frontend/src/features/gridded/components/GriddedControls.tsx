@@ -3,10 +3,10 @@ import { Form, Row, Col, Button, InputGroup, Spinner, Alert } from 'react-bootst
 
 import { useDatasets } from '@/shared/queries/gridded/datasets';
 import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
+import { useTimesteps } from '@/shared/queries/gridded/timesteps';
 import { useVariables } from '@/shared/queries/gridded/variables';
 
 import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
-import { useGriddedDataFetching } from '../hooks/useGriddedDataFetching';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 const COLOR_RAMPS = [
@@ -23,18 +23,18 @@ const GriddedControls = () => {
   const [polygonLayersExpanded, setPolygonLayersExpanded] = useState(false);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const { state, dispatch } = useGriddedDashboard();
-  const { loadTimesteps } = useGriddedDataFetching();
-  const { timesteps, mapFilters, activeOverlays, variableAttrs, activePolygonLayer } = state;
+  const { mapFilters, activeOverlays, variableAttrs, activePolygonLayer } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
   const datasets = useDatasets();
   const variables = useVariables(dataset);
+  const timesteps = useTimesteps(dataset);
 
   const units = variable ? variableAttrs[variable]?.units : undefined;
 
-  const currentTimestep = timesteps[timestepIndex] ?? '';
+  const currentTimestep = timesteps.data[timestepIndex] ?? '';
   const canStepBack = timestepIndex > 0;
-  const canStepForward = timestepIndex < timesteps.length - 1;
+  const canStepForward = timestepIndex < timesteps.data.length - 1;
 
   const [timestepInput, setTimestepInput] = useState(currentTimestep);
   const [timestepEditing, setTimestepEditing] = useState(false);
@@ -52,7 +52,7 @@ const GriddedControls = () => {
 
   const commitTimestepInput = () => {
     setTimestepEditing(false);
-    if (!timestepInput || timesteps.length === 0) return;
+    if (!timestepInput || timesteps.data.length === 0) return;
     const entered = new Date(timestepInput);
     if (isNaN(entered.getTime())) {
       setTimestepInputError(true);
@@ -60,7 +60,7 @@ const GriddedControls = () => {
     }
     let closestIdx = 0;
     let closestDiff = Infinity;
-    timesteps.forEach((ts, i) => {
+    timesteps.data.forEach((ts, i) => {
       const diff = Math.abs(new Date(ts).getTime() - entered.getTime());
       if (diff < closestDiff) {
         closestDiff = diff;
@@ -94,9 +94,6 @@ const GriddedControls = () => {
       type: ActionTypes.UPDATE_MAP_FILTERS,
       payload: { variable: selected, timestepIndex: 0 },
     });
-    if (dataset && selected) {
-      await loadTimesteps(dataset);
-    }
   };
 
   const handlePrevTimestep = () => {
@@ -195,7 +192,7 @@ const GriddedControls = () => {
                 }}
                 onBlur={commitTimestepInput}
                 onKeyDown={handleTimestepKeyDown}
-                disabled={timesteps.length === 0}
+                disabled={timesteps.data.length === 0}
                 isInvalid={timestepInputError}
                 className="text-center"
                 style={{ fontSize: '0.8rem' }}
@@ -215,9 +212,9 @@ const GriddedControls = () => {
                 Invalid datetime — try e.g. 2024-01-15T12:00:00
               </div>
             )}
-            {!timestepInputError && timesteps.length > 0 && (
+            {!timestepInputError && timesteps.data.length > 0 && (
               <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
-                {timestepIndex + 1} / {timesteps.length}
+                {timestepIndex + 1} / {timesteps.data.length}
               </div>
             )}
           </Col>
