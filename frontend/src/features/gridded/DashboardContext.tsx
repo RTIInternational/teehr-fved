@@ -1,8 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, type Dispatch } from 'react';
-import type { TimeseriesData } from '../../shared/types/gridded/edr';
-import type { ClickedPoint, MapFilters } from '../../shared/types/gridded/maps';
-import type { VariableAttrs } from '../../shared/types/gridded/variableAttrs';
+import type { TimeseriesData } from '@/shared/types/gridded/edr';
+import type { ClickedPoint, MapFilters } from '@/shared/types/gridded/maps';
+import type { VariableAttrs } from '@/shared/types/gridded/variableAttrs';
 
 export type DashboardState = {
   datasets: string[];

@@ -1,10 +1,10 @@
 // Gridded / xpublish API service backed by VITE_XPUBLISH_API_BASE_URL
-import { ensureFreshToken } from '../auth/keycloak';
-import type { DatasetsResponse } from '../shared/types/gridded/datasets';
-import type { EdrPointResponse, EdrTimeseriesResponse } from '../shared/types/gridded/edr';
-import type { TimestepsResponse } from '../shared/types/gridded/timesteps';
-import type { VariableAttrsResponse } from '../shared/types/gridded/variableAttrs';
-import type { VariablesResponse } from '../shared/types/gridded/variables';
+import { ensureFreshToken } from '@/auth/keycloak';
+import type { DatasetsResponse } from '@/shared/types/gridded/datasets';
+import type { EdrPointResponse, EdrTimeseriesResponse } from '@/shared/types/gridded/edr';
+import type { TimestepsResponse } from '@/shared/types/gridded/timesteps';
+import type { VariableAttrsResponse } from '@/shared/types/gridded/variableAttrs';
+import type { VariablesResponse } from '@/shared/types/gridded/variables';
 
 export const GRIDDED_API_BASE_URL =
   import.meta.env.VITE_XPUBLISH_API_BASE_URL || 'http://127.0.0.1:8001';
