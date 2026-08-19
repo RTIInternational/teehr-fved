@@ -16,17 +16,8 @@ const TABS = [
 
 const Dashboard = () => {
   const { state, dispatch } = useGriddedDashboard();
-  const { loadVariables, loadTimesteps, loadVariableAttrs, runTimeseriesQuery } =
-    useGriddedDataFetching();
+  const { loadTimesteps, loadVariableAttrs, runTimeseriesQuery } = useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
-
-  // Auto-load variables when a dataset is first set
-  useEffect(() => {
-    const { dataset } = state.mapFilters;
-    if (dataset && state.variables.length === 0) {
-      loadVariables(dataset);
-    }
-  }, [state.mapFilters.dataset, state.variables.length, loadVariables]);
 
   // Auto-load timesteps when a variable is first set
   useEffect(() => {

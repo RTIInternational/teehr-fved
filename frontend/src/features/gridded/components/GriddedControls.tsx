@@ -3,6 +3,7 @@ import { Form, Row, Col, Button, InputGroup, Spinner, Alert } from 'react-bootst
 
 import { useDatasets } from '@/shared/queries/gridded/datasets';
 import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
+import { useVariables } from '@/shared/queries/gridded/variables';
 
 import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
 import { useGriddedDataFetching } from '../hooks/useGriddedDataFetching';
@@ -22,12 +23,12 @@ const GriddedControls = () => {
   const [polygonLayersExpanded, setPolygonLayersExpanded] = useState(false);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const { state, dispatch } = useGriddedDashboard();
-  const { loadVariables, loadTimesteps } = useGriddedDataFetching();
-  const { variables, timesteps, mapFilters, activeOverlays, variableAttrs, activePolygonLayer } =
-    state;
+  const { loadTimesteps } = useGriddedDataFetching();
+  const { timesteps, mapFilters, activeOverlays, variableAttrs, activePolygonLayer } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
   const datasets = useDatasets();
+  const variables = useVariables(dataset);
 
   const units = variable ? variableAttrs[variable]?.units : undefined;
 
@@ -85,9 +86,6 @@ const GriddedControls = () => {
       type: ActionTypes.UPDATE_MAP_FILTERS,
       payload: { dataset: selected, timestepIndex: 0 },
     });
-    if (selected) {
-      await loadVariables(selected);
-    }
   };
 
   const handleVariableChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -163,10 +161,10 @@ const GriddedControls = () => {
                 size="sm"
                 value={variable ?? ''}
                 onChange={handleVariableChange}
-                disabled={!dataset || variables.length === 0}
+                disabled={!dataset || variables.data.length === 0}
               >
                 <option value="">Select variable…</option>
-                {variables.map((v) => (
+                {variables.data.map((v) => (
                   <option key={v} value={v}>
                     {v}
                   </option>
