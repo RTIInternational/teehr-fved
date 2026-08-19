@@ -9,16 +9,8 @@ import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
 
 const Dashboard = () => {
   const { state, dispatch } = useGriddedDashboard();
-  const { loadTimesteps, loadVariableAttrs, runTimeseriesQuery } = useGriddedDataFetching();
+  const { loadVariableAttrs, runTimeseriesQuery } = useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
-
-  // Auto-load timesteps when a variable is first set
-  useEffect(() => {
-    const { dataset, variable } = state.mapFilters;
-    if (dataset && variable && state.timesteps.length === 0) {
-      loadTimesteps(dataset);
-    }
-  }, [state.mapFilters.dataset, state.mapFilters.variable, state.timesteps.length, loadTimesteps]);
 
   // Run timeseries query when the user clicks a point on the map
   useEffect(() => {

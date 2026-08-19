@@ -5,22 +5,6 @@ import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
 export const useGriddedDataFetching = () => {
   const { state, dispatch } = useGriddedDashboard();
 
-  const loadTimesteps = useCallback(
-    async (datasetId) => {
-      try {
-        const data = await griddedApiService.getGriddedTimesteps(datasetId);
-        dispatch({ type: ActionTypes.SET_TIMESTEPS, payload: data.values ?? [] });
-      } catch (err) {
-        console.error('useGriddedDataFetching: Failed to load timesteps:', err);
-        dispatch({
-          type: ActionTypes.SET_ERROR,
-          payload: `Failed to load timesteps: ${err.message}`,
-        });
-      }
-    },
-    [dispatch]
-  );
-
   const loadVariableAttrs = useCallback(
     async (datasetId) => {
       try {
@@ -59,5 +43,5 @@ export const useGriddedDataFetching = () => {
     [state.mapFilters.dataset, state.mapFilters.variable, state.timesteps, dispatch]
   );
 
-  return { loadTimesteps, loadVariableAttrs, runTimeseriesQuery };
+  return { loadVariableAttrs, runTimeseriesQuery };
 };

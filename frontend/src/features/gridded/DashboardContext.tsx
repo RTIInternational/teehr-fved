@@ -5,7 +5,6 @@ import type { ClickedPoint, MapFilters } from '@/shared/types/gridded/maps';
 import type { VariableAttrs } from '@/shared/types/gridded/variableAttrs';
 
 export type DashboardState = {
-  timesteps: string[];
   mapFilters: MapFilters;
   activeOverlays: string[];
   variableAttrs: VariableAttrs | Record<string, never>;
@@ -21,8 +20,6 @@ export type DashboardState = {
 type UpdateMapFiltersPayload = Partial<MapFilters>;
 
 const initialState: DashboardState = {
-  timesteps: [], // string[] — ISO datetime strings for selected dataset+variable
-
   mapFilters: {
     dataset: null,
     variable: null,
@@ -62,7 +59,6 @@ export const ActionTypes = {
 } as const;
 
 export type DashboardAction =
-  | { type: typeof ActionTypes.SET_TIMESTEPS; payload: string[] }
   | { type: typeof ActionTypes.UPDATE_MAP_FILTERS; payload: UpdateMapFiltersPayload }
   | { type: typeof ActionTypes.TOGGLE_OVERLAY; payload: string }
   | { type: typeof ActionTypes.SET_CLICKED_POINT; payload: ClickedPoint | null }
@@ -77,16 +73,6 @@ export type DashboardAction =
 
 const reducer = (state: DashboardState, action: DashboardAction): DashboardState => {
   switch (action.type) {
-    case ActionTypes.SET_TIMESTEPS:
-      return {
-        ...state,
-        timesteps: Array.isArray(action.payload) ? action.payload : [],
-        mapFilters: {
-          ...state.mapFilters,
-          timestepIndex: 0,
-        },
-      };
-
     case ActionTypes.UPDATE_MAP_FILTERS:
       return {
         ...state,
