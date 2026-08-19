@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Form, Row, Col, Button, InputGroup } from 'react-bootstrap';
 import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
 import { useGriddedDataFetching } from '../hooks/useGriddedDataFetching';
@@ -21,7 +21,7 @@ const GriddedControls = () => {
   const { datasets, variables, timesteps, mapFilters, activeOverlays, variableAttrs } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
-  const units = variableAttrs[variable]?.units ?? null;
+  const units = variable ? variableAttrs[variable]?.units : undefined;
 
   const currentTimestep = timesteps[timestepIndex] ?? '';
   const canStepBack = timestepIndex > 0;
@@ -60,7 +60,7 @@ const GriddedControls = () => {
     dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { timestepIndex: closestIdx } });
   };
 
-  const handleTimestepKeyDown = (e) => {
+  const handleTimestepKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') commitTimestepInput();
     if (e.key === 'Escape') {
       setTimestepEditing(false);
@@ -69,7 +69,7 @@ const GriddedControls = () => {
     }
   };
 
-  const handleDatasetChange = async (e) => {
+  const handleDatasetChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value || null;
     dispatch({
       type: ActionTypes.UPDATE_MAP_FILTERS,
@@ -80,7 +80,7 @@ const GriddedControls = () => {
     }
   };
 
-  const handleVariableChange = async (e) => {
+  const handleVariableChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value || null;
     dispatch({
       type: ActionTypes.UPDATE_MAP_FILTERS,
@@ -109,11 +109,11 @@ const GriddedControls = () => {
     }
   };
 
-  const handleColorRampChange = (e) => {
+  const handleColorRampChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { colorRamp: e.target.value } });
   };
 
-  const handleRangeChange = (field, value) => {
+  const handleRangeChange = (field: string, value: string) => {
     const num = parseFloat(value);
     if (Number.isNaN(num)) return;
     if (field === 'colorRampMin' && num >= colorRampMax) return;
