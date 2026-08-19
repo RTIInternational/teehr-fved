@@ -101,7 +101,7 @@ export type DashboardAction =
   | { type: typeof ActionTypes.SET_TIMESTEPS; payload: string[] }
   | { type: typeof ActionTypes.UPDATE_MAP_FILTERS; payload: UpdateMapFiltersPayload }
   | { type: typeof ActionTypes.TOGGLE_OVERLAY; payload: string }
-  | { type: typeof ActionTypes.SET_ACTIVE_POLYGON_LAYER; payload: string }
+  | { type: typeof ActionTypes.SET_ACTIVE_POLYGON_LAYER; payload: string | null }
   | { type: typeof ActionTypes.SET_RIGHT_PANEL_TAB; payload: TabName }
   | { type: typeof ActionTypes.SET_POLYGON_FEATURES; payload: PolygonFeaturesPayload }
   | { type: typeof ActionTypes.CLEAR_POLYGON_FEATURES }

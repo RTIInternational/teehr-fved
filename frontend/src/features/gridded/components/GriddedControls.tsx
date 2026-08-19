@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Form, Row, Col, Button, InputGroup, Spinner, Alert } from 'react-bootstrap';
 
-import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching';
-import { griddedApiService } from '../../../services/griddedApi';
+import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
+
 import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
+import { useGriddedDataFetching } from '../hooks/useGriddedDataFetching';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 const COLOR_RAMPS = [
@@ -28,14 +29,11 @@ const GriddedControls = () => {
     mapFilters,
     activeOverlays,
     variableAttrs,
-    availablePolygonLayers,
     activePolygonLayer,
-    polygonLayerLoading,
-    polygonLayerError,
   } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
-  const units = variableAttrs[variable]?.units ?? null;
+  const units = variable ? variableAttrs[variable]?.units : undefined;
 
   const currentTimestep = timesteps[timestepIndex] ?? '';
   const canStepBack = timestepIndex > 0;
@@ -45,28 +43,7 @@ const GriddedControls = () => {
   const [timestepEditing, setTimestepEditing] = useState(false);
   const [timestepInputError, setTimestepInputError] = useState(false);
 
-  // Fetch polygon layers from discovery endpoint
-  useEffect(() => {
-    const fetchPolygonLayers = async () => {
-      dispatch({ type: ActionTypes.SET_POLYGON_LAYER_LOADING, payload: true });
-      try {
-        const data = await griddedApiService.discoverPolygonLayers();
-        dispatch({ type: ActionTypes.SET_POLYGON_LAYERS, payload: data.items || [] });
-      } catch (error) {
-        if (error.message.includes('401')) {
-          dispatch({
-            type: ActionTypes.SET_POLYGON_LAYER_ERROR,
-            payload: 'Sign in required to access polygon layers',
-          });
-          return;
-        }
-        console.error('Failed to fetch polygon layers:', error);
-        dispatch({ type: ActionTypes.SET_POLYGON_LAYER_ERROR, payload: error.message });
-      }
-    };
-
-    fetchPolygonLayers();
-  }, [dispatch]);
+  const polygonLayers = usePolygonLayers();
 
   // Keep display in sync when stepping with buttons
   useEffect(() => {
@@ -97,7 +74,7 @@ const GriddedControls = () => {
     dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { timestepIndex: closestIdx } });
   };
 
-  const handleTimestepKeyDown = (e) => {
+  const handleTimestepKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') commitTimestepInput();
     if (e.key === 'Escape') {
       setTimestepEditing(false);
@@ -106,7 +83,7 @@ const GriddedControls = () => {
     }
   };
 
-  const handleDatasetChange = async (e) => {
+  const handleDatasetChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value || null;
     dispatch({
       type: ActionTypes.UPDATE_MAP_FILTERS,
@@ -117,7 +94,7 @@ const GriddedControls = () => {
     }
   };
 
-  const handleVariableChange = async (e) => {
+  const handleVariableChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value || null;
     dispatch({
       type: ActionTypes.UPDATE_MAP_FILTERS,
@@ -146,11 +123,11 @@ const GriddedControls = () => {
     }
   };
 
-  const handleColorRampChange = (e) => {
+  const handleColorRampChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { colorRamp: e.target.value } });
   };
 
-  const handleRangeChange = (field, value) => {
+  const handleRangeChange = (field: string, value: string) => {
     const num = parseFloat(value);
     if (Number.isNaN(num)) return;
     if (field === 'colorRampMin' && num >= colorRampMax) return;
@@ -265,30 +242,30 @@ const GriddedControls = () => {
             </button>
             {polygonLayersExpanded && (
               <div className="mt-1">
-                {polygonLayerLoading && (
+                {polygonLayers.isLoading && (
                   <div className="d-flex align-items-center gap-2">
                     <Spinner animation="border" size="sm" />
                     <span style={{ fontSize: '0.75rem' }}>Loading layers…</span>
                   </div>
                 )}
-                {polygonLayerError && (
+                {polygonLayers.isError && (
                   <Alert
                     variant="warning"
                     className="py-1 px-2 mb-1"
                     style={{ fontSize: '0.8rem' }}
                   >
-                    {polygonLayerError}
+                    {polygonLayers.error.message}
                   </Alert>
                 )}
-                {!polygonLayerLoading &&
-                  availablePolygonLayers.length === 0 &&
-                  !polygonLayerError && (
+                {!polygonLayers.isLoading &&
+                  polygonLayers.data?.length === 0 &&
+                  !polygonLayers.isError && (
                     <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>
                       No polygon layers available
                     </span>
                   )}
-                {!polygonLayerLoading &&
-                  availablePolygonLayers.map((layer) => (
+                {!polygonLayers.isLoading &&
+                  polygonLayers.data?.map((layer) => (
                     <Form.Check
                       key={layer.id}
                       type="checkbox"
