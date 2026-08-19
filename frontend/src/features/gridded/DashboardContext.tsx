@@ -5,7 +5,6 @@ import type { ClickedPoint, MapFilters } from '@/shared/types/gridded/maps';
 import type { VariableAttrs } from '@/shared/types/gridded/variableAttrs';
 
 export type DashboardState = {
-  variables: string[];
   timesteps: string[];
   mapFilters: MapFilters;
   activeOverlays: string[];
@@ -22,7 +21,6 @@ export type DashboardState = {
 type UpdateMapFiltersPayload = Partial<MapFilters>;
 
 const initialState: DashboardState = {
-  variables: [], // string[] — variables for the selected dataset
   timesteps: [], // string[] — ISO datetime strings for selected dataset+variable
 
   mapFilters: {
@@ -49,7 +47,6 @@ const initialState: DashboardState = {
 };
 
 export const ActionTypes = {
-  SET_VARIABLES: 'SET_VARIABLES',
   SET_TIMESTEPS: 'SET_TIMESTEPS',
   UPDATE_MAP_FILTERS: 'UPDATE_MAP_FILTERS',
   TOGGLE_OVERLAY: 'TOGGLE_OVERLAY',
@@ -65,7 +62,6 @@ export const ActionTypes = {
 } as const;
 
 export type DashboardAction =
-  | { type: typeof ActionTypes.SET_VARIABLES; payload: string[] }
   | { type: typeof ActionTypes.SET_TIMESTEPS; payload: string[] }
   | { type: typeof ActionTypes.UPDATE_MAP_FILTERS; payload: UpdateMapFiltersPayload }
   | { type: typeof ActionTypes.TOGGLE_OVERLAY; payload: string }
@@ -81,19 +77,6 @@ export type DashboardAction =
 
 const reducer = (state: DashboardState, action: DashboardAction): DashboardState => {
   switch (action.type) {
-    case ActionTypes.SET_VARIABLES:
-      return {
-        ...state,
-        variables: Array.isArray(action.payload) ? action.payload : [],
-        // Reset variable and timestep when the dataset changes
-        mapFilters: {
-          ...state.mapFilters,
-          variable: action.payload?.[0] ?? null,
-          timestepIndex: 0,
-        },
-        timesteps: [],
-      };
-
     case ActionTypes.SET_TIMESTEPS:
       return {
         ...state,
