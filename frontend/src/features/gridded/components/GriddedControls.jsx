@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Form, Row, Col, Button, InputGroup } from 'react-bootstrap';
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
-import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching';
-import { OVERLAY_LAYERS } from './overlayLayers';
+import { useGriddedDashboard, ActionTypes } from '../GriddedDashboardContext';
+import { useGriddedDataFetching } from '../hooks/useGriddedDataFetching';
+import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 const COLOR_RAMPS = [
   { label: 'Plasma', value: 'raster/plasma' },

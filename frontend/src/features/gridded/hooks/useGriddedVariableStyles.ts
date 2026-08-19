@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
-import { useGriddedDashboard } from '../../../context/GriddedDashboardContext';
-import { getVariableStyle } from './variableStyles';
+import { useGriddedDashboard } from '../GriddedDashboardContext';
+import { getVariableStyle } from '../utils/variableStyles';
 
 type UpdateMapFiltersAction = {
   type: 'UPDATE_MAP_FILTERS';

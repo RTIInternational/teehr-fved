@@ -2,9 +2,9 @@ import maplibregl from 'maplibre-gl';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { ensureFreshToken } from '../../../auth/keycloak';
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
 import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi';
-import { OVERLAY_LAYERS } from './overlayLayers';
+import { useGriddedDashboard, ActionTypes } from '../GriddedDashboardContext';
+import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 const escapeHtml = (str) =>
   String(str).replace(
