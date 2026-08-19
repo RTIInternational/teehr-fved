@@ -12,7 +12,7 @@ import { NwmdDashboard } from './components/dashboards/nwmd/index';
 import GriddedDashboard from './features/gridded/index';
 import { DataDashboardProvider } from './context/DataDashboardContext';
 import { ForecastDashboardProvider } from './context/ForecastDashboardContext';
-import { GriddedDashboardProvider } from './features/gridded/GriddedDashboardContext';
+import { GriddedDashboardProvider } from './features/gridded/DashboardContext';
 import { NwmdDashboardProvider } from './context/NwmdDashboardContext';
 import { RetrospectiveDashboardProvider } from './context/RetrospectiveDashboardContext';
 import { useAuth } from './hooks/useAuth';

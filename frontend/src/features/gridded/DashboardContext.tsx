@@ -1,10 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, type Dispatch } from 'react';
 import type { TimeseriesData } from '../../shared/types/gridded/edr';
 import type { ClickedPoint, MapFilters } from '../../shared/types/gridded/maps';
 import type { VariableAttrs } from '../../shared/types/gridded/variableAttrs';
 
-export type GriddedDashboardState = {
+export type DashboardState = {
   datasets: string[];
   variables: string[];
   timesteps: string[];
@@ -22,7 +22,7 @@ export type GriddedDashboardState = {
 
 type UpdateMapFiltersPayload = Partial<MapFilters>;
 
-const initialGriddedState: GriddedDashboardState = {
+const initialState: DashboardState = {
   datasets: [], // string[] — available dataset names from xpublish
   variables: [], // string[] — variables for the selected dataset
   timesteps: [], // string[] — ISO datetime strings for selected dataset+variable
@@ -67,7 +67,7 @@ export const ActionTypes = {
   CLEAR_ERROR: 'CLEAR_ERROR',
 } as const;
 
-export type GriddedDashboardAction =
+export type DashboardAction =
   | { type: typeof ActionTypes.SET_DATASETS; payload: string[] }
   | { type: typeof ActionTypes.SET_VARIABLES; payload: string[] }
   | { type: typeof ActionTypes.SET_TIMESTEPS; payload: string[] }
@@ -83,12 +83,7 @@ export type GriddedDashboardAction =
   | { type: typeof ActionTypes.SET_ERROR; payload: string | null }
   | { type: typeof ActionTypes.CLEAR_ERROR };
 
-export type GriddedDispatch = Dispatch<GriddedDashboardAction>;
-
-const griddedDashboardReducer = (
-  state: GriddedDashboardState,
-  action: GriddedDashboardAction
-): GriddedDashboardState => {
+const reducer = (state: DashboardState, action: DashboardAction): DashboardState => {
   switch (action.type) {
     case ActionTypes.SET_DATASETS:
       return {
@@ -179,19 +174,15 @@ const griddedDashboardReducer = (
   }
 };
 
-export type GriddedDashboardContextValue = {
-  state: GriddedDashboardState;
-  dispatch: GriddedDispatch;
+export type DashboardContextValue = {
+  state: DashboardState;
+  dispatch: Dispatch<DashboardAction>;
 };
 
-const GriddedDashboardContext = createContext<GriddedDashboardContextValue | undefined>(undefined);
+const GriddedDashboardContext = createContext<DashboardContextValue | undefined>(undefined);
 
-type GriddedDashboardProviderProps = {
-  children: ReactNode;
-};
-
-export const GriddedDashboardProvider = ({ children }: GriddedDashboardProviderProps) => {
-  const [state, dispatch] = useReducer(griddedDashboardReducer, initialGriddedState);
+export const GriddedDashboardProvider = ({ children }: React.PropsWithChildren) => {
+  const [state, dispatch] = useReducer(reducer, initialState);
   return (
     <GriddedDashboardContext.Provider value={{ state, dispatch }}>
       {children}
@@ -199,7 +190,7 @@ export const GriddedDashboardProvider = ({ children }: GriddedDashboardProviderP
   );
 };
 
-export const useGriddedDashboard = (): GriddedDashboardContextValue => {
+export const useGriddedDashboard = () => {
   const context = useContext(GriddedDashboardContext);
   if (!context) {
     throw new Error('useGriddedDashboard must be used within a GriddedDashboardProvider');

@@ -3,7 +3,7 @@ import DashboardPanel from '../../components/common/dashboard/DashboardPanel';
 import GriddedControls from './components/GriddedControls';
 import GriddedMapComponent from './components/GriddedMapComponent';
 import GriddedTimeseriesPanel from './components/GriddedTimeseriesPanel';
-import { useGriddedDashboard, ActionTypes } from './GriddedDashboardContext';
+import { useGriddedDashboard, ActionTypes } from './DashboardContext';
 import { useGriddedDataFetching } from './hooks/useGriddedDataFetching';
 import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
 

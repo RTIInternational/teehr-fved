@@ -3,7 +3,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { ensureFreshToken } from '../../../auth/keycloak';
 import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi';
-import { useGriddedDashboard, ActionTypes } from '../GriddedDashboardContext';
+import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 const escapeHtml = (str) =>

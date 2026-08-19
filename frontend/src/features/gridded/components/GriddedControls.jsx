@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Form, Row, Col, Button, InputGroup } from 'react-bootstrap';
-import { useGriddedDashboard, ActionTypes } from '../GriddedDashboardContext';
+import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
 import { useGriddedDataFetching } from '../hooks/useGriddedDataFetching';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
