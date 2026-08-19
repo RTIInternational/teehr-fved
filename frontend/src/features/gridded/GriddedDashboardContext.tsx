@@ -1,7 +1,28 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useReducer } from 'react';
+import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react';
+import type { TimeseriesData } from '../../shared/types/gridded/edr';
+import type { ClickedPoint, MapFilters } from '../../shared/types/gridded/maps';
+import type { VariableAttrs } from '../../shared/types/gridded/variableAttrs';
 
-const initialGriddedState = {
+export type GriddedDashboardState = {
+  datasets: string[];
+  variables: string[];
+  timesteps: string[];
+  mapFilters: MapFilters;
+  activeOverlays: string[];
+  variableAttrs: VariableAttrs | Record<string, never>;
+  clickedPoint: ClickedPoint | null;
+  timeseriesLoading: boolean;
+  timeseriesError: string | null;
+  timeseriesData: TimeseriesData | null;
+  mapLoaded: boolean;
+  loading: boolean;
+  error: string | null;
+};
+
+type UpdateMapFiltersPayload = Partial<MapFilters>;
+
+const initialGriddedState: GriddedDashboardState = {
   datasets: [], // string[] — available dataset names from xpublish
   variables: [], // string[] — variables for the selected dataset
   timesteps: [], // string[] — ISO datetime strings for selected dataset+variable
@@ -44,9 +65,30 @@ export const ActionTypes = {
   SET_LOADING: 'SET_LOADING',
   SET_ERROR: 'SET_ERROR',
   CLEAR_ERROR: 'CLEAR_ERROR',
-};
+} as const;
 
-const griddedDashboardReducer = (state, action) => {
+export type GriddedDashboardAction =
+  | { type: typeof ActionTypes.SET_DATASETS; payload: string[] }
+  | { type: typeof ActionTypes.SET_VARIABLES; payload: string[] }
+  | { type: typeof ActionTypes.SET_TIMESTEPS; payload: string[] }
+  | { type: typeof ActionTypes.UPDATE_MAP_FILTERS; payload: UpdateMapFiltersPayload }
+  | { type: typeof ActionTypes.TOGGLE_OVERLAY; payload: string }
+  | { type: typeof ActionTypes.SET_CLICKED_POINT; payload: ClickedPoint | null }
+  | { type: typeof ActionTypes.SET_TIMESERIES_LOADING; payload: boolean }
+  | { type: typeof ActionTypes.SET_TIMESERIES_DATA; payload: TimeseriesData | null }
+  | { type: typeof ActionTypes.SET_TIMESERIES_ERROR; payload: string | null }
+  | { type: typeof ActionTypes.SET_VARIABLE_ATTRS; payload: VariableAttrs }
+  | { type: typeof ActionTypes.SET_MAP_LOADED; payload: boolean }
+  | { type: typeof ActionTypes.SET_LOADING; payload: boolean }
+  | { type: typeof ActionTypes.SET_ERROR; payload: string | null }
+  | { type: typeof ActionTypes.CLEAR_ERROR };
+
+export type GriddedDispatch = Dispatch<GriddedDashboardAction>;
+
+const griddedDashboardReducer = (
+  state: GriddedDashboardState,
+  action: GriddedDashboardAction
+): GriddedDashboardState => {
   switch (action.type) {
     case ActionTypes.SET_DATASETS:
       return {
@@ -137,9 +179,18 @@ const griddedDashboardReducer = (state, action) => {
   }
 };
 
-const GriddedDashboardContext = createContext(null);
+export type GriddedDashboardContextValue = {
+  state: GriddedDashboardState;
+  dispatch: GriddedDispatch;
+};
 
-export const GriddedDashboardProvider = ({ children }) => {
+const GriddedDashboardContext = createContext<GriddedDashboardContextValue | undefined>(undefined);
+
+type GriddedDashboardProviderProps = {
+  children: ReactNode;
+};
+
+export const GriddedDashboardProvider = ({ children }: GriddedDashboardProviderProps) => {
   const [state, dispatch] = useReducer(griddedDashboardReducer, initialGriddedState);
   return (
     <GriddedDashboardContext.Provider value={{ state, dispatch }}>
@@ -148,7 +199,7 @@ export const GriddedDashboardProvider = ({ children }) => {
   );
 };
 
-export const useGriddedDashboard = () => {
+export const useGriddedDashboard = (): GriddedDashboardContextValue => {
   const context = useContext(GriddedDashboardContext);
   if (!context) {
     throw new Error('useGriddedDashboard must be used within a GriddedDashboardProvider');

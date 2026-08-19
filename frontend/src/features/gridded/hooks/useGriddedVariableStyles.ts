@@ -2,20 +2,9 @@ import { useCallback, useRef } from 'react';
 import { useGriddedDashboard } from '../GriddedDashboardContext';
 import { getVariableStyle } from '../utils/variableStyles';
 
-type UpdateMapFiltersAction = {
-  type: 'UPDATE_MAP_FILTERS';
-  payload: {
-    colorRamp: string;
-    colorRampMin: number;
-    colorRampMax: number;
-  };
-};
-
-type GriddedDispatch = (action: UpdateMapFiltersAction) => void;
-
 export const useGriddedVariableStyles = () => {
-  const { dispatch } = useGriddedDashboard() as { dispatch: GriddedDispatch };
-  const styledVariablesRef = useRef(new Set());
+  const { dispatch } = useGriddedDashboard();
+  const styledVariablesRef = useRef<Set<string>>(new Set());
 
   const resetStyles = useCallback(() => {
     styledVariablesRef.current = new Set();

@@ -1,7 +1,9 @@
 export type VariableAttrsResponse = {
   dataset_id: string;
-  variables: Record<string, VariableMetadata> & { crs: CrsMetadata };
+  variables: VariableAttrs;
 };
+
+export type VariableAttrs = Record<string, VariableMetadata> & { crs: CrsMetadata };
 
 type CrsMetadata = {
   crs_wkt: string;

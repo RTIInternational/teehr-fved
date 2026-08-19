@@ -12,3 +12,11 @@ type EdrPointProps = Record<string, unknown> & {
 };
 
 export type EdrTimeseriesResponse = string;
+
+export type TimeseriesData = {
+  times: string[];
+  values: number[];
+  lon: number;
+  lat: number;
+  variable: string;
+};
