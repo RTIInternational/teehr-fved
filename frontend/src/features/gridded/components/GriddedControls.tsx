@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Row, Col, Button, InputGroup } from 'react-bootstrap';
+import { useDatasets } from '@/shared/queries/gridded/datasets';
 import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
 import { useGriddedDataFetching } from '../hooks/useGriddedDataFetching';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
@@ -18,8 +19,10 @@ const GriddedControls = () => {
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const { state, dispatch } = useGriddedDashboard();
   const { loadVariables, loadTimesteps } = useGriddedDataFetching();
-  const { datasets, variables, timesteps, mapFilters, activeOverlays, variableAttrs } = state;
+  const { variables, timesteps, mapFilters, activeOverlays, variableAttrs } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
+
+  const datasets = useDatasets();
 
   const units = variable ? variableAttrs[variable]?.units : undefined;
 
@@ -133,10 +136,10 @@ const GriddedControls = () => {
                 size="sm"
                 value={dataset ?? ''}
                 onChange={handleDatasetChange}
-                disabled={datasets.length === 0}
+                disabled={datasets.data.length === 0}
               >
                 <option value="">Select dataset…</option>
-                {datasets.map((ds) => (
+                {datasets.data.map((ds) => (
                   <option key={ds} value={ds}>
                     {ds}
                   </option>

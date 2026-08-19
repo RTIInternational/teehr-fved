@@ -5,7 +5,6 @@ import type { ClickedPoint, MapFilters } from '@/shared/types/gridded/maps';
 import type { VariableAttrs } from '@/shared/types/gridded/variableAttrs';
 
 export type DashboardState = {
-  datasets: string[];
   variables: string[];
   timesteps: string[];
   mapFilters: MapFilters;
@@ -23,7 +22,6 @@ export type DashboardState = {
 type UpdateMapFiltersPayload = Partial<MapFilters>;
 
 const initialState: DashboardState = {
-  datasets: [], // string[] — available dataset names from xpublish
   variables: [], // string[] — variables for the selected dataset
   timesteps: [], // string[] — ISO datetime strings for selected dataset+variable
 
@@ -51,7 +49,6 @@ const initialState: DashboardState = {
 };
 
 export const ActionTypes = {
-  SET_DATASETS: 'SET_DATASETS',
   SET_VARIABLES: 'SET_VARIABLES',
   SET_TIMESTEPS: 'SET_TIMESTEPS',
   UPDATE_MAP_FILTERS: 'UPDATE_MAP_FILTERS',
@@ -68,7 +65,6 @@ export const ActionTypes = {
 } as const;
 
 export type DashboardAction =
-  | { type: typeof ActionTypes.SET_DATASETS; payload: string[] }
   | { type: typeof ActionTypes.SET_VARIABLES; payload: string[] }
   | { type: typeof ActionTypes.SET_TIMESTEPS; payload: string[] }
   | { type: typeof ActionTypes.UPDATE_MAP_FILTERS; payload: UpdateMapFiltersPayload }
@@ -85,13 +81,6 @@ export type DashboardAction =
 
 const reducer = (state: DashboardState, action: DashboardAction): DashboardState => {
   switch (action.type) {
-    case ActionTypes.SET_DATASETS:
-      return {
-        ...state,
-        datasets: Array.isArray(action.payload) ? action.payload : [],
-        loading: false,
-      };
-
     case ActionTypes.SET_VARIABLES:
       return {
         ...state,

@@ -9,14 +9,9 @@ import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
 
 const Dashboard = () => {
   const { state, dispatch } = useGriddedDashboard();
-  const { loadDatasets, loadVariables, loadTimesteps, loadVariableAttrs, runTimeseriesQuery } =
+  const { loadVariables, loadTimesteps, loadVariableAttrs, runTimeseriesQuery } =
     useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
-
-  // Load datasets on mount
-  useEffect(() => {
-    loadDatasets();
-  }, [loadDatasets]);
 
   // Auto-load variables when a dataset is first set
   useEffect(() => {
