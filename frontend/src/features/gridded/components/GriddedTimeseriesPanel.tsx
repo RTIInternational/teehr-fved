@@ -2,18 +2,23 @@ import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef } from 'react';
 
 import DashboardPanel from '@/shared/components/DashboardPanel';
+import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
 
 import { useGriddedDashboard } from '../DashboardContext';
 
 const GriddedTimeseriesPanel = () => {
   const { state } = useGriddedDashboard();
-  const { timeseriesData, timeseriesLoading, timeseriesError, clickedPoint, variableAttrs } = state;
+  const { mapFilters, timeseriesData, timeseriesLoading, timeseriesError, clickedPoint } = state;
   const plotRef = useRef(null);
+
+  const variableAttrs = useVariableAttrs(mapFilters.dataset);
 
   useEffect(() => {
     if (!plotRef.current || !timeseriesData) return;
     const { times, values, lon, lat, variable, source, location_id, name } = timeseriesData;
-    const units = variableAttrs[variable]?.units ? ` (${variableAttrs[variable].units})` : '';
+    const units = variableAttrs.data?.[variable]?.units
+      ? ` (${variableAttrs.data?.[variable].units})`
+      : '';
 
     // The plot shows one series at a time — whichever query ran last. The title
     // says where it came from so a gridded point and a polygon aren't confused.

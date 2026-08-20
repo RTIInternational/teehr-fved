@@ -4,7 +4,6 @@ import React, { createContext, useContext, useReducer, type Dispatch } from 'rea
 import type { TimeseriesData } from '@/shared/types/gridded/edr';
 import type { ClickedPoint, MapFilters, SelectedLocation } from '@/shared/types/gridded/maps';
 import type { PolygonFeatures } from '@/shared/types/gridded/tiles';
-import type { VariableAttrs } from '@/shared/types/gridded/variableAttrs';
 
 type PolygonFeaturesPayload = { features: PolygonFeatures; lngLat: ClickedPoint };
 
@@ -13,7 +12,6 @@ type TabName = 'dataset' | 'polygons';
 export type DashboardState = {
   mapFilters: MapFilters;
   activeOverlays: string[];
-  variableAttrs: VariableAttrs | Record<string, never>;
   activePolygonLayer: string | null;
   rightPanelTab: TabName;
   polygonFeatures: PolygonFeatures;
@@ -41,8 +39,6 @@ const initialState: DashboardState = {
   },
 
   activeOverlays: [], // string[] of overlay IDs currently shown on the map
-
-  variableAttrs: {}, // { [varName]: { units, long_name, ... } } — from /variable-attrs endpoint
 
   // Polygon layers from S3/pmtiles
   activePolygonLayer: null, // string (layer id) | null — exclusive selection
@@ -79,7 +75,6 @@ export const ActionTypes = {
   SET_TIMESERIES_LOADING: 'SET_TIMESERIES_LOADING',
   SET_TIMESERIES_DATA: 'SET_TIMESERIES_DATA',
   SET_TIMESERIES_ERROR: 'SET_TIMESERIES_ERROR',
-  SET_VARIABLE_ATTRS: 'SET_VARIABLE_ATTRS',
   SET_MAP_LOADED: 'SET_MAP_LOADED',
   SET_LOADING: 'SET_LOADING',
   SET_ERROR: 'SET_ERROR',
@@ -98,7 +93,6 @@ export type DashboardAction =
   | { type: typeof ActionTypes.SET_TIMESERIES_LOADING; payload: boolean }
   | { type: typeof ActionTypes.SET_TIMESERIES_DATA; payload: TimeseriesData | null }
   | { type: typeof ActionTypes.SET_TIMESERIES_ERROR; payload: string | null }
-  | { type: typeof ActionTypes.SET_VARIABLE_ATTRS; payload: VariableAttrs }
   | { type: typeof ActionTypes.SET_MAP_LOADED; payload: boolean }
   | { type: typeof ActionTypes.SET_LOADING; payload: boolean }
   | { type: typeof ActionTypes.SET_ERROR; payload: string | null }
@@ -181,9 +175,6 @@ const reducer = (state: DashboardState, action: DashboardAction): DashboardState
 
     case ActionTypes.SET_TIMESERIES_ERROR:
       return { ...state, timeseriesError: action.payload, timeseriesLoading: false };
-
-    case ActionTypes.SET_VARIABLE_ATTRS:
-      return { ...state, variableAttrs: action.payload };
 
     case ActionTypes.SET_MAP_LOADED:
       return { ...state, mapLoaded: action.payload };

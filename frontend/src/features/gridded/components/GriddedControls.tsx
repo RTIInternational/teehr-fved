@@ -4,6 +4,7 @@ import { Form, Row, Col, Button, InputGroup, Spinner, Alert } from 'react-bootst
 import { useDatasets } from '@/shared/queries/gridded/datasets';
 import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
 import { useTimesteps } from '@/shared/queries/gridded/timesteps';
+import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
 import { useVariables } from '@/shared/queries/gridded/variables';
 
 import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
@@ -23,14 +24,15 @@ const GriddedControls = () => {
   const [polygonLayersExpanded, setPolygonLayersExpanded] = useState(false);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const { state, dispatch } = useGriddedDashboard();
-  const { mapFilters, activeOverlays, variableAttrs, activePolygonLayer } = state;
+  const { mapFilters, activeOverlays, activePolygonLayer } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
   const datasets = useDatasets();
   const variables = useVariables(dataset);
   const timesteps = useTimesteps(dataset);
+  const variableAttrs = useVariableAttrs(dataset);
 
-  const units = variable ? variableAttrs[variable]?.units : undefined;
+  const units = variable ? variableAttrs.data?.[variable]?.units : undefined;
 
   const currentTimestep = timesteps.data[timestepIndex] ?? '';
   const canStepBack = timestepIndex > 0;
