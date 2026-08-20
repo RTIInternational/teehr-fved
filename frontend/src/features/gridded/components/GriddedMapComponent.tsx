@@ -3,9 +3,12 @@ import { FetchSource, PMTiles, Protocol } from 'pmtiles';
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { ensureFreshToken } from '../../../auth/keycloak';
-import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi';
-import { useTimesteps } from '../../../shared/queries/gridded/timesteps';
+import { ensureFreshToken } from '@/auth/keycloak';
+import { griddedApiService, GRIDDED_API_BASE_URL } from '@/services/griddedApi';
+import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
+import { useTimesteps } from '@/shared/queries/gridded/timesteps';
+import type { PolygonFeatures } from '@/shared/types/gridded/tiles';
+
 import { useDashboard, ActionTypes } from '../DashboardContext';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
@@ -17,11 +20,31 @@ import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 const pmtilesProtocol = new Protocol();
 maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
 
-const escapeHtml = (str) =>
-  String(str).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
-  );
+type ArcGisLegendEntry = {
+  label: string;
+  imageData: string;
+  contentType: string;
+  width: number;
+  height: number;
+};
+
+type ArcGisLegendResponse = {
+  layers?: Array<{
+    layerId: number;
+    legend?: ArcGisLegendEntry[];
+  }>;
+};
+
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+const escapeHtml = (value: unknown): string =>
+  String(value).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] ?? c);
 
 const POLYGON_LAYER_ID = 'polygon-layer';
 const POLYGON_SOURCE_ID = 'polygon-source';
@@ -29,10 +52,10 @@ const POLYGON_SELECTED_LAYER_ID = 'polygon-layer-selected';
 
 // A polygon that spans a tile boundary is split across tiles, so the same feature
 // can come back once per tile. Collapse those down to one entry per location id.
-const dedupePolygonFeatures = (features) => {
+const dedupePolygonFeatures = (features?: maplibregl.MapGeoJSONFeature[]) => {
   const seen = new Set();
-  return (features || []).reduce((acc, feature) => {
-    const props = feature.properties || {};
+  return (features || []).reduce<PolygonFeatures>((acc, feature) => {
+    const props = (feature.properties || {}) as Record<string, unknown>;
     const key = props.id ?? feature.id;
     if (key !== undefined && key !== null) {
       if (seen.has(key)) return acc;
@@ -45,32 +68,28 @@ const dedupePolygonFeatures = (features) => {
 
 const GriddedMapComponent = () => {
   const { state, dispatch } = useDashboard();
-  const {
-    mapFilters,
-    mapLoaded,
-    activeOverlays,
-    activePolygonLayer,
-    availablePolygonLayers,
-    selectedLocation,
-  } = state;
+  const { mapFilters, mapLoaded, activeOverlays, activePolygonLayer, selectedLocation } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
+  const polygonLayers = usePolygonLayers();
   const timesteps = useTimesteps(dataset);
 
-  const mapContainer = useRef(null);
-  const map = useRef(null);
-  const popup = useRef(null);
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const map = useRef<maplibregl.Map | null>(null);
+  const popup = useRef<maplibregl.Popup | null>(null);
   // Separate popup for polygon hover so it never clobbers the click popup
-  const hoverPopup = useRef(null);
+  const hoverPopup = useRef<maplibregl.Popup | null>(null);
   // Holds the current Bearer token for synchronous use inside transformRequest
-  const tokenRef = useRef(null);
+  const tokenRef = useRef<string | null>(null);
   // The active archive's FetchSource, so a refreshed token can be pushed into
   // its headers without tearing the source down.
-  const polygonFetchSource = useRef(null);
+  const polygonFetchSource = useRef<FetchSource | null>(null);
   // Track the click handler so it can be removed when dependencies change
-  const clickHandlerRef = useRef(null);
+  const clickHandlerRef = useRef<((e: maplibregl.MapMouseEvent) => void | Promise<void>) | null>(
+    null
+  );
 
-  const currentTimestep = timesteps.data[timestepIndex] ?? null;
+  const currentTimestep = (timesteps.data[timestepIndex] as string | undefined) ?? null;
 
   // Prime the token so a polygon layer selected before the first tile load
   // still builds its FetchSource with an Authorization header.
@@ -81,12 +100,12 @@ const GriddedMapComponent = () => {
   }, []);
 
   // Map of overlay id -> array of { label, imageData, contentType, width, height }
-  const [overlayLegends, setOverlayLegends] = useState({});
-  const fetchedLegends = useRef(new Set());
+  const [overlayLegends, setOverlayLegends] = useState<Record<string, ArcGisLegendEntry[]>>({});
+  const fetchedLegends = useRef<Set<string>>(new Set());
 
-  const [legendBlobUrl, setLegendBlobUrl] = useState(null);
+  const [legendBlobUrl, setLegendBlobUrl] = useState<string | null>(null);
   // Kept in a ref so the cleanup closure always sees the latest URL to revoke
-  const prevLegendBlobUrl = useRef(null);
+  const prevLegendBlobUrl = useRef<string | null>(null);
 
   // Fetch ArcGIS legend JSON for newly-activated overlays that declare a legendUrl.
   useEffect(() => {
@@ -97,12 +116,15 @@ const GriddedMapComponent = () => {
 
     toFetch.forEach(async (overlay) => {
       fetchedLegends.current.add(overlay.id);
+      const legendUrl = overlay.legendUrl;
+      if (!legendUrl) return;
       try {
-        const res = await fetch(overlay.legendUrl);
-        const json = await res.json();
+        const res = await fetch(legendUrl);
+        const json: ArcGisLegendResponse = await res.json();
         const layer = json.layers?.find((l) => l.layerId === overlay.legendLayerId);
-        if (layer?.legend) {
-          setOverlayLegends((prev) => ({ ...prev, [overlay.id]: layer.legend }));
+        const legendEntries = layer?.legend;
+        if (legendEntries) {
+          setOverlayLegends((prev) => ({ ...prev, [overlay.id]: legendEntries }));
         }
       } catch {
         // Legend fetch failure is non-critical; silently skip.
@@ -130,7 +152,9 @@ const GriddedMapComponent = () => {
         height: '200', // px
       });
       const url = `${GRIDDED_API_BASE_URL}/api/datasets/${encodeURIComponent(dataset)}/tiles/legend?${params}`;
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers: HeadersInit | undefined = token
+        ? { Authorization: `Bearer ${token}` }
+        : undefined;
       try {
         const res = await fetch(url, { headers });
         if (!res.ok || cancelled) return;
@@ -154,7 +178,7 @@ const GriddedMapComponent = () => {
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
 
-    map.current = new maplibregl.Map({
+    const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
       style: {
         version: 8,
@@ -166,7 +190,7 @@ const GriddedMapComponent = () => {
       attributionControl: false,
       // Add the Bearer token to every tile request aimed at the xpublish-api.
       // transformRequest is synchronous — tokenRef is kept current by updateTileLayer.
-      transformRequest: (url) => {
+      transformRequest: (url: string) => {
         if (url.startsWith(GRIDDED_API_BASE_URL)) {
           const token = tokenRef.current;
           if (token) return { url, headers: { Authorization: `Bearer ${token}` } };
@@ -174,6 +198,7 @@ const GriddedMapComponent = () => {
         return { url };
       },
     });
+    map.current = mapInstance;
 
     popup.current = new maplibregl.Popup({
       closeButton: true,
@@ -187,21 +212,22 @@ const GriddedMapComponent = () => {
       maxWidth: '280px',
     });
 
-    map.current.on('load', () => {
-      map.current.addSource('osm', {
+    mapInstance.on('load', () => {
+      mapInstance.addSource('osm', {
         type: 'raster',
         tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
         tileSize: 256,
       });
-      map.current.addLayer({ id: 'osm', type: 'raster', source: 'osm' });
+      mapInstance.addLayer({ id: 'osm', type: 'raster', source: 'osm' });
 
       dispatch({ type: ActionTypes.SET_MAP_LOADED, payload: true });
     });
 
-    map.current.on('error', (e) => {
+    mapInstance.on('error', (e: maplibregl.ErrorEvent) => {
       console.error('GriddedMapComponent: MapLibre error:', e);
       // e.sourceId is set for tile/source errors (e.g. 404 for areas with no data); only surface fatal map errors.
-      if (!e.sourceId) {
+      const sourceId = (e as { sourceId?: string }).sourceId;
+      if (!sourceId) {
         dispatch({
           type: ActionTypes.SET_ERROR,
           payload: `Map error: ${e.error?.message || 'Unknown error'}`,
@@ -277,9 +303,14 @@ const GriddedMapComponent = () => {
       const hasSource = !!mapInstance.getSource(id);
 
       if (isActive && !hasLayer) {
-        if (!hasSource) mapInstance.addSource(id, sourceConfig);
+        if (!hasSource) {
+          mapInstance.addSource(id, sourceConfig as maplibregl.SourceSpecification);
+        }
         const beforeId = mapInstance.getLayer('gridded-layer') ? 'gridded-layer' : undefined;
-        mapInstance.addLayer({ id, source: id, ...layerConfig }, beforeId);
+        mapInstance.addLayer(
+          { id, source: id, ...(layerConfig as object) } as maplibregl.LayerSpecification,
+          beforeId
+        );
       } else if (!isActive && hasLayer) {
         mapInstance.removeLayer(id);
         if (hasSource) mapInstance.removeSource(id);
@@ -297,7 +328,7 @@ const GriddedMapComponent = () => {
 
     // Hover shows every polygon under the cursor, so nested features are visible
     // before committing to a click.
-    const handlePolygonHover = (e) => {
+    const handlePolygonHover = (e: maplibregl.MapLayerMouseEvent) => {
       const features = dedupePolygonFeatures(e.features);
       if (features.length === 0) return;
 
@@ -314,9 +345,10 @@ const GriddedMapComponent = () => {
         )
         .join('');
 
-      hoverPopup.current
-        .setLngLat(e.lngLat)
-        .setHTML(`
+      if (hoverPopup.current) {
+        hoverPopup.current
+          .setLngLat(e.lngLat)
+          .setHTML(`
           <div style="padding:8px; font-size:0.8rem;">
             <div style="font-weight:600; margin-bottom:4px; color:#495057;">
               ${features.length} polygon${features.length === 1 ? '' : 's'} here
@@ -325,12 +357,13 @@ const GriddedMapComponent = () => {
             <div style="margin-top:4px; font-size:0.7rem; color:#6c757d;">Click to list attributes</div>
           </div>
         `)
-        .addTo(mapInstance);
+          .addTo(mapInstance);
+      }
     };
 
     const handlePolygonLeave = () => {
       mapInstance.getCanvas().style.cursor = '';
-      hoverPopup.current.remove();
+      if (hoverPopup.current) hoverPopup.current.remove();
     };
 
     const removePolygonLayer = () => {
@@ -359,7 +392,7 @@ const GriddedMapComponent = () => {
     }
 
     // Find the layer metadata
-    const selectedLayer = availablePolygonLayers.find((l) => l.id === activePolygonLayer);
+    const selectedLayer = polygonLayers.data?.find((l) => l.id === activePolygonLayer);
     if (!selectedLayer) {
       removePolygonLayer();
       return;
@@ -434,7 +467,7 @@ const GriddedMapComponent = () => {
       mapInstance.off('mouseleave', polygonLayerId, handlePolygonLeave);
       hoverPopup.current?.remove();
     };
-  }, [mapLoaded, activePolygonLayer, availablePolygonLayers]);
+  }, [mapLoaded, activePolygonLayer, polygonLayers.data]);
 
   // Keep the highlight layer in sync with the polygon chosen in the panel
   useEffect(() => {
@@ -458,7 +491,11 @@ const GriddedMapComponent = () => {
       mapInstance.off('click', clickHandlerRef.current);
     }
 
-    const handleClick = async (e) => {
+    const handleClick = async (e: maplibregl.MapMouseEvent) => {
+      if (!dataset || !variable || !currentTimestep) return;
+      const popupInstance = popup.current;
+      if (!popupInstance) return;
+
       const { lng, lat } = e.lngLat;
 
       // Polygons take precedence over the gridded query. Every polygon under the
@@ -468,7 +505,7 @@ const GriddedMapComponent = () => {
           layers: [POLYGON_LAYER_ID],
         });
         if (features.length > 0) {
-          popup.current.remove();
+          popupInstance.remove();
           dispatch({
             type: ActionTypes.SET_POLYGON_FEATURES,
             payload: {
@@ -485,7 +522,7 @@ const GriddedMapComponent = () => {
 
       dispatch({ type: ActionTypes.SET_CLICKED_POINT, payload: { lon: lng, lat } });
 
-      popup.current
+      popupInstance
         .setLngLat([lng, lat])
         .setHTML('<div style="padding:6px; font-size:0.8rem;">Loading…</div>')
         .addTo(mapInstance);
@@ -498,7 +535,7 @@ const GriddedMapComponent = () => {
           lng,
           lat
         );
-        popup.current.setHTML(`
+        popupInstance.setHTML(`
           <div style="padding:8px; font-size:0.85rem;">
             <div style="font-weight:600; margin-bottom:4px; color:#495057;">${escapeHtml(variable)}</div>
             <div><strong>Value:</strong> ${value !== null && value !== undefined ? (typeof value === 'number' ? value.toFixed(2) : escapeHtml(value)) : 'N/A'}</div>
@@ -509,7 +546,7 @@ const GriddedMapComponent = () => {
         `);
       } catch (err) {
         console.error('GriddedMapComponent: EDR point query failed:', err);
-        popup.current.setHTML(
+        popupInstance.setHTML(
           '<div style="padding:6px; font-size:0.8rem; color:#dc3545;">Failed to retrieve value.</div>'
         );
       }
