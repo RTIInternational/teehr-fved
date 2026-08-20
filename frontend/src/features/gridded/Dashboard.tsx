@@ -4,20 +4,11 @@ import GriddedControls from './components/GriddedControls';
 import GriddedMapComponent from './components/GriddedMapComponent';
 import GriddedTimeseriesPanel from './components/GriddedTimeseriesPanel';
 import { useDashboard, ActionTypes } from './DashboardContext';
-import { useGriddedDataFetching } from './hooks/useGriddedDataFetching';
 import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
 
 export const Dashboard = () => {
   const { state, dispatch } = useDashboard();
-  const { runTimeseriesQuery } = useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
-
-  // Run timeseries query when the user clicks a point on the map
-  useEffect(() => {
-    if (state.clickedPoint) {
-      runTimeseriesQuery(state.clickedPoint.lon, state.clickedPoint.lat);
-    }
-  }, [state.clickedPoint, runTimeseriesQuery]);
 
   // Reset style-tracking when dataset changes
   useEffect(() => {

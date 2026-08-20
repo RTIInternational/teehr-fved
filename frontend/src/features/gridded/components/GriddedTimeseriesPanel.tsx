@@ -1,19 +1,29 @@
 import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef } from 'react';
 import DashboardPanel from '@/shared/components/DashboardPanel';
+import { useEdrTimeseries } from '@/shared/queries/gridded/edr';
+import { useTimesteps } from '@/shared/queries/gridded/timesteps';
 import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
 import { useDashboard } from '../DashboardContext';
 
 const GriddedTimeseriesPanel = () => {
   const { state } = useDashboard();
-  const { mapFilters, timeseriesData, timeseriesLoading, timeseriesError, clickedPoint } = state;
+  const { mapFilters, clickedPoint } = state;
   const plotRef = useRef(null);
 
+  const timesteps = useTimesteps(mapFilters.dataset);
   const variableAttrs = useVariableAttrs(mapFilters.dataset);
+  const timeseries = useEdrTimeseries({
+    datasetId: mapFilters.dataset,
+    variable: mapFilters.variable,
+    lat: clickedPoint?.lat,
+    lon: clickedPoint?.lon,
+    timesteps: timesteps.data,
+  });
 
   useEffect(() => {
-    if (!plotRef.current || !timeseriesData) return;
-    const { times, values, lon, lat, variable } = timeseriesData;
+    if (!plotRef.current || !timeseries.data) return;
+    const { times, values, lon, lat, variable } = timeseries.data;
     const latHem = lat >= 0 ? 'N' : 'S';
     const lonHem = lon >= 0 ? 'E' : 'W';
     Plotly.react(
@@ -41,11 +51,11 @@ const GriddedTimeseriesPanel = () => {
       } as Partial<Plotly.Layout>,
       { responsive: true, displayModeBar: false }
     );
-  }, [timeseriesData, variableAttrs]);
+  }, [timeseries.data, variableAttrs]);
 
   const header = <span className="small fw-bold">Timeseries</span>;
 
-  if (!clickedPoint && !timeseriesData && !timeseriesLoading && !timeseriesError) {
+  if (!clickedPoint && !timeseries.data && !timeseries.isLoading && !timeseries.isError) {
     return (
       <DashboardPanel header={header} style={{ height: '100%' }}>
         <div className="d-flex align-items-center justify-content-center h-100 text-muted small">
@@ -61,18 +71,18 @@ const GriddedTimeseriesPanel = () => {
       style={{ height: '100%' }}
       bodyStyle={{ padding: 0, overflow: 'hidden', height: '100%' }}
     >
-      {timeseriesLoading && (
+      {timeseries.isLoading && (
         <div className="d-flex align-items-center justify-content-center h-100">
           <div className="spinner-border spinner-border-sm text-primary me-2" />
           <span className="small text-muted">Loading timeseries…</span>
         </div>
       )}
-      {timeseriesError && !timeseriesLoading && (
+      {timeseries.isError && !timeseries.isLoading && (
         <div className="d-flex align-items-center justify-content-center h-100">
-          <span className="small text-danger">Error: {timeseriesError}</span>
+          <span className="small text-danger">Error: {timeseries.error.message}</span>
         </div>
       )}
-      {timeseriesData && !timeseriesLoading && (
+      {timeseries.data && !timeseries.isLoading && (
         <div ref={plotRef} style={{ width: '100%', height: '100%' }} />
       )}
     </DashboardPanel>

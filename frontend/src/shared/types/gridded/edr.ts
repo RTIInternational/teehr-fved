@@ -11,6 +11,14 @@ type EdrPointProps = Record<string, unknown> & {
   spatial_ref: number;
 };
 
+export type EdrTimeseriesFilters = {
+  datasetId: string | null;
+  variable: string | null;
+  lon?: number;
+  lat?: number;
+  timesteps: string[];
+};
+
 export type EdrTimeseriesResponse = string;
 
 export type TimeseriesData = {

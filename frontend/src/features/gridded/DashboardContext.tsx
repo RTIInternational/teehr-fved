@@ -1,15 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, type Dispatch } from 'react';
-import type { TimeseriesData } from '@/shared/types/gridded/edr';
 import type { ClickedPoint, MapFilters } from '@/shared/types/gridded/maps';
 
 export type DashboardState = {
   mapFilters: MapFilters;
   activeOverlays: string[];
   clickedPoint: ClickedPoint | null;
-  timeseriesLoading: boolean;
-  timeseriesError: string | null;
-  timeseriesData: TimeseriesData | null;
   mapLoaded: boolean;
   loading: boolean;
   error: string | null;
@@ -30,9 +26,6 @@ const initialState: DashboardState = {
   activeOverlays: [], // string[] of overlay IDs currently shown on the map
 
   clickedPoint: null, // { lon, lat } | null — last point clicked on the map
-  timeseriesLoading: false,
-  timeseriesError: null,
-  timeseriesData: null, // { times: string[], values: number[], lon, lat, variable } | null
 
   mapLoaded: false,
   loading: false,
@@ -44,9 +37,6 @@ export const ActionTypes = {
   UPDATE_MAP_FILTERS: 'UPDATE_MAP_FILTERS',
   TOGGLE_OVERLAY: 'TOGGLE_OVERLAY',
   SET_CLICKED_POINT: 'SET_CLICKED_POINT',
-  SET_TIMESERIES_LOADING: 'SET_TIMESERIES_LOADING',
-  SET_TIMESERIES_DATA: 'SET_TIMESERIES_DATA',
-  SET_TIMESERIES_ERROR: 'SET_TIMESERIES_ERROR',
   SET_MAP_LOADED: 'SET_MAP_LOADED',
   SET_LOADING: 'SET_LOADING',
   SET_ERROR: 'SET_ERROR',
@@ -57,9 +47,6 @@ export type DashboardAction =
   | { type: typeof ActionTypes.UPDATE_MAP_FILTERS; payload: UpdateMapFiltersPayload }
   | { type: typeof ActionTypes.TOGGLE_OVERLAY; payload: string }
   | { type: typeof ActionTypes.SET_CLICKED_POINT; payload: ClickedPoint | null }
-  | { type: typeof ActionTypes.SET_TIMESERIES_LOADING; payload: boolean }
-  | { type: typeof ActionTypes.SET_TIMESERIES_DATA; payload: TimeseriesData | null }
-  | { type: typeof ActionTypes.SET_TIMESERIES_ERROR; payload: string | null }
   | { type: typeof ActionTypes.SET_MAP_LOADED; payload: boolean }
   | { type: typeof ActionTypes.SET_LOADING; payload: boolean }
   | { type: typeof ActionTypes.SET_ERROR; payload: string | null }
@@ -88,23 +75,7 @@ const reducer = (state: DashboardState, action: DashboardAction): DashboardState
       return {
         ...state,
         clickedPoint: action.payload,
-        timeseriesData: null,
-        timeseriesError: null,
       };
-
-    case ActionTypes.SET_TIMESERIES_LOADING:
-      return { ...state, timeseriesLoading: action.payload };
-
-    case ActionTypes.SET_TIMESERIES_DATA:
-      return {
-        ...state,
-        timeseriesData: action.payload,
-        timeseriesLoading: false,
-        timeseriesError: null,
-      };
-
-    case ActionTypes.SET_TIMESERIES_ERROR:
-      return { ...state, timeseriesError: action.payload, timeseriesLoading: false };
 
     case ActionTypes.SET_MAP_LOADED:
       return { ...state, mapLoaded: action.payload };
