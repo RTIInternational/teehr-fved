@@ -868,3 +868,14 @@ deployments:
     entrypoint: workflows/riverware/riverware_ssm_run.py:run_riverware_python_script
     parameters: {"script_path": 'C:\FVED\Scripts\ssm_test.py'}
     work_pool: *work_pool
+
+  - name: run-riverware-s3-workflow-test
+    version:
+    tags: []
+    concurrency_limit: 1
+    concurrency_options:
+      collision_strategy: "CANCEL_NEW"
+    description: Prototype S3 data exchange - upload input to S3, run EC2 script via SSM, validate outputs
+    entrypoint: workflows/riverware/riverware_s3_workflow.py:run_riverware_s3_workflow
+    parameters: {"script_path": 'C:\FVED\Scripts\riverware_s3_reader.py'}
+    work_pool: *work_pool
