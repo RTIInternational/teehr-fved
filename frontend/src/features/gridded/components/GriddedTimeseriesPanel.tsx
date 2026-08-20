@@ -1,6 +1,6 @@
 import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef } from 'react';
-import DashboardPanel from '../../../shared/components/DashboardPanel';
+import DashboardPanel from '@/shared/components/DashboardPanel';
 import { useGriddedDashboard } from '../DashboardContext';
 
 const GriddedTimeseriesPanel = () => {
@@ -35,10 +35,10 @@ const GriddedTimeseriesPanel = () => {
         yaxis: { title: variable },
         margin: { t: 40, r: 20, b: 50, l: 60 },
         autosize: true,
-      },
+      } as Partial<Plotly.Layout>,
       { responsive: true, displayModeBar: false }
     );
-  }, [timeseriesData]);
+  }, [timeseriesData, variableAttrs]);
 
   const header = <span className="small fw-bold">Timeseries</span>;
 
