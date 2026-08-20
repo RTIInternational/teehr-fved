@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching';
-import DashboardPanel from '../../components/common/dashboard/DashboardPanel';
+import DashboardPanel from '../../shared/components/DashboardPanel';
 import GriddedControls from './components/GriddedControls';
 import GriddedMapComponent from './components/GriddedMapComponent';
 import GriddedPolygonPanel from './components/GriddedPolygonPanel';
