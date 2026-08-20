@@ -15,7 +15,7 @@ const TABS = [
   { id: 'polygons', label: 'Polygon Attributes' },
 ];
 
-const Dashboard = () => {
+export const Dashboard = () => {
   const { state, dispatch } = useDashboard();
   const { runTimeseriesQuery } = useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
@@ -158,5 +158,3 @@ const Dashboard = () => {
     </div>
   );
 };
-
-export default Dashboard;
