@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { griddedApiService } from '../../../services/griddedApi';
-import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
+import { useDashboard, ActionTypes } from '../DashboardContext';
 
 export const useGriddedDataFetching = () => {
-  const { state, dispatch } = useGriddedDashboard();
+  const { state, dispatch } = useDashboard();
 
   const runTimeseriesQuery = useCallback(
     async (lon, lat) => {

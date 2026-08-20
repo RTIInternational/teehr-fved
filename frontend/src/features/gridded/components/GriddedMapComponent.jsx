@@ -4,7 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { ensureFreshToken } from '../../../auth/keycloak';
 import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi';
 import { useTimesteps } from '../../../shared/queries/gridded/timesteps';
-import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
+import { useDashboard, ActionTypes } from '../DashboardContext';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 const escapeHtml = (str) =>
@@ -14,7 +14,7 @@ const escapeHtml = (str) =>
   );
 
 const GriddedMapComponent = () => {
-  const { state, dispatch } = useGriddedDashboard();
+  const { state, dispatch } = useDashboard();
   const { mapFilters, mapLoaded, activeOverlays } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 

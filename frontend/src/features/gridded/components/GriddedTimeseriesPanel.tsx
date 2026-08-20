@@ -2,10 +2,10 @@ import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef } from 'react';
 import DashboardPanel from '@/shared/components/DashboardPanel';
 import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
-import { useGriddedDashboard } from '../DashboardContext';
+import { useDashboard } from '../DashboardContext';
 
 const GriddedTimeseriesPanel = () => {
-  const { state } = useGriddedDashboard();
+  const { state } = useDashboard();
   const { mapFilters, timeseriesData, timeseriesLoading, timeseriesError, clickedPoint } = state;
   const plotRef = useRef(null);
 

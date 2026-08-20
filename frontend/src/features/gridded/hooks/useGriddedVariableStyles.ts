@@ -1,9 +1,9 @@
 import { useCallback, useRef } from 'react';
-import { useGriddedDashboard } from '../DashboardContext';
+import { useDashboard } from '../DashboardContext';
 import { getVariableStyle } from '../utils/variableStyles';
 
 export const useGriddedVariableStyles = () => {
-  const { dispatch } = useGriddedDashboard();
+  const { dispatch } = useDashboard();
   const styledVariablesRef = useRef<Set<string>>(new Set());
 
   const resetStyles = useCallback(() => {
