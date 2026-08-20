@@ -200,7 +200,7 @@ export type DashboardContextValue = {
 
 const GriddedDashboardContext = createContext<DashboardContextValue | undefined>(undefined);
 
-export const GriddedDashboardProvider = ({ children }: React.PropsWithChildren) => {
+export const DashboardProvider = ({ children }: React.PropsWithChildren) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   return (
     <GriddedDashboardContext.Provider value={{ state, dispatch }}>
@@ -209,7 +209,7 @@ export const GriddedDashboardProvider = ({ children }: React.PropsWithChildren) 
   );
 };
 
-export const useGriddedDashboard = () => {
+export const useDashboard = () => {
   const context = useContext(GriddedDashboardContext);
   if (!context) {
     throw new Error('useGriddedDashboard must be used within a GriddedDashboardProvider');

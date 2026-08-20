@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 
-import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching';
-import DashboardPanel from '../../shared/components/DashboardPanel';
+import DashboardPanel from '@/shared/components/DashboardPanel';
+
 import GriddedControls from './components/GriddedControls';
 import GriddedMapComponent from './components/GriddedMapComponent';
 import GriddedPolygonPanel from './components/GriddedPolygonPanel';
 import GriddedTimeseriesPanel from './components/GriddedTimeseriesPanel';
-import { useGriddedDashboard, ActionTypes } from './DashboardContext';
+import { useDashboard, ActionTypes } from './DashboardContext';
+import { useGriddedDataFetching } from './hooks/useGriddedDataFetching';
 import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
 
 const TABS = [
@@ -15,7 +16,7 @@ const TABS = [
 ];
 
 const Dashboard = () => {
-  const { state, dispatch } = useGriddedDashboard();
+  const { state, dispatch } = useDashboard();
   const { runTimeseriesQuery } = useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
 

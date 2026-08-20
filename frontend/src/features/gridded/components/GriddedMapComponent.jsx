@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { ensureFreshToken } from '../../../auth/keycloak';
 import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi';
 import { useTimesteps } from '../../../shared/queries/gridded/timesteps';
-import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
+import { useDashboard, ActionTypes } from '../DashboardContext';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 // The pmtiles Protocol issues its own fetches, so maplibre's transformRequest
@@ -44,7 +44,7 @@ const dedupePolygonFeatures = (features) => {
 };
 
 const GriddedMapComponent = () => {
-  const { state, dispatch } = useGriddedDashboard();
+  const { state, dispatch } = useDashboard();
   const {
     mapFilters,
     mapLoaded,

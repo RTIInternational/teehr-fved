@@ -7,7 +7,7 @@ import { useTimesteps } from '@/shared/queries/gridded/timesteps';
 import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
 import { useVariables } from '@/shared/queries/gridded/variables';
 
-import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
+import { useDashboard, ActionTypes } from '../DashboardContext';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 const COLOR_RAMPS = [
@@ -23,7 +23,7 @@ const GriddedControls = () => {
   const [overlaysExpanded, setOverlaysExpanded] = useState(false);
   const [polygonLayersExpanded, setPolygonLayersExpanded] = useState(false);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
-  const { state, dispatch } = useGriddedDashboard();
+  const { state, dispatch } = useDashboard();
   const { mapFilters, activeOverlays, activePolygonLayer } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
