@@ -1,12 +1,15 @@
 import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef } from 'react';
 import DashboardPanel from '@/shared/components/DashboardPanel';
+import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
 import { useGriddedDashboard } from '../DashboardContext';
 
 const GriddedTimeseriesPanel = () => {
   const { state } = useGriddedDashboard();
-  const { timeseriesData, timeseriesLoading, timeseriesError, clickedPoint, variableAttrs } = state;
+  const { mapFilters, timeseriesData, timeseriesLoading, timeseriesError, clickedPoint } = state;
   const plotRef = useRef(null);
+
+  const variableAttrs = useVariableAttrs(mapFilters.dataset);
 
   useEffect(() => {
     if (!plotRef.current || !timeseriesData) return;
@@ -28,7 +31,7 @@ const GriddedTimeseriesPanel = () => {
       ],
       {
         title: {
-          text: `${variable}${variableAttrs[variable]?.units ? ` (${variableAttrs[variable].units})` : ''} at (${Math.abs(lat).toFixed(4)}°${latHem}, ${Math.abs(lon).toFixed(4)}°${lonHem})`,
+          text: `${variable}${variableAttrs.data?.[variable]?.units ? ` (${variableAttrs.data?.[variable].units})` : ''} at (${Math.abs(lat).toFixed(4)}°${latHem}, ${Math.abs(lon).toFixed(4)}°${lonHem})`,
           font: { size: 13 },
         },
         xaxis: { title: 'Time', type: 'date' },

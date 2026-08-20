@@ -9,7 +9,7 @@ import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
 
 const Dashboard = () => {
   const { state, dispatch } = useGriddedDashboard();
-  const { loadVariableAttrs, runTimeseriesQuery } = useGriddedDataFetching();
+  const { runTimeseriesQuery } = useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
 
   // Run timeseries query when the user clicks a point on the map
@@ -19,13 +19,12 @@ const Dashboard = () => {
     }
   }, [state.clickedPoint, runTimeseriesQuery]);
 
-  // Fetch variable attrs and reset style-tracking when dataset changes
+  // Reset style-tracking when dataset changes
   useEffect(() => {
     if (state.mapFilters.dataset) {
-      loadVariableAttrs(state.mapFilters.dataset);
       resetStyles();
     }
-  }, [state.mapFilters.dataset, loadVariableAttrs, resetStyles]);
+  }, [state.mapFilters.dataset, resetStyles]);
 
   // Auto-apply variable-specific default styles on first selection of each variable
   useEffect(() => {

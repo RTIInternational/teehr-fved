@@ -5,18 +5,6 @@ import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
 export const useGriddedDataFetching = () => {
   const { state, dispatch } = useGriddedDashboard();
 
-  const loadVariableAttrs = useCallback(
-    async (datasetId) => {
-      try {
-        const data = await griddedApiService.getGriddedVariableAttrs(datasetId);
-        dispatch({ type: ActionTypes.SET_VARIABLE_ATTRS, payload: data.variables ?? {} });
-      } catch (err) {
-        console.error('useGriddedDataFetching: Failed to load variable attrs:', err);
-      }
-    },
-    [dispatch]
-  );
-
   const runTimeseriesQuery = useCallback(
     async (lon, lat) => {
       const { dataset, variable } = state.mapFilters;
@@ -43,5 +31,5 @@ export const useGriddedDataFetching = () => {
     [state.mapFilters.dataset, state.mapFilters.variable, state.timesteps, dispatch]
   );
 
-  return { loadVariableAttrs, runTimeseriesQuery };
+  return { runTimeseriesQuery };
 };
