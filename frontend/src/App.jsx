@@ -7,15 +7,15 @@ import KeycloakAdmin from './components/admin/KeycloakAdmin';
 import { Home, DashboardsHome, Navbar } from './components/common';
 import { DataDashboard } from './components/dashboards/data_management';
 import { ForecastDashboard } from './components/dashboards/forecast';
-import { Dashboard } from './components/dashboards/retrospective';
 import { NwmdDashboard } from './components/dashboards/nwmd/index';
-import GriddedDashboard from './features/gridded/index';
+import { Dashboard } from './components/dashboards/retrospective';
 import { DataDashboardProvider } from './context/DataDashboardContext';
 import { ForecastDashboardProvider } from './context/ForecastDashboardContext';
-import { DashboardProvider } from './features/gridded/DashboardContext';
 import { NwmdDashboardProvider } from './context/NwmdDashboardContext';
 import { RetrospectiveDashboardProvider } from './context/RetrospectiveDashboardContext';
+import { GriddedDashboard, GriddedDashboardProvider } from './features/gridded';
 import { useAuth } from './hooks/useAuth';
+
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -139,9 +139,9 @@ const AppRoutes = () => {
             path="/gridded"
             element={
               <RequireAuth>
-                <DashboardProvider>
+                <GriddedDashboardProvider>
                   <GriddedDashboard />
-                </DashboardProvider>
+                </GriddedDashboardProvider>
               </RequireAuth>
             }
           />

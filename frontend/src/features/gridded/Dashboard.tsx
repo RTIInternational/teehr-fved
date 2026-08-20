@@ -7,7 +7,7 @@ import { useDashboard, ActionTypes } from './DashboardContext';
 import { useGriddedDataFetching } from './hooks/useGriddedDataFetching';
 import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
 
-const Dashboard = () => {
+export const Dashboard = () => {
   const { state, dispatch } = useDashboard();
   const { runTimeseriesQuery } = useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
@@ -110,5 +110,3 @@ const Dashboard = () => {
     </div>
   );
 };
-
-export default Dashboard;
