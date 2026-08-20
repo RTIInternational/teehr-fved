@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import DashboardPanel from '../../components/common/dashboard/DashboardPanel';
+import DashboardPanel from '../../shared/components/DashboardPanel';
 import GriddedControls from './components/GriddedControls';
 import GriddedMapComponent from './components/GriddedMapComponent';
 import GriddedTimeseriesPanel from './components/GriddedTimeseriesPanel';

@@ -13,7 +13,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Spinner, Alert } from 'react-bootstrap';
 import { useSortableTable } from '../../../hooks/useSortableTable';
 import { apiService } from '../../../services/api';
-import { DashboardPanel } from '../../common/dashboard';
+import { DashboardPanel } from '../../../shared/components/DashboardPanel';
 import SharedDataTable from '../../common/SharedDataTable';
 import SimpleMapPanel from './SimpleMapPanel';
 

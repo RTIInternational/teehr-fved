@@ -18,7 +18,7 @@ import { Form } from 'react-bootstrap';
 import SimpleMapPanel from './SimpleMapPanel';
 import CompletenessHeatmap from './CompletenessHeatmap';
 import { apiService } from '../../../services/api';
-import { DashboardPanel } from '../../common/dashboard';
+import { DashboardPanel } from '../../../shared/components/DashboardPanel';
 
 const CONFIG_OPTIONS = ['usgs_observations'];
 const VARIABLE_OPTIONS = ['streamflow_hourly_inst'];
