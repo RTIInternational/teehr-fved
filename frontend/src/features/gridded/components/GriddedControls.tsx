@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Form, Row, Col, Button, InputGroup, Spinner, Alert } from 'react-bootstrap';
 
 import { useDatasets } from '@/shared/queries/gridded/datasets';
@@ -44,18 +44,14 @@ const GriddedControls = () => {
 
   const polygonLayers = usePolygonLayers();
 
-  // Keep display in sync when stepping with buttons
-  useEffect(() => {
-    if (!timestepEditing) {
-      setTimestepInput(currentTimestep);
-      setTimestepInputError(false);
-    }
-  }, [currentTimestep, timestepEditing]);
+  const displayedTimestep = timestepEditing ? timestepInput : currentTimestep;
 
   const commitTimestepInput = () => {
+    const inputValue = timestepInput;
     setTimestepEditing(false);
-    if (!timestepInput || timesteps.data.length === 0) return;
-    const entered = new Date(timestepInput);
+    setTimestepInputError(false);
+    if (!inputValue || timesteps.data.length === 0) return;
+    const entered = new Date(inputValue);
     if (isNaN(entered.getTime())) {
       setTimestepInputError(true);
       return;
@@ -77,7 +73,6 @@ const GriddedControls = () => {
     if (e.key === 'Enter') commitTimestepInput();
     if (e.key === 'Escape') {
       setTimestepEditing(false);
-      setTimestepInput(currentTimestep);
       setTimestepInputError(false);
     }
   };
@@ -185,7 +180,7 @@ const GriddedControls = () => {
                 &#9664;
               </Button>
               <Form.Control
-                value={timestepInput}
+                value={displayedTimestep}
                 placeholder={variable ? 'No timesteps' : '—'}
                 onChange={(e) => {
                   setTimestepEditing(true);
