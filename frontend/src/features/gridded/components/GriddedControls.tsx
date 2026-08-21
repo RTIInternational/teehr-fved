@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Form, Row, Col, Button, InputGroup, Spinner, Alert } from 'react-bootstrap';
 
 import { useDatasets } from '@/shared/queries/gridded/datasets';
@@ -45,6 +45,20 @@ const GriddedControls = () => {
   const polygonLayers = usePolygonLayers();
 
   const displayedTimestep = timestepEditing ? timestepInput : currentTimestep;
+
+  // Auto-select variable when dataset is selected
+  useEffect(() => {
+    if (!dataset) return;
+    if (variables.data.length === 0) return;
+
+    const currentIsValid = !!variable && variables.data.includes(variable);
+    if (currentIsValid) return;
+
+    dispatch({
+      type: ActionTypes.UPDATE_MAP_FILTERS,
+      payload: { variable: variables.data[0], timestepIndex: 0 },
+    });
+  }, [dataset, variable, variables.data, dispatch]);
 
   const commitTimestepInput = () => {
     const inputValue = timestepInput;
