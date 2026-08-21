@@ -134,11 +134,16 @@ const GriddedMapComponent = () => {
 
   useEffect(() => {
     if (!dataset || !variable || !mapLoaded) {
-      setLegendBlobUrl(null);
+      if (prevLegendBlobUrl.current) {
+        URL.revokeObjectURL(prevLegendBlobUrl.current);
+        prevLegendBlobUrl.current = null;
+      }
       return;
     }
 
+    const controller = new AbortController();
     let cancelled = false;
+
     (async () => {
       const token = await ensureFreshToken();
       const params = new URLSearchParams({
@@ -152,14 +157,16 @@ const GriddedMapComponent = () => {
         height: '200', // px
       });
       const url = `${GRIDDED_API_BASE_URL}/api/datasets/${encodeURIComponent(dataset)}/tiles/legend?${params}`;
-      const headers: HeadersInit | undefined = token
-        ? { Authorization: `Bearer ${token}` }
-        : undefined;
       try {
-        const res = await fetch(url, { headers });
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          signal: controller.signal,
+        });
         if (!res.ok || cancelled) return;
+
         const blob = await res.blob();
         if (cancelled) return;
+
         const blobUrl = URL.createObjectURL(blob);
         if (prevLegendBlobUrl.current) URL.revokeObjectURL(prevLegendBlobUrl.current);
         prevLegendBlobUrl.current = blobUrl;
@@ -171,6 +178,7 @@ const GriddedMapComponent = () => {
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [mapLoaded, dataset, variable, colorRamp, colorRampMin, colorRampMax]);
 
