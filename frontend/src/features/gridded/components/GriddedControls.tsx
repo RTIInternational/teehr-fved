@@ -119,7 +119,7 @@ const GriddedControls = () => {
 
   return (
     <div className="h-100 d-flex flex-column overflow-auto p-1">
-      <Form>
+      <Form onSubmit={(e) => e.preventDefault()}>
         <Row className="g-2">
           {/* Dataset selector */}
           <Col md={12}>
