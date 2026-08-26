@@ -193,6 +193,7 @@ def ingest_nwm_streamflow_forecasts(
             end_date=end_dt,
             location_ids=stripped_ids,
             json_dir=kerchunk_cache_dir,
+            kerchunk_method="local",
             output_parquet_dir=Path(
                 nwm_cache_dir,
                 ev_config["name"],
