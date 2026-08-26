@@ -61,15 +61,8 @@ environments:
       stableTeehrVersion: v0.6.5
       previousTeehrVersion: v0.5.3
       irsa:
-        # icebergRestRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-irsa
-        jupyterRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
-        # prefectJobRoleArn: arn:aws:iam::794457362858:role/fved-prefect-jobs-irsa
-        # sparkRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
-        # trinoRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-irsa
-        xpublishRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
-        # Polaris's own identity, used to assume the warehouse data-access
-        # role and vend scoped, short-lived S3 credentials to Trino, Spark,
-        # Prefect, and Jupyter. No other service holds a warehouse role.
+        prefectJobRoleArn: arn:aws:iam::794457362858:role/fved-prefect-jobs-irsa
+        xpublishRoleArn: arn:aws:iam::794457362858:role/fved-xpublish-api-irsa
         polarisRoleArn: arn:aws:iam::794457362858:role/fved-polaris-irsa
       polaris:
         inCluster: "true"
@@ -79,7 +72,7 @@ environments:
         catalogType: rest
         catalogUri: http://polaris:8181/api/catalog
         catalogWarehouse: s3://dev-fved-iceberg-warehouse-rti-use1/
-        catalogRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-irsa
+        catalogRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-access
         skipCredentialSubscopingIndirection: "false"
         storageStsUnavailable: "false"
         defaultRealm: teehr
