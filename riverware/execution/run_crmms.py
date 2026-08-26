@@ -1,6 +1,7 @@
 """Invoke the CRMMS RiverWare model via CLI or RCL script."""
 
 import argparse
+import os
 import re
 import subprocess
 import time
@@ -19,13 +20,17 @@ _PAT_ERROR = re.compile(r"_ERROR_")
 
 
 def find_mdl_file(model_dir: Path) -> Path:
-    matches = list((model_dir / "RW Files").glob("*.mdl"))
+    rw_dir = model_dir / "RW Files"
+    candidates = list(rw_dir.glob("*.mdl")) + list(rw_dir.glob("*.mdl.gz"))
+    esp_files = [f for f in candidates if "ESP" in f.name.upper()]
+    matches = esp_files if esp_files else candidates
     if not matches:
-        raise FileNotFoundError(f"No .mdl file found in {model_dir / 'RW Files'}")
+        raise FileNotFoundError(f"No .mdl or .mdl.gz file found in {rw_dir}")
     if len(matches) > 1:
         raise ValueError(
-            f"Multiple .mdl files found in {model_dir / 'RW Files'}: "
+            f"Multiple ESP model files found in {rw_dir}: "
             + ", ".join(m.name for m in matches)
+            + " — specify --mdl-filename to disambiguate."
         )
     return matches[0]
 
@@ -117,6 +122,10 @@ def run_crmms(
         if stale.exists():
             stale.unlink()
             print(f"Removed stale file: {stale}")
+
+    # Required by the model to locate input/output directories (replaces 1.SetCrmmsDirectory.bat)
+    os.environ["CRMMS_DIR"] = str(model_dir)
+    print(f"CRMMS_DIR={model_dir}")
 
     write_rcl(mdl_path, mrm_run_name, rcl_path)
     proc = launch_riverware(riverware_exe, rcl_path, log_path)
