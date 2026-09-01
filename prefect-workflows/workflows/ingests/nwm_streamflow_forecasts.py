@@ -19,8 +19,6 @@ from teehr.fetching.nwm.point_utils import (
 from teehr.utils.utils import remove_dir_if_exists
 from teehr.utils.concurrency import resolve_budget
 from teehr.fetching.utils import (
-    FeatureIdSelection,
-    build_feature_id_selection,
     format_nwm_configuration_metadata,
 )
 from teehr.fetching.const import (
@@ -123,33 +121,10 @@ def _plan_fetch(
 
 
 @task(cache_policy=NO_CACHE, retries=2, retry_delay_seconds=30)
-def _resolve_locations(
-    json_path: str,
-    location_ids: List[str],
-) -> FeatureIdSelection:
-    """Find where the requested locations sit in the NWM feature_id coordinate.
-
-    NWM writes the same feature_id coordinate into every file, so this is
-    run-level work: resolve it once here and hand the result to every chunk,
-    rather than having each chunk read that coordinate for itself.
-
-    Retried because it reads from GCS.
-    """
-    logger = get_run_logger()
-    selection = build_feature_id_selection(json_path, location_ids)
-    logger.info(
-        f"Resolved {len(selection.location_ids)} locations against a feature_id"
-        f" coordinate of {selection.fingerprint[0]} values"
-    )
-    return selection
-
-
-@task(cache_policy=NO_CACHE, retries=2, retry_delay_seconds=30)
 def _process_chunk(
     chunk: pd.DataFrame,
     plan: NwmPointFetchPlan,
     location_ids: List[str],
-    selection: FeatureIdSelection,
     output_parquet_dir: str,
     nwm_version: str,
     variable_mapper: Dict,
@@ -185,7 +160,6 @@ def _process_chunk(
         timeseries_type=timeseries_type,
         drop_overlapping_assimilation_values=DROP_OVERLAPPING_ASSIM_VALUES,
         max_concurrent_files=max_concurrent_files,
-        selection=selection,
     )
     if filepath is None:
         logger.warning("Chunk produced no data")
@@ -324,13 +298,6 @@ def ingest_nwm_streamflow_forecasts(
             process_by_z_hour=PROCESS_BY_Z_HOUR,
             stepsize=STEPSIZE
         )
-        # Called directly, so it runs here in the flow process and every chunk
-        # task gets the same resolved positions. json_paths carries None for
-        # files that were missing from GCS, so resolve against a real one.
-        selection = _resolve_locations(
-            next(path for path in plan.json_paths if path is not None),
-            stripped_ids,
-        )
 
         # The chunk tasks run in separate processes, so their budgets add up
         # against the same machine. Divide both so all of them together use
@@ -361,7 +328,6 @@ def ingest_nwm_streamflow_forecasts(
             chunks,
             plan=unmapped(plan),
             location_ids=unmapped(stripped_ids),
-            selection=unmapped(selection),
             output_parquet_dir=unmapped(str(output_parquet_dir)),
             nwm_version=unmapped(nwm_version),
             variable_mapper=unmapped(variable_mapper),

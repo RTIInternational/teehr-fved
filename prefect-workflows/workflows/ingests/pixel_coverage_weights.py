@@ -15,7 +15,7 @@ The first flow will calculate pixel coverage weights for a given grid and polygo
         - Read a single timestep of the grid from the Icechunk repo
         - Use exactextract to calculate the pixel coverage weights for each polygon
         - Write the pixel coverage weights to the iceberg warehouse table with the domain name and location IDs as keys.
-            - Schema: fraction_covered, row, col, location_id, position_index, configuration_name, variable_name, domain_name
+            - Schema: fraction_covered, row, col, position_index, location_id, configuration_name, variable_name, domain_name
         
 The second flow will use the pixel coverage weights to calculate mean areal scalar timeseries values
 for a given raster layer and polygon layer and write them to the iceberg warehouse table.
@@ -35,12 +35,12 @@ from typing import Tuple
 from prefect import flow, task, get_run_logger
 from prefect.cache_policies import NO_CACHE
 import icechunk as ic
-from exactextract import exact_extract
 import geopandas as gpd
 import xarray as xr
 import rioxarray  # noqa: F401
 import pandas as pd
 from teehr import Evaluation
+from teehr.utilities.generate_weights import generate_weights_file
 from shapely.geometry import box
 
 from workflows.utils.common_utils import initialize_evaluation
@@ -93,55 +93,45 @@ def write_dataframe_to_warehouse(
 @task(timeout_seconds=60 * 5)
 def format_weights_df(
     weights_df: pd.DataFrame,
-    grid_width: int,
+    grid_da: xr.DataArray,
     configuration_name: str,
     variable_name: str,
     domain_name: str
 ) -> pd.DataFrame:
-    """Format the weights dataframe to match the teehr iceberg warehouse table schema."""
+    """Format teehr's weights to match the warehouse table schema.
+
+    ``row``/``col`` are absolute over the full grid and are what the icechunk
+    path indexes with; the grid itself is identified by
+    configuration_name/variable_name/domain_name.
+
+    ``position_index`` is kept for the sedona workflow (``nwm_forcing_map``),
+    which joins on it. It is a *north-up* row-major index, matching what
+    ``posexplode(RS_BandAsArray(...))`` produces -- not ``row * width + col``,
+    since teehr's row 0 is the southernmost when the grid transform's y step is
+    positive.
+    """
     logger = get_run_logger()
-    weights_df = weights_df.explode(["cell_id", "coverage"])
-    logger.info("Exploded the weights dataframe.")
-    weights_df = weights_df.dropna(subset=["cell_id", "coverage"])
-    logger.info("Dropped rows with NaN values in 'cell_id' or 'coverage' columns.")
-    weights_df.rename(
-        columns={
-            "coverage": "fraction_covered",
-            "cell_id": "position_index"
-        }, inplace=True
+    weights_df = weights_df.rename(columns={"weight": "fraction_covered"})
+
+    height, width = grid_da.rio.height, grid_da.rio.width
+    north_up_row = weights_df["row"].astype("int64")
+    if grid_da.rio.transform().e > 0:
+        north_up_row = (height - 1) - north_up_row
+    weights_df["position_index"] = (
+        north_up_row * width + weights_df["col"].astype("int64")
     )
-    weights_df["row"] = weights_df["position_index"] // grid_width
-    weights_df["col"] = weights_df["position_index"] % grid_width
+
     weights_df["configuration_name"] = configuration_name
     weights_df["variable_name"] = variable_name
     weights_df["domain_name"] = domain_name
     weights_df["row"] = weights_df["row"].astype(int)
     weights_df["col"] = weights_df["col"].astype(int)
-    weights_df["position_index"] = weights_df["position_index"].astype(int)
-    weights_df["fraction_covered"] = weights_df["fraction_covered"].astype("float32")
-    logger.info("Formatted the weights dataframe to match the iceberg warehouse table schema.")
-    return weights_df
-
-
-@task(timeout_seconds=60 * 15)
-def run_exact_extract(
-    grid_template_da: xr.DataArray,
-    polygons_gdf: gpd.GeoDataFrame,
-    ops: list = ["cell_id", "coverage"],
-    include_cols: list = ["location_id"],
-    output: str = "pandas"
-) -> pd.DataFrame:
-    """Run exactextract to calculate pixel coverage weights for each polygon."""
-    logger = get_run_logger()
-    logger.info("Running exactextract to calculate pixel coverage weights for each polygon.")
-    weights_df = exact_extract(
-        rast=grid_template_da,
-        vec=polygons_gdf,
-        ops=ops,
-        include_cols=include_cols,
-        output=output
+    weights_df["fraction_covered"] = (
+        weights_df["fraction_covered"].astype("float32")
     )
-    logger.info("Pixel coverage weights calculated.")
+    logger.info(
+        f"Formatted {len(weights_df)} weight rows for a {height}x{width} grid."
+    )
     return weights_df
 
 
@@ -152,8 +142,8 @@ def check_layer_extents(
 ) -> Tuple[gpd.GeoDataFrame, xr.DataArray]:
     """Check the extents of the polygons and grid to ensure they overlap.
     
-    If there are polygons outside the grid extent, drop them from the polygons_gdf.
-    If the grid extent is larger than the polygon extent, clip the grid layer to the polygon extent.
+    Polygons outside the grid extent are dropped. The grid is not clipped:
+    clipping drops boundary pixels and would make row/col relative.
     """
     logger = get_run_logger()
     logger.info("Checking the extents of the polygons and grid to ensure they overlap.")
@@ -170,12 +160,6 @@ def check_layer_extents(
             logger.info(
                 f"Dropped {dropped_count} polygons that are outside the grid extent."
             )
-    elif grid_box.contains(poly_box):
-        logger.info(
-            "The grid layer extends beyond the polygon extent. "
-            "Clipping the grid layer to the polygon extent."
-        )
-        grid_da = grid_da.rio.clip_box(*poly_box.bounds)
     return polygons_gdf, grid_da
 
 
@@ -207,7 +191,7 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
             }
         ]
     ).to_geopandas()
-    polygons_gdf["location_id"] = polygons_gdf["id"].values  # the 'id' column is ignored by exactextract
+    # teehr resolves the zone id internally, including the "id" column name.
 
     # Connect to the IceChunk S3 repository with a read-only session to read the grid data
     store = get_readonly_repo_store(
@@ -234,16 +218,22 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
     # Load into memory for exactextract
     grid_template_da = grid_template_da.load()
 
-    # Calculate pixel coverage weights for each polygon using exactextract
-    weights_df = run_exact_extract(
-        grid_template_da=grid_template_da,
-        polygons_gdf=polygons_gdf
+    # Shared with standalone teehr: one implementation, one row/col convention.
+    weights_df = generate_weights_file(
+        zone_polygons=polygons_gdf,
+        template_dataset=grid_template_da.to_dataset(
+            name=args.grid_variable_name
+        ),
+        variable_name=args.grid_variable_name,
+        output_weights_filepath=None,
+        crs_wkt=grid_template_da.rio.crs.to_wkt(),
+        unique_zone_id="id",
     )
 
     teehr_variable_name = args.variable_and_unit_mapper.variable_name[args.grid_variable_name].name
     weights_df = format_weights_df(
         weights_df=weights_df,
-        grid_width=grid_template_da.rio.width,
+        grid_da=grid_template_da,
         configuration_name=args.configuration_name,
         variable_name=teehr_variable_name,
         domain_name=args.domain_name
