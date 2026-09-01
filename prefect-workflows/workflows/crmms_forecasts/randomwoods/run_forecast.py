@@ -57,7 +57,6 @@ def run_r_forecast(
     pdo_file: str | None = None,
     static_data_dir: str | Path | None = None,
     random_seed: int | None = 42,
-    generate_plots: bool | None = None,
     r_script_dir: str | Path = R_SCRIPT_DIR,
     timeout_seconds: int = 30 * 60,
 ) -> subprocess.CompletedProcess:
@@ -73,7 +72,7 @@ def run_r_forecast(
     end_year : int, optional
         Water year to forecast. Auto-derived from the system date if omitted.
     output_dir : str or Path, optional
-        Where forecast outputs (CSV/PNG/PDF) are written. Defaults to work_dir.
+        Where forecast outputs (CSV) are written. Defaults to work_dir.
     lf_natflow_file : str, optional
         Filename of the naturalized flow workbook within work_dir. Defaults
         to the R script's own default (see RandomWoods_Forecast.R).
@@ -92,13 +91,6 @@ def run_r_forecast(
         RNG seed passed to the R script for reproducible randomForest
         training/bootstrapping. Defaults to 42; pass None to let the R
         script use its own default instead.
-    generate_plots : bool, optional
-        Whether to generate PNG/PDF plots in addition to the forecast CSV.
-        Defaults to None, which leaves it to the R script's own default
-        (True) or the container's GENERATE_PLOTS env var. Pass False for a
-        lean, CSV-only operational run -- this also lets a Docker image
-        built with INSTALL_PLOT_PACKAGES=false (no ggplot2/gghalves/
-        patchwork) run successfully.
     r_script_dir : str or Path
         Directory holding RandomWoods_Forecast.R and the R library file.
     timeout_seconds : int
@@ -122,8 +114,6 @@ def run_r_forecast(
     env = os.environ.copy()
     env["FORECAST_YEAR"] = str(end_year)
     env["WORK_DIR"] = str(work_dir)
-    if generate_plots is not None:
-        env["GENERATE_PLOTS"] = "true" if generate_plots else "false"
     if static_data_dir is not None:
         env["STATIC_DATA_DIR"] = str(static_data_dir)
     if output_dir is not None:
@@ -174,16 +164,10 @@ if __name__ == "__main__":
         default=42,
         help="RNG seed for reproducible randomForest training (default: 42)",
     )
-    parser.add_argument(
-        "--no-plots",
-        action="store_true",
-        help="Skip PNG/PDF plot generation; write only the forecast CSV",
-    )
     args = parser.parse_args()
 
     run_r_forecast(
         args.work_dir,
         args.end_year,
         random_seed=args.random_seed,
-        generate_plots=not args.no_plots,
     )
