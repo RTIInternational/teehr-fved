@@ -8,7 +8,7 @@ import pyspark.sql.functions as F
 from teehr import Evaluation
 
 from workflows.utils.common_utils import initialize_evaluation
-from models.mean_areal_inputs import MeanArealValuesInput
+from workflows.models.mean_areal_inputs import MeanArealValuesInput
 from pixel_coverage_weights import get_readonly_repo_store, write_dataframe_to_warehouse
 
 

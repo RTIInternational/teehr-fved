@@ -48,6 +48,8 @@ definitions:
         IN_CLUSTER: "{{ $IN_CLUSTER }}"
         ICECHUNK_BUCKET: "{{ $ICECHUNK_BUCKET }}"
         ICECHUNK_PREFIX: "{{ $ICECHUNK_PREFIX }}"
+        PMTILES_BUCKET: "{{ $PMTILES_BUCKET }}"
+        PMTILES_PREFIX: "{{ $PMTILES_PREFIX }}"
       node_selector:
         teehr-hub/nodegroup-name: spark-r5-4xlarge
       tolerations:
@@ -541,6 +543,21 @@ deployments:
       "args": {
         "configuration_name": "ua-swann-4km",
         "factors": [1]
+      }
+    }
+    work_pool: *work_pool
+
+  # Create Vector Tiles
+  - name: create-vector-tiles
+    version:
+    tags: []
+    description: Create vector tiles from the locations table and upload to S3
+    entrypoint: workflows/data_management/create_vector_tiles.py:create_vector_tile_archive
+    parameters: {
+      "args": {
+        "temp_dir_path": *temp_dir_path,
+        "location_id_prefix": "cpnr",
+        "output_layer_name": "cpnr_basins"
       }
     }
     work_pool: *work_pool

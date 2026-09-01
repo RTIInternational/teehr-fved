@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Form, Row, Col, Button, InputGroup } from 'react-bootstrap';
+import { Form, Row, Col, Button, InputGroup, Spinner, Alert } from 'react-bootstrap';
 import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
 import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching.js';
+import { griddedApiService } from '../../../services/griddedApi.js';
 import { OVERLAY_LAYERS } from './overlayLayers.js';
 
 const COLOR_RAMPS = [
@@ -15,10 +16,11 @@ const COLOR_RAMPS = [
 
 const GriddedControls = () => {
   const [overlaysExpanded, setOverlaysExpanded] = useState(false);
+  const [polygonLayersExpanded, setPolygonLayersExpanded] = useState(false);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
   const { state, dispatch } = useGriddedDashboard();
   const { loadVariables, loadTimesteps } = useGriddedDataFetching();
-  const { datasets, variables, timesteps, mapFilters, activeOverlays, variableAttrs } = state;
+  const { datasets, variables, timesteps, mapFilters, activeOverlays, variableAttrs, availablePolygonLayers, activePolygonLayer, polygonLayerLoading, polygonLayerError } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
   const units = variableAttrs[variable]?.units ?? null;
@@ -30,6 +32,35 @@ const GriddedControls = () => {
   const [timestepInput, setTimestepInput] = useState(currentTimestep);
   const [timestepEditing, setTimestepEditing] = useState(false);
   const [timestepInputError, setTimestepInputError] = useState(false);
+
+  // Fetch polygon layers from discovery endpoint
+  useEffect(() => {
+    const fetchPolygonLayers = async () => {
+      const bucket = import.meta.env.VITE_PMTILES_BUCKET;
+      const prefix = import.meta.env.VITE_PMTILES_PREFIX;
+      const extension = '.pmtiles';
+
+      if (!bucket || prefix === undefined) {
+        dispatch({ type: ActionTypes.SET_POLYGON_LAYER_ERROR, payload: 'Missing S3 configuration' });
+        return;
+      }
+
+      dispatch({ type: ActionTypes.SET_POLYGON_LAYER_LOADING, payload: true });
+      try {
+        const data = await griddedApiService.discoverPolygonLayers(bucket, prefix, extension);
+        dispatch({ type: ActionTypes.SET_POLYGON_LAYERS, payload: data.items || [] });
+      } catch (error) {
+        if (error.message.includes('401')) {
+          dispatch({ type: ActionTypes.SET_POLYGON_LAYER_ERROR, payload: 'Sign in required to access polygon layers' });
+          return;
+        }
+        console.error('Failed to fetch polygon layers:', error);
+        dispatch({ type: ActionTypes.SET_POLYGON_LAYER_ERROR, payload: error.message });
+      }
+    };
+
+    fetchPolygonLayers();
+  }, [dispatch]);
 
   // Keep display in sync when stepping with buttons
   useEffect(() => {
@@ -192,6 +223,52 @@ const GriddedControls = () => {
             )}
           </Col>
 
+          {/* Polygon layers (exclusive selection) */}
+          <Col md={12}>
+            <button
+              type="button"
+              className="small btn btn-link p-0 text-decoration-none d-flex align-items-center gap-1"
+              style={{ color: '#555658', fontWeight: 700 }}
+              onClick={() => setPolygonLayersExpanded((v) => !v)}
+              aria-expanded={polygonLayersExpanded}
+            >
+              <span style={{ fontSize: '0.65rem' }}>{polygonLayersExpanded ? '▼' : '▶'}</span>
+              <span>Polygon Layers</span>
+            </button>
+            {polygonLayersExpanded && (
+              <div className="mt-1">
+                {polygonLayerLoading && (
+                  <div className="d-flex align-items-center gap-2">
+                    <Spinner animation="border" size="sm" />
+                    <span style={{ fontSize: '0.75rem' }}>Loading layers…</span>
+                  </div>
+                )}
+                {polygonLayerError && (
+                  <Alert variant="warning" className="py-1 px-2 mb-1" style={{ fontSize: '0.8rem' }}>
+                    {polygonLayerError}
+                  </Alert>
+                )}
+                {!polygonLayerLoading && availablePolygonLayers.length === 0 && !polygonLayerError && (
+                  <span style={{ fontSize: '0.75rem', color: '#6c757d' }}>No polygon layers available</span>
+                )}
+                {!polygonLayerLoading && availablePolygonLayers.map((layer) => (
+                  <Form.Check
+                    key={layer.id}
+                    type="checkbox"
+                    id={`polygon-${layer.id}`}
+                    label={<span style={{ fontSize: '0.8rem' }}>{layer.id}</span>}
+                    checked={activePolygonLayer === layer.id}
+                    onChange={() => dispatch({
+                      type: ActionTypes.SET_ACTIVE_POLYGON_LAYER,
+                      payload: activePolygonLayer === layer.id ? null : layer.id,
+                    })}
+                    className="mb-1"
+                  />
+                ))}
+              </div>
+            )}
+          </Col>
+
           {/* Overlay layer toggles */}
           <Col md={12}>
             <button
@@ -231,7 +308,7 @@ const GriddedControls = () => {
               aria-expanded={mapControlsExpanded}
             >
               <span style={{ fontSize: '0.65rem' }}>{mapControlsExpanded ? '▼' : '▶'}</span>
-              <span>Map Controls</span>
+              <span>Display Controls</span>
             </button>
             {mapControlsExpanded && (
               <Row className="g-2 mt-0">
