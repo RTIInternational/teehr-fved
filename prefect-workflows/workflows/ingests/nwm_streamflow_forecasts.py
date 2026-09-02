@@ -75,7 +75,7 @@ def _filter_crosswalk_table(
     flow_run_name="ingest-nwm-streamflow-forecasts",
     timeout_seconds=60 * 60
 )
-def ingest_nwm_streamflow_forecasts(
+async def ingest_nwm_streamflow_forecasts(
     temp_dir_path: Union[str, Path],
     end_dt: Union[str, datetime, pd.Timestamp, None] = None,
     num_lookback_days: Union[int, None] = LOOKBACK_DAYS,
