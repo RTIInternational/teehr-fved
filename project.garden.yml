@@ -23,16 +23,24 @@ environments:
     variables:
       hostname: teehr.local.app.garden
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 3f925aa5ac15419e1a6f7e6e4af55b7dbf3fe99e
+      devTeehrVersion: 5e647048de2ed1a4ce061d7ebd7c6b7e8a1c6a8d
       stableTeehrVersion: place-holder # Needed for sync to work for some reason.
       previousTeehrVersion: place-holder
-      iceberg:
+      polaris:
         inCluster: "true"
         catalogS3PathStyleAccess: "true"
         catalogS3Endpoint: "http://minio:9000"
+        catalogS3Region: ${var.aws.region}
         catalogType: rest
-        catalogUri: http://iceberg-rest:8181
+        catalogUri: http://polaris:8181/api/catalog
         catalogWarehouse: s3://warehouse/
+        catalogRoleArn: "" # MinIO has no real STS; Polaris can't assume a role against it
+        skipCredentialSubscopingIndirection: "true"
+        storageStsUnavailable: "true"
+        defaultRealm: teehr
+        realmsCsv: teehr
+        oauthServerUri: http://keycloak-service:8080/realms/teehr/protocol/openid-connect/token
+        oidcIssuerUri: http://keycloak-service:8080/realms/teehr
       trino:
         host: trino
         port: "8080"
@@ -49,23 +57,28 @@ environments:
     variables:
       hostname: dev.low.amzifved.aws.rti.org
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: da04e8836bcbfac77f079a2d94b20592f28c15ca
+      devTeehrVersion: 5e647048de2ed1a4ce061d7ebd7c6b7e8a1c6a8d
       stableTeehrVersion: v0.6.5
       previousTeehrVersion: v0.5.3
       irsa:
-        icebergRestRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-irsa
-        jupyterRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
         prefectJobRoleArn: arn:aws:iam::794457362858:role/fved-prefect-jobs-irsa
-        sparkRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
-        trinoRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-irsa
-        xpublishRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-readonly-irsa
-      iceberg:
-        inCluster: "false"
+        xpublishRoleArn: arn:aws:iam::794457362858:role/fved-xpublish-api-irsa
+        polarisRoleArn: arn:aws:iam::794457362858:role/fved-polaris-irsa
+      polaris:
+        inCluster: "true"
         catalogS3PathStyleAccess: "false"
         catalogS3Endpoint: ""
-        catalogUri: http://iceberg-rest:8181
+        catalogS3Region: ${var.aws.region}
         catalogType: rest
+        catalogUri: http://polaris:8181/api/catalog
         catalogWarehouse: s3://dev-fved-iceberg-warehouse-rti-use1/
+        catalogRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-access
+        skipCredentialSubscopingIndirection: "false"
+        storageStsUnavailable: "false"
+        defaultRealm: teehr
+        realmsCsv: teehr
+        oauthServerUri: http://keycloak-service:8080/realms/teehr/protocol/openid-connect/token
+        oidcIssuerUri: http://keycloak-service:8080/realms/teehr
       nfsServerDns: "fs-0d53828f401595456.efs.us-east-1.amazonaws.com"
       trino:
         host: trino

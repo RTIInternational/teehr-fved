@@ -182,7 +182,7 @@ def _process_chunk(
     timeout_seconds=60 * 60,
     task_runner=ProcessPoolTaskRunner(max_workers=CHUNK_TASK_WORKERS)
 )
-def ingest_nwm_streamflow_forecasts(
+async def ingest_nwm_streamflow_forecasts(
     temp_dir_path: Union[str, Path],
     end_dt: Union[str, datetime, pd.Timestamp, None] = None,
     num_lookback_days: Union[int, None] = LOOKBACK_DAYS,
