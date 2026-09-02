@@ -2,7 +2,6 @@ from pathlib import Path
 from datetime import datetime, timedelta, UTC
 from typing import Dict, List, Optional, Union
 import logging
-import os
 
 from prefect import flow, get_run_logger, task, unmapped
 from prefect.cache_policies import NO_CACHE
@@ -17,7 +16,11 @@ from teehr.fetching.nwm.point_utils import (
     process_chunk_of_files,
 )
 from teehr.utils.utils import remove_dir_if_exists
-from teehr.utils.concurrency import resolve_budget
+from teehr.utils.concurrency import (
+    available_cpus,
+    resolve_budget,
+    set_concurrency,
+)
 from teehr.fetching.utils import (
     format_nwm_configuration_metadata,
 )
@@ -40,8 +43,11 @@ OCONUS_STATE_NAMES = [
 ]
 # Chunks are mapped as tasks, each running in its own worker process. More
 # workers than the pod has cores still pays, since the work mostly waits on GCS;
-# throughput flattens out around 8. Each worker peaks near 700MB.
-CHUNK_TASK_WORKERS = int(os.environ.get("CHUNK_TASK_WORKERS", 8))
+# throughput flattens out around 8. Each worker peaks near 700MB. Not a flow
+# parameter: the task runner is built when this module is imported, before any
+# parameter exists. The io/cpu budgets below are divided by it and *are*
+# settable per run, which is the knob that moves throughput.
+CHUNK_TASK_WORKERS = 8
 # Matches nwm_to_parquet's defaults, which this flow relied on before it mapped
 # the chunks itself.
 PROCESS_BY_Z_HOUR = True
@@ -129,7 +135,8 @@ def _process_chunk(
     nwm_version: str,
     variable_mapper: Dict,
     timeseries_type: TimeseriesTypeEnum,
-    max_concurrent_files: int,
+    io_per_task: int,
+    cpu_per_task: int,
 ) -> Optional[str]:
     """Read one chunk of reference files and write its parquet file.
 
@@ -142,6 +149,9 @@ def _process_chunk(
     renamed into place, so a failed attempt leaves nothing behind.
     """
     logger = get_run_logger()
+    # This worker's share of the run's budget. Set here rather than in the
+    # flow, whose settings a separate process never sees.
+    set_concurrency(io=io_per_task, cpu=cpu_per_task)
     logger.info(
         f"Reading {len(chunk)} files starting"
         f" {chunk.day.iloc[0]} {chunk.z_hour.iloc[0]}"
@@ -159,7 +169,6 @@ def _process_chunk(
         variable_mapper=variable_mapper,
         timeseries_type=timeseries_type,
         drop_overlapping_assimilation_values=DROP_OVERLAPPING_ASSIM_VALUES,
-        max_concurrent_files=max_concurrent_files,
     )
     if filepath is None:
         logger.warning("Chunk produced no data")
@@ -182,9 +191,22 @@ def ingest_nwm_streamflow_forecasts(
     output_type: str = "channel_rt",
     variable_name: str = "streamflow",
     start_spark_cluster: bool = False,
-    timeseries_type: Union[TimeseriesTypeEnum, str] = "secondary"
+    timeseries_type: Union[TimeseriesTypeEnum, str] = "secondary",
+    io_concurrency: Optional[int] = None,
+    cpu_workers: Optional[int] = None
 ) -> None:
     """NWM Streamflow Forecasts Ingestion.
+
+    Parameters
+    ----------
+    io_concurrency : Optional[int]
+        Total GCS reads in flight across all chunk tasks, divided among them.
+        Defaults to teehr's own budget (48). This is the knob that responds to
+        a faster network; raise it to test.
+    cpu_workers : Optional[int]
+        Total compute-bound calls at once, divided the same way. Defaults to
+        the CPUs the pod can use. Not clamped to that, so a value above it
+        deliberately oversubscribes.
 
     Notes
     -----
@@ -203,6 +225,12 @@ def ingest_nwm_streamflow_forecasts(
 
         if isinstance(timeseries_type, str):
             timeseries_type = TimeseriesTypeEnum(timeseries_type)
+
+        # Set before anything fetches, so _plan_fetch's listing gets the same
+        # budget as the chunk tasks. This applies to the flow process only;
+        # each worker gets its divided share passed in below.
+        if io_concurrency is not None or cpu_workers is not None:
+            set_concurrency(io=io_concurrency, cpu=cpu_workers)
 
         logger.info(f"Starting NWM streamflow forecast ingestion with configuration: {nwm_configuration}, variable: {variable_name}, output type: {output_type}, timeseries type: {timeseries_type}")
 
@@ -300,19 +328,20 @@ def ingest_nwm_streamflow_forecasts(
         )
 
         # The chunk tasks run in separate processes, so their budgets add up
-        # against the same machine. Divide both so all of them together use
-        # what a single sequential fetch would have. set_concurrency() cannot
-        # reach another process, but workers are spawned lazily and inherit the
-        # environment, so the cpu share goes through there.
+        # against the same machine. Divide both, so all of them together use
+        # what a single sequential fetch would have, and hand each task its
+        # share to apply on its own side.
         budget = resolve_budget()
-        os.environ["TEEHR_CPU_WORKERS"] = str(
-            max(1, budget.cpu // CHUNK_TASK_WORKERS)
-        )
-        files_per_task = max(1, budget.io // CHUNK_TASK_WORKERS)
+        io_per_task = max(1, budget.io // CHUNK_TASK_WORKERS)
+        cpu_per_task = max(1, budget.cpu // CHUNK_TASK_WORKERS)
+        # Logged so a run's own record says what it was tuned to; comparing two
+        # runs from the parameters alone hides the division and the pod's size.
         logger.info(
             f"Fetching {len(plan.json_paths)} files in {len(chunks)} chunks,"
-            f" {CHUNK_TASK_WORKERS} at a time, each reading up to"
-            f" {files_per_task} files at once"
+            f" {CHUNK_TASK_WORKERS} at a time. Concurrency:"
+            f" io={budget.io} total ({io_per_task} per task),"
+            f" cpu={budget.cpu} total ({cpu_per_task} per task),"
+            f" pod has {available_cpus()} usable cpus"
         )
 
         output_parquet_dir = Path(
@@ -332,7 +361,8 @@ def ingest_nwm_streamflow_forecasts(
             nwm_version=unmapped(nwm_version),
             variable_mapper=unmapped(variable_mapper),
             timeseries_type=unmapped(timeseries_type),
-            max_concurrent_files=unmapped(files_per_task),
+            io_per_task=unmapped(io_per_task),
+            cpu_per_task=unmapped(cpu_per_task),
         ).result()
 
         paths = [path for path in written if path is not None]

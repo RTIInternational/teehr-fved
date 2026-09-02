@@ -244,6 +244,11 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
         ev=ev,
         dataframe=weights_df,
         table_name="grid_pixel_coverage_weights",
-        uniqueness_fields=["location_id", "domain_name"],
+        uniqueness_fields=[
+            "location_id",
+            "configuration_name",
+            "variable_name",
+            "domain_name"
+        ],
         write_mode=args.write_mode
     )
