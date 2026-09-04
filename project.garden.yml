@@ -58,8 +58,8 @@ environments:
       hostname: dev.low.amzifved.aws.rti.org
       certificateIssuerName: letsencrypt-prod
       devTeehrVersion: 2bd6f5c836558e3fdb5be4724c8127bf4f68d888
-      stableTeehrVersion: v0.6.5
-      previousTeehrVersion: v0.5.3
+      stableTeehrVersion: v0.7.0
+      previousTeehrVersion: v0.6.6
       irsa:
         prefectJobRoleArn: arn:aws:iam::794457362858:role/fved-prefect-jobs-irsa
         xpublishRoleArn: arn:aws:iam::794457362858:role/fved-xpublish-api-irsa
