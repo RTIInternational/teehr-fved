@@ -1,5 +1,5 @@
 from prefect import flow, get_run_logger
-from datetime import datetime, timedelta, UTC
+from datetime import timedelta
 import icechunk as ic
 from icechunk.xarray import to_icechunk
 import virtualizarr as vz
@@ -17,6 +17,7 @@ from models.ingest_gridded_data_input import (
 )
 from build_geozarr_pyramids import build_pyramids as build_pyramids_flow
 from models.mean_areal_inputs import VARIABLE_AND_UNIT_MAPPER
+from workflows.utils.time_utils import to_naive_utc
 
 
 DEFAULT_LOOKBACK_DAYS = 1
@@ -63,16 +64,7 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
     parser = _PARSER_MAP[args.parser_type]()
     virtual_store = _VIRTUAL_CONTAINER_MAP[args.source_data_storage]()
 
-    # Resolve end_dt — handle all types that arrive from Prefect UI and programmatic callers
-    end_dt = args.end_dt
-    if end_dt is None:
-        end_dt = datetime.now(UTC).replace(tzinfo=None)
-    elif isinstance(end_dt, str):
-        end_dt = datetime.fromisoformat(end_dt)
-    elif isinstance(end_dt, pd.Timestamp):
-        end_dt = end_dt.to_pydatetime().replace(tzinfo=None)
-    elif end_dt.tzinfo is not None:
-        end_dt = end_dt.replace(tzinfo=None)
+    end_dt = to_naive_utc(args.end_dt)
 
     # Configure the IceChunk S3 repository with a virtual chunk container
     repo = gu.configure_icechunk_s3_repo(
