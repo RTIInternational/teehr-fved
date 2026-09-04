@@ -43,7 +43,12 @@ definitions:
       AWS_REGION: "{{ $AWS_REGION }}"
       REMOTE_CATALOG_REST_URI: "{{ $REMOTE_CATALOG_REST_URI }}"
       REMOTE_CATALOG_TYPE: "{{ $REMOTE_CATALOG_TYPE }}"
-      REMOTE_WAREHOUSE_S3_PATH: "{{ $REMOTE_WAREHOUSE_S3_PATH }}"
+      REMOTE_WAREHOUSE_IDENTIFIER: "{{ $REMOTE_WAREHOUSE_IDENTIFIER }}"
+      POLARIS_OAUTH2_SERVER_URI: "{{ $POLARIS_OAUTH2_SERVER_URI }}"
+      POLARIS_CLIENT_ID: "{{ $POLARIS_CLIENT_ID }}"
+      POLARIS_CLIENT_SECRET: "{{ $POLARIS_CLIENT_SECRET }}"
+      POLARIS_DEFAULT_REALM: "{{ $POLARIS_DEFAULT_REALM }}"
+      POLARIS_USE_STS: "true"
       IN_CLUSTER: "{{ $IN_CLUSTER }}"
     node_selector:
       teehr-hub/nodegroup-name: spark-r5-4xlarge
@@ -867,4 +872,15 @@ deployments:
     description: Run ssm_test.py on the RiverWare Windows EC2 instance via AWS SSM
     entrypoint: workflows/riverware/riverware_ssm_run.py:run_riverware_python_script
     parameters: {"script_path": 'C:\FVED\Scripts\ssm_test.py'}
+    work_pool: *work_pool
+
+  - name: run-riverware-s3-workflow-test
+    version:
+    tags: []
+    concurrency_limit: 1
+    concurrency_options:
+      collision_strategy: "CANCEL_NEW"
+    description: Prototype S3 data exchange - upload input to S3, run EC2 script via SSM, validate outputs
+    entrypoint: workflows/riverware/riverware_s3_workflow.py:run_riverware_s3_workflow
+    parameters: {"script_path": 'C:\FVED\Scripts\riverware_s3_reader.py'}
     work_pool: *work_pool
