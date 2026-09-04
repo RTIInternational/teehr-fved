@@ -1,52 +1,83 @@
 import maplibregl from 'maplibre-gl';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
-import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi.js';
-import { ensureFreshToken } from '../../../auth/keycloak.js';
-import { OVERLAY_LAYERS } from './overlayLayers.js';
+import { ensureFreshToken } from '@/auth/keycloak';
+import { griddedApiService, GRIDDED_API_BASE_URL } from '@/services/griddedApi';
+import { useTimesteps } from '@/shared/queries/gridded/timesteps';
+import { useDashboard, ActionTypes } from '../DashboardContext';
+import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
-const escapeHtml = (str) =>
-  String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+type ArcGisLegendEntry = {
+  label: string;
+  imageData: string;
+  contentType: string;
+  width: number;
+  height: number;
+};
+
+type ArcGisLegendResponse = {
+  layers?: Array<{
+    layerId: number;
+    legend?: ArcGisLegendEntry[];
+  }>;
+};
+
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+const escapeHtml = (value: unknown): string =>
+  String(value).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] ?? c);
 
 const GriddedMapComponent = () => {
-  const { state, dispatch } = useGriddedDashboard();
+  const { state, dispatch } = useDashboard();
   const { mapFilters, mapLoaded, activeOverlays } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
-  const mapContainer = useRef(null);
-  const map = useRef(null);
-  const popup = useRef(null);
-  // Holds the current Bearer token for synchronous use inside transformRequest
-  const tokenRef = useRef(null);
-  // Track the click handler so it can be removed when dependencies change
-  const clickHandlerRef = useRef(null);
+  const timesteps = useTimesteps(dataset);
 
-  const currentTimestep = state.timesteps[timestepIndex] ?? null;
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const map = useRef<maplibregl.Map | null>(null);
+  const popup = useRef<maplibregl.Popup | null>(null);
+  // Holds the current Bearer token for synchronous use inside transformRequest
+  const tokenRef = useRef<string | null>(null);
+  // Track the click handler so it can be removed when dependencies change
+  const clickHandlerRef = useRef<((e: maplibregl.MapMouseEvent) => void | Promise<void>) | null>(
+    null
+  );
+
+  const currentTimestep = (timesteps.data[timestepIndex] as string | undefined) ?? null;
 
   // Map of overlay id -> array of { label, imageData, contentType, width, height }
-  const [overlayLegends, setOverlayLegends] = useState({});
-  const fetchedLegends = useRef(new Set());
+  const [overlayLegends, setOverlayLegends] = useState<Record<string, ArcGisLegendEntry[]>>({});
+  const fetchedLegends = useRef<Set<string>>(new Set());
 
-  const [legendBlobUrl, setLegendBlobUrl] = useState(null);
+  const [legendBlobUrl, setLegendBlobUrl] = useState<string | null>(null);
   // Kept in a ref so the cleanup closure always sees the latest URL to revoke
-  const prevLegendBlobUrl = useRef(null);
+  const prevLegendBlobUrl = useRef<string | null>(null);
 
   // Fetch ArcGIS legend JSON for newly-activated overlays that declare a legendUrl.
   useEffect(() => {
     const toFetch = OVERLAY_LAYERS.filter(
-      (o) => activeOverlays.includes(o.id) && o.legendUrl && !fetchedLegends.current.has(o.id),
+      (o) => activeOverlays.includes(o.id) && o.legendUrl && !fetchedLegends.current.has(o.id)
     );
     if (toFetch.length === 0) return;
 
     toFetch.forEach(async (overlay) => {
       fetchedLegends.current.add(overlay.id);
+      const legendUrl = overlay.legendUrl;
+      if (!legendUrl) return;
       try {
-        const res = await fetch(overlay.legendUrl);
-        const json = await res.json();
+        const res = await fetch(legendUrl);
+        const json: ArcGisLegendResponse = await res.json();
         const layer = json.layers?.find((l) => l.layerId === overlay.legendLayerId);
-        if (layer?.legend) {
-          setOverlayLegends((prev) => ({ ...prev, [overlay.id]: layer.legend }));
+        const legendEntries = layer?.legend;
+        if (legendEntries) {
+          setOverlayLegends((prev) => ({ ...prev, [overlay.id]: legendEntries }));
         }
       } catch {
         // Legend fetch failure is non-critical; silently skip.
@@ -56,11 +87,16 @@ const GriddedMapComponent = () => {
 
   useEffect(() => {
     if (!dataset || !variable || !mapLoaded) {
-      setLegendBlobUrl(null);
+      if (prevLegendBlobUrl.current) {
+        URL.revokeObjectURL(prevLegendBlobUrl.current);
+        prevLegendBlobUrl.current = null;
+      }
       return;
     }
 
+    const controller = new AbortController();
     let cancelled = false;
+
     (async () => {
       const token = await ensureFreshToken();
       const params = new URLSearchParams({
@@ -70,16 +106,20 @@ const GriddedMapComponent = () => {
         belowmincolor: 'transparent',
         f: 'image/png',
         background_color: 'white',
-        width: '80',   // px
+        width: '80', // px
         height: '200', // px
       });
       const url = `${GRIDDED_API_BASE_URL}/api/datasets/${encodeURIComponent(dataset)}/tiles/legend?${params}`;
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       try {
-        const res = await fetch(url, { headers });
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          signal: controller.signal,
+        });
         if (!res.ok || cancelled) return;
+
         const blob = await res.blob();
         if (cancelled) return;
+
         const blobUrl = URL.createObjectURL(blob);
         if (prevLegendBlobUrl.current) URL.revokeObjectURL(prevLegendBlobUrl.current);
         prevLegendBlobUrl.current = blobUrl;
@@ -89,14 +129,17 @@ const GriddedMapComponent = () => {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [mapLoaded, dataset, variable, colorRamp, colorRampMin, colorRampMax]);
 
   // Initialize map once on mount
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
 
-    map.current = new maplibregl.Map({
+    const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
       style: {
         version: 8,
@@ -108,7 +151,7 @@ const GriddedMapComponent = () => {
       attributionControl: false,
       // Add the Bearer token to every tile request aimed at the xpublish-api.
       // transformRequest is synchronous — tokenRef is kept current by updateTileLayer.
-      transformRequest: (url) => {
+      transformRequest: (url: string) => {
         if (url.startsWith(GRIDDED_API_BASE_URL)) {
           const token = tokenRef.current;
           if (token) return { url, headers: { Authorization: `Bearer ${token}` } };
@@ -116,6 +159,7 @@ const GriddedMapComponent = () => {
         return { url };
       },
     });
+    map.current = mapInstance;
 
     popup.current = new maplibregl.Popup({
       closeButton: true,
@@ -123,22 +167,26 @@ const GriddedMapComponent = () => {
       maxWidth: '280px',
     });
 
-    map.current.on('load', () => {
-      map.current.addSource('osm', {
+    mapInstance.on('load', () => {
+      mapInstance.addSource('osm', {
         type: 'raster',
         tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
         tileSize: 256,
       });
-      map.current.addLayer({ id: 'osm', type: 'raster', source: 'osm' });
+      mapInstance.addLayer({ id: 'osm', type: 'raster', source: 'osm' });
 
       dispatch({ type: ActionTypes.SET_MAP_LOADED, payload: true });
     });
 
-    map.current.on('error', (e) => {
+    mapInstance.on('error', (e: maplibregl.ErrorEvent) => {
       console.error('GriddedMapComponent: MapLibre error:', e);
       // e.sourceId is set for tile/source errors (e.g. 404 for areas with no data); only surface fatal map errors.
-      if (!e.sourceId) {
-        dispatch({ type: ActionTypes.SET_ERROR, payload: `Map error: ${e.error?.message || 'Unknown error'}` });
+      const sourceId = (e as { sourceId?: string }).sourceId;
+      if (!sourceId) {
+        dispatch({
+          type: ActionTypes.SET_ERROR,
+          payload: `Map error: ${e.error?.message || 'Unknown error'}`,
+        });
       }
     });
 
@@ -170,7 +218,7 @@ const GriddedMapComponent = () => {
       currentTimestep,
       colorRamp,
       colorRampMin,
-      colorRampMax,
+      colorRampMax
     );
 
     mapInstance.addSource('gridded-tiles', {
@@ -203,9 +251,14 @@ const GriddedMapComponent = () => {
       const hasSource = !!mapInstance.getSource(id);
 
       if (isActive && !hasLayer) {
-        if (!hasSource) mapInstance.addSource(id, sourceConfig);
+        if (!hasSource) {
+          mapInstance.addSource(id, sourceConfig as maplibregl.SourceSpecification);
+        }
         const beforeId = mapInstance.getLayer('gridded-layer') ? 'gridded-layer' : undefined;
-        mapInstance.addLayer({ id, source: id, ...layerConfig }, beforeId);
+        mapInstance.addLayer(
+          { id, source: id, ...(layerConfig as object) } as maplibregl.LayerSpecification,
+          beforeId
+        );
       } else if (!isActive && hasLayer) {
         mapInstance.removeLayer(id);
         if (hasSource) mapInstance.removeSource(id);
@@ -223,14 +276,16 @@ const GriddedMapComponent = () => {
       mapInstance.off('click', clickHandlerRef.current);
     }
 
-    const handleClick = async (e) => {
+    const handleClick = async (e: maplibregl.MapMouseEvent) => {
       if (!dataset || !variable || !currentTimestep) return;
+      const popupInstance = popup.current;
+      if (!popupInstance) return;
 
       const { lng, lat } = e.lngLat;
 
       dispatch({ type: ActionTypes.SET_CLICKED_POINT, payload: { lon: lng, lat } });
 
-      popup.current
+      popupInstance
         .setLngLat([lng, lat])
         .setHTML('<div style="padding:6px; font-size:0.8rem;">Loading…</div>')
         .addTo(mapInstance);
@@ -241,9 +296,9 @@ const GriddedMapComponent = () => {
           variable,
           currentTimestep,
           lng,
-          lat,
+          lat
         );
-        popup.current.setHTML(`
+        popupInstance.setHTML(`
           <div style="padding:8px; font-size:0.85rem;">
             <div style="font-weight:600; margin-bottom:4px; color:#495057;">${escapeHtml(variable)}</div>
             <div><strong>Value:</strong> ${value !== null && value !== undefined ? (typeof value === 'number' ? value.toFixed(2) : escapeHtml(value)) : 'N/A'}</div>
@@ -254,7 +309,9 @@ const GriddedMapComponent = () => {
         `);
       } catch (err) {
         console.error('GriddedMapComponent: EDR point query failed:', err);
-        popup.current.setHTML('<div style="padding:6px; font-size:0.8rem; color:#dc3545;">Failed to retrieve value.</div>');
+        popupInstance.setHTML(
+          '<div style="padding:6px; font-size:0.8rem; color:#dc3545;">Failed to retrieve value.</div>'
+        );
       }
     };
 
@@ -266,11 +323,11 @@ const GriddedMapComponent = () => {
         mapInstance.off('click', clickHandlerRef.current);
       }
     };
-  }, [mapLoaded, dataset, variable, currentTimestep]);
+  }, [mapLoaded, dataset, variable, currentTimestep, dispatch]);
 
-  const activeLegendEntries = OVERLAY_LAYERS
-    .filter((o) => activeOverlays.includes(o.id) && overlayLegends[o.id])
-    .map((o) => ({ label: o.label, entries: overlayLegends[o.id] }));
+  const activeLegendEntries = OVERLAY_LAYERS.filter(
+    (o) => activeOverlays.includes(o.id) && overlayLegends[o.id]
+  ).map((o) => ({ label: o.label, entries: overlayLegends[o.id] }));
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -299,7 +356,10 @@ const GriddedMapComponent = () => {
             />
           )}
           {activeLegendEntries.map(({ label, entries }) => (
-            <div key={label} style={{ fontSize: '0.72rem', marginBottom: entries.length > 1 ? '6px' : 0 }}>
+            <div
+              key={label}
+              style={{ fontSize: '0.72rem', marginBottom: entries.length > 1 ? '6px' : 0 }}
+            >
               <div style={{ fontWeight: 600, marginBottom: '2px' }}>{label}</div>
               {entries.map((entry, i) => (
                 <div key={i} className="d-flex align-items-center gap-1">

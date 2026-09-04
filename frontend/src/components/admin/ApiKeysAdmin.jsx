@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Col, Form, Row, Table } from 'react-bootstrap';
-import { apiService } from '../../services/api.js';
+import { apiService } from '../../services/api';
 
 const ApiKeysAdmin = () => {
   const [loading, setLoading] = useState(false);
@@ -158,7 +158,9 @@ const ApiKeysAdmin = () => {
                         <tr key={item.id}>
                           <td>{item.name}</td>
                           <td>{(item.scopes || []).join(', ') || '-'}</td>
-                          <td>{item.created_at ? new Date(item.created_at).toLocaleString() : '-'}</td>
+                          <td>
+                            {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
+                          </td>
                           <td>{revoked ? 'Revoked' : 'Active'}</td>
                           <td>
                             {!revoked ? (

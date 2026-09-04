@@ -19,7 +19,7 @@ export const RETROSPECTIVE_DASHBOARD_DEFAULTS = {
 
   // Default date range for retrospective analysis
   defaultStartDate: '2020-01-01T00:00',
-  defaultEndDate: '2020-12-31T23:59'
+  defaultEndDate: '2020-12-31T23:59',
 };
 
 export const FORECAST_DASHBOARD_DEFAULTS = {
@@ -30,7 +30,7 @@ export const FORECAST_DASHBOARD_DEFAULTS = {
   preferredVariable: 'streamflow_hourly_inst',
 
   // Default metric for map coloring
-  defaultMetricName: 'relative_bias'
+  defaultMetricName: 'relative_bias',
 };
 
 export const DATA_DASHBOARD_DEFAULTS = {
@@ -43,7 +43,7 @@ export const NWMD_DASHBOARD_DEFAULTS = {
   preferredThreshold: null,
   preferredAggMethod: 'mean',
   preferredLeadTimeBin: 'PT0S_P1DT0H',
-  defaultMetricName: 'relative_bias'
+  defaultMetricName: 'relative_bias',
 };
 
 /**
