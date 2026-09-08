@@ -30,12 +30,21 @@ def initialize_evaluation(
     logger = get_run_logger()
     logger.info("Initializing Teehr Evaluation")
 
+    remote_catalog_uri = os.getenv("REMOTE_CATALOG_REST_URI", "")
+    remote_catalog_type = os.getenv("REMOTE_CATALOG_TYPE", "rest")
+    remote_warehouse_dir = os.getenv(
+        "REMOTE_WAREHOUSE_IDENTIFIER",
+        os.getenv("POLARIS_DEFAULT_REALM", "teehr")
+    )
+
     # Ensure Spark executors use the prefect-job service account
     # which has read-write S3 access (the default 'spark' SA is read-only).
     default_configs = {
         "spark.kubernetes.authenticate.executor.serviceAccountName": "prefect-job",
         "spark.kubernetes.executor.podNamePrefix": "prefect-job",
         "spark.sql.catalog.iceberg.client.region": "us-east-1",
+        "spark.sql.catalog.iceberg.token-exchange-enabled": "false",
+        "spark.sql.catalog.iceberg.token-refresh-enabled": "true",
     }
     if update_configs:
         default_configs.update(update_configs)
@@ -45,6 +54,9 @@ def initialize_evaluation(
         executor_instances=executor_instances,
         executor_cores=executor_cores,
         executor_memory=executor_memory,
+        remote_catalog_uri=remote_catalog_uri,
+        remote_catalog_type=remote_catalog_type,
+        remote_warehouse_dir=remote_warehouse_dir,
         update_configs=default_configs,
         enable_gcs=enable_gcs,
         gcs_project_id=gcs_project_id
