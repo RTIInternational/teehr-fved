@@ -1,4 +1,4 @@
-import { Form } from "react-bootstrap";
+import { Form } from 'react-bootstrap';
 
 export const CdfSidebar = ({ state, plotIds, setCdfPlotMetric }) => {
   return (

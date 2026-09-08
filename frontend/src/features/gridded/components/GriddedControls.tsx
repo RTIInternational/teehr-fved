@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Form, Row, Col, Button, InputGroup } from 'react-bootstrap';
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
-import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching.js';
-import { OVERLAY_LAYERS } from './overlayLayers.js';
+import { useDatasets } from '@/shared/queries/gridded/datasets';
+import { useTimesteps } from '@/shared/queries/gridded/timesteps';
+import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
+import { useVariables } from '@/shared/queries/gridded/variables';
+import { useDashboard, ActionTypes } from '../DashboardContext';
+import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 const COLOR_RAMPS = [
   { label: 'Plasma', value: 'raster/plasma' },
@@ -16,89 +19,111 @@ const COLOR_RAMPS = [
 const GriddedControls = () => {
   const [overlaysExpanded, setOverlaysExpanded] = useState(false);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
-  const { state, dispatch } = useGriddedDashboard();
-  const { loadVariables, loadTimesteps } = useGriddedDataFetching();
-  const { datasets, variables, timesteps, mapFilters, activeOverlays, variableAttrs } = state;
+  const { state, dispatch } = useDashboard();
+  const { mapFilters, activeOverlays } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
-  const units = variableAttrs[variable]?.units ?? null;
+  const datasets = useDatasets();
+  const variables = useVariables(dataset);
+  const timesteps = useTimesteps(dataset);
+  const variableAttrs = useVariableAttrs(dataset);
 
-  const currentTimestep = timesteps[timestepIndex] ?? '';
+  const units = variable ? variableAttrs.data?.[variable]?.units : undefined;
+
+  const currentTimestep = timesteps.data[timestepIndex] ?? '';
   const canStepBack = timestepIndex > 0;
-  const canStepForward = timestepIndex < timesteps.length - 1;
+  const canStepForward = timestepIndex < timesteps.data.length - 1;
 
   const [timestepInput, setTimestepInput] = useState(currentTimestep);
   const [timestepEditing, setTimestepEditing] = useState(false);
   const [timestepInputError, setTimestepInputError] = useState(false);
 
-  // Keep display in sync when stepping with buttons
+  const displayedTimestep = timestepEditing ? timestepInput : currentTimestep;
+
+  // Auto-select variable when dataset is selected
   useEffect(() => {
-    if (!timestepEditing) {
-      setTimestepInput(currentTimestep);
-      setTimestepInputError(false);
-    }
-  }, [currentTimestep, timestepEditing]);
+    if (!dataset) return;
+    if (variables.data.length === 0) return;
+
+    const currentIsValid = !!variable && variables.data.includes(variable);
+    if (currentIsValid) return;
+
+    dispatch({
+      type: ActionTypes.UPDATE_MAP_FILTERS,
+      payload: { variable: variables.data[0], timestepIndex: 0 },
+    });
+  }, [dataset, variable, variables.data, dispatch]);
 
   const commitTimestepInput = () => {
+    const inputValue = timestepInput;
     setTimestepEditing(false);
-    if (!timestepInput || timesteps.length === 0) return;
-    const entered = new Date(timestepInput);
+    setTimestepInputError(false);
+    if (!inputValue || timesteps.data.length === 0) return;
+    const entered = new Date(inputValue);
     if (isNaN(entered.getTime())) {
       setTimestepInputError(true);
       return;
     }
     let closestIdx = 0;
     let closestDiff = Infinity;
-    timesteps.forEach((ts, i) => {
+    timesteps.data.forEach((ts, i) => {
       const diff = Math.abs(new Date(ts).getTime() - entered.getTime());
-      if (diff < closestDiff) { closestDiff = diff; closestIdx = i; }
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closestIdx = i;
+      }
     });
     setTimestepInputError(false);
     dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { timestepIndex: closestIdx } });
   };
 
-  const handleTimestepKeyDown = (e) => {
+  const handleTimestepKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') commitTimestepInput();
     if (e.key === 'Escape') {
       setTimestepEditing(false);
-      setTimestepInput(currentTimestep);
       setTimestepInputError(false);
     }
   };
 
-  const handleDatasetChange = async (e) => {
+  const handleDatasetChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value || null;
-    dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { dataset: selected, timestepIndex: 0 } });
-    if (selected) {
-      await loadVariables(selected);
-    }
+    dispatch({
+      type: ActionTypes.UPDATE_MAP_FILTERS,
+      payload: { dataset: selected, timestepIndex: 0 },
+    });
   };
 
-  const handleVariableChange = async (e) => {
+  const handleVariableChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value || null;
-    dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { variable: selected, timestepIndex: 0 } });
-    if (dataset && selected) {
-      await loadTimesteps(dataset);
-    }
+    dispatch({
+      type: ActionTypes.UPDATE_MAP_FILTERS,
+      payload: { variable: selected, timestepIndex: 0 },
+    });
   };
 
   const handlePrevTimestep = () => {
     if (canStepBack) {
-      dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { timestepIndex: timestepIndex - 1 } });
+      dispatch({
+        type: ActionTypes.UPDATE_MAP_FILTERS,
+        payload: { timestepIndex: timestepIndex - 1 },
+      });
     }
   };
 
   const handleNextTimestep = () => {
     if (canStepForward) {
-      dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { timestepIndex: timestepIndex + 1 } });
+      dispatch({
+        type: ActionTypes.UPDATE_MAP_FILTERS,
+        payload: { timestepIndex: timestepIndex + 1 },
+      });
     }
   };
 
-  const handleColorRampChange = (e) => {
+  const handleColorRampChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { colorRamp: e.target.value } });
   };
 
-  const handleRangeChange = (field, value) => {
+  const handleRangeChange = (field: string, value: string) => {
     const num = parseFloat(value);
     if (Number.isNaN(num)) return;
     if (field === 'colorRampMin' && num >= colorRampMax) return;
@@ -108,9 +133,8 @@ const GriddedControls = () => {
 
   return (
     <div className="h-100 d-flex flex-column overflow-auto p-1">
-      <Form>
+      <Form onSubmit={(e) => e.preventDefault()}>
         <Row className="g-2">
-
           {/* Dataset selector */}
           <Col md={12}>
             <Form.Group>
@@ -119,11 +143,13 @@ const GriddedControls = () => {
                 size="sm"
                 value={dataset ?? ''}
                 onChange={handleDatasetChange}
-                disabled={datasets.length === 0}
+                disabled={datasets.data.length === 0}
               >
                 <option value="">Select dataset…</option>
-                {datasets.map((ds) => (
-                  <option key={ds} value={ds}>{ds}</option>
+                {datasets.data.map((ds) => (
+                  <option key={ds} value={ds}>
+                    {ds}
+                  </option>
                 ))}
               </Form.Select>
             </Form.Group>
@@ -137,11 +163,13 @@ const GriddedControls = () => {
                 size="sm"
                 value={variable ?? ''}
                 onChange={handleVariableChange}
-                disabled={!dataset || variables.length === 0}
+                disabled={!dataset || variables.data.length === 0}
               >
                 <option value="">Select variable…</option>
-                {variables.map((v) => (
-                  <option key={v} value={v}>{v}</option>
+                {variables.data.map((v) => (
+                  <option key={v} value={v}>
+                    {v}
+                  </option>
                 ))}
               </Form.Select>
             </Form.Group>
@@ -160,12 +188,16 @@ const GriddedControls = () => {
                 &#9664;
               </Button>
               <Form.Control
-                value={timestepInput}
+                value={displayedTimestep}
                 placeholder={variable ? 'No timesteps' : '—'}
-                onChange={(e) => { setTimestepEditing(true); setTimestepInput(e.target.value); setTimestepInputError(false); }}
+                onChange={(e) => {
+                  setTimestepEditing(true);
+                  setTimestepInput(e.target.value);
+                  setTimestepInputError(false);
+                }}
                 onBlur={commitTimestepInput}
                 onKeyDown={handleTimestepKeyDown}
-                disabled={timesteps.length === 0}
+                disabled={timesteps.data.length === 0}
                 isInvalid={timestepInputError}
                 className="text-center"
                 style={{ fontSize: '0.8rem' }}
@@ -185,9 +217,9 @@ const GriddedControls = () => {
                 Invalid datetime — try e.g. 2024-01-15T12:00:00
               </div>
             )}
-            {!timestepInputError && timesteps.length > 0 && (
+            {!timestepInputError && timesteps.data.length > 0 && (
               <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
-                {timestepIndex + 1} / {timesteps.length}
+                {timestepIndex + 1} / {timesteps.data.length}
               </div>
             )}
           </Col>
@@ -213,7 +245,9 @@ const GriddedControls = () => {
                     id={`overlay-${overlay.id}`}
                     label={<span style={{ fontSize: '0.8rem' }}>{overlay.label}</span>}
                     checked={activeOverlays.includes(overlay.id)}
-                    onChange={() => dispatch({ type: ActionTypes.TOGGLE_OVERLAY, payload: overlay.id })}
+                    onChange={() =>
+                      dispatch({ type: ActionTypes.TOGGLE_OVERLAY, payload: overlay.id })
+                    }
                     className="mb-1"
                   />
                 ))}
@@ -238,20 +272,20 @@ const GriddedControls = () => {
                 <Col md={12}>
                   <Form.Group>
                     <Form.Label className="small fw-bold">Color Scale</Form.Label>
-                    <Form.Select
-                      size="sm"
-                      value={colorRamp}
-                      onChange={handleColorRampChange}
-                    >
+                    <Form.Select size="sm" value={colorRamp} onChange={handleColorRampChange}>
                       {COLOR_RAMPS.map((cr) => (
-                        <option key={cr.value} value={cr.value}>{cr.label}</option>
+                        <option key={cr.value} value={cr.value}>
+                          {cr.label}
+                        </option>
                       ))}
                     </Form.Select>
                   </Form.Group>
                 </Col>
                 <Col md={6}>
                   <Form.Group>
-                    <Form.Label className="small fw-bold">Min{units ? ` (${units})` : ''}</Form.Label>
+                    <Form.Label className="small fw-bold">
+                      Min{units ? ` (${units})` : ''}
+                    </Form.Label>
                     <Form.Control
                       size="sm"
                       type="number"
@@ -262,7 +296,9 @@ const GriddedControls = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group>
-                    <Form.Label className="small fw-bold">Max{units ? ` (${units})` : ''}</Form.Label>
+                    <Form.Label className="small fw-bold">
+                      Max{units ? ` (${units})` : ''}
+                    </Form.Label>
                     <Form.Control
                       size="sm"
                       type="number"
