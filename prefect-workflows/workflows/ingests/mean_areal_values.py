@@ -10,6 +10,7 @@ from teehr import Evaluation
 from workflows.utils.common_utils import initialize_evaluation
 from models.mean_areal_inputs import MeanArealValuesInput
 from pixel_coverage_weights import get_readonly_repo_store, write_dataframe_to_warehouse
+from teehr.fetching.nwm.grid_utils import compute_weighted_average
 
 
 @task(timeout_seconds=60 * 10)
@@ -58,46 +59,33 @@ def format_to_teehr_timeseries(
 
 
 @task(timeout_seconds=60 * 10)
-def flatten_dataarray(dataarray: xr.DataArray, append_dim: str) -> xr.DataArray:
-    """Flatten a 3D DataArray into a 2D DataArray with dimensions (time, pixel_index)."""
-    logger = get_run_logger()
-    logger.info("Flattening the 3D DataArray into a 2D DataArray with dimensions (time, pixel_index).")
-    x_dim = dataarray.rio.x_dim
-    y_dim = dataarray.rio.y_dim
-    dataarray = dataarray.sortby(x_dim, ascending=True)
-    dataarray = dataarray.sortby(y_dim, ascending=False)
-    dataarray = dataarray.transpose(append_dim, y_dim, x_dim)
-    flat_da = dataarray.stack(position_index=[y_dim, x_dim])
-    flat_da = flat_da.reset_index("position_index", drop=True)
-    flat_da = flat_da.drop_vars([y_dim, x_dim], errors="ignore")
-    logger.info("Flattening complete. The resulting DataArray has dimensions: " + str(flat_da.dims))
-    return flat_da
+def calculate_all_polygons(dataarray: xr.DataArray, weights_df, append_dim: str):
+    """Coverage-weighted mean per polygon at every timestep.
 
-
-@task(timeout_seconds=60 * 10)
-def calculate_all_polygons(flat_da, weights_df):
-    """
-    flat_da: The 2D Xarray DataArray pre-flattened to dimensions: (time, position_index)
-    weights_df: The Pandas DataFrame containing 'position_index', 'fraction_covered', and 'location_id'
+    Pixels are gathered by the weights' absolute ``row``/``col``, so the grid
+    is never flattened and there is no pixel ordering to keep in step.
     """
     logger = get_run_logger()
     logger.info("Calculating mean areal values for all polygons.")
-    swe_matrix = flat_da.values
-    results = []
-    gp = weights_df.groupby("location_id")
-    for location_id, df in gp:
-        inds = df.position_index.values
-        weights = df.fraction_covered.values
-        pixel_matrix = swe_matrix[:, inds]
-        weighted_sum = np.sum(pixel_matrix * weights, axis=1)
-        total_weight = np.sum(weights)
-        if not total_weight > 0:
-            raise ValueError(f"Total coverage weight is 0 for location_id '{location_id}'.")
-        time_series_result = weighted_sum / total_weight
-        results.append({
-            "location_id": location_id,
-            "values": time_series_result
-        })
+
+    rows = weights_df["row"].to_numpy()
+    cols = weights_df["col"].to_numpy()
+    pixels = dataarray.isel(
+        {dataarray.rio.y_dim: xr.DataArray(rows, dims="pixel"),
+         dataarray.rio.x_dim: xr.DataArray(cols, dims="pixel")}
+    ).transpose(append_dim, "pixel").values
+
+    df = compute_weighted_average(
+        pixels, weights_df.rename(columns={"fraction_covered": "weight"})
+    )
+    wide = df.pivot(
+        index="location_id", columns="time_index", values="value"
+    ).sort_index(axis=1)
+
+    results = [
+        {"location_id": location_id, "values": values.to_numpy()}
+        for location_id, values in wide.iterrows()
+    ]
     logger.info(f"Completed calculating mean areal values for {len(results)} polygons.")
     if len(results) == 0:
         logger.error("No results were calculated. The results list is empty.")
@@ -126,7 +114,7 @@ def read_weights_from_warehouse(
             (F.col("domain_name") == weights_domain_name) &
             (F.col("variable_name") == weights_variable_name)
         )
-        .select("fraction_covered", "location_id", "position_index")
+        .select("fraction_covered", "location_id", "row", "col")
         .toPandas()
     )
     logger.info(f"Retrieved {len(df)} rows of pixel coverage weights from the warehouse table.")
@@ -188,11 +176,10 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
         decode_coords="all"
     )[args.grid_variable_name]
 
-    # Flatten the 3D DataArray into a 2D DataArray with dimensions (time, pixel_index)
-    flat_da = flatten_dataarray(grid_template_da, append_dim=args.append_dim)
-
     # Calculate mean areal values for each polygon at each timestep
-    mean_areal_values_results = calculate_all_polygons(flat_da, weights_df)
+    mean_areal_values_results = calculate_all_polygons(
+        grid_template_da, weights_df, append_dim=args.append_dim
+    )
 
     grid_unit_name = grid_template_da.attrs.get("units", None)
     if grid_unit_name is None:
@@ -202,7 +189,7 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
     # Format to teehr timeseries table format
     mean_areal_values_df = format_to_teehr_timeseries(
         results=mean_areal_values_results,
-        value_time_array=flat_da[args.append_dim].values,
+        value_time_array=grid_template_da[args.append_dim].values,
         configuration_name=args.configuration_name,
         variable_name=teehr_variable_name,
         reference_time=None,  # Placeholder for reference_time column
