@@ -137,9 +137,7 @@ def build_pyramids(args: BuildPyramidsDataInput) -> None:
         if "proj:code" in pyramid.attrs:
             attrs["proj:code"] = pyramid.attrs["proj:code"]
 
-        level_ds = gu.rechunk_dataset(
-            level_tree_node.to_dataset(), args.append_dim, args.chunk_size
-        )
+        level_ds = level_tree_node.to_dataset()
         # Drop scalar (0-D) data variables
         level_ds = level_ds.drop_vars(
             [v for v in level_ds.data_vars if level_ds[v].ndim == 0]
@@ -152,7 +150,7 @@ def build_pyramids(args: BuildPyramidsDataInput) -> None:
         )
         level_ds.attrs.update(attrs)
 
-        logger.info("Rechunked and updated GeoZarr attributes for pyramid level: %s", level_name)
+        logger.info("Updated GeoZarr attributes for pyramid level: %s", level_name)
         # Check to see if data exists
         if gu.group_contains_data(
             store=rw_session.store,

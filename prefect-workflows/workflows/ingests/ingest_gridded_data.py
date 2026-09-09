@@ -169,8 +169,6 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
         logger.info(f"Dropping potential duplicates from the virtual dataset along dimension: {args.append_dim}.")
         ds = ds.drop_duplicates(dim=args.append_dim)
 
-        ds = gu.rechunk_dataset(ds, args.append_dim, args.chunk_size)
-
         ds = gu.standardize_and_inject_geozarr(
             ds,
             source_crs=args.source_crs,
