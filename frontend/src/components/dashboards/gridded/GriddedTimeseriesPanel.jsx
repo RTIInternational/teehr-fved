@@ -10,9 +10,20 @@ const GriddedTimeseriesPanel = () => {
 
   useEffect(() => {
     if (!plotRef.current || !timeseriesData) return;
-    const { times, values, lon, lat, variable } = timeseriesData;
-    const latHem = lat >= 0 ? 'N' : 'S';
-    const lonHem = lon >= 0 ? 'E' : 'W';
+    const { times, values, lon, lat, variable, source, location_id, name } = timeseriesData;
+    const units = variableAttrs[variable]?.units ? ` (${variableAttrs[variable].units})` : '';
+
+    // The plot shows one series at a time — whichever query ran last. The title
+    // says where it came from so a gridded point and a polygon aren't confused.
+    let plotTitle;
+    if (source === 'warehouse') {
+      plotTitle = `${variable}${units} at ${name ? `${name} (${location_id})` : location_id}`;
+    } else {
+      const latHem = lat >= 0 ? 'N' : 'S';
+      const lonHem = lon >= 0 ? 'E' : 'W';
+      plotTitle = `${variable}${units} at (${Math.abs(lat).toFixed(4)}°${latHem}, ${Math.abs(lon).toFixed(4)}°${lonHem})`;
+    }
+
     Plotly.react(
       plotRef.current,
       [
@@ -27,10 +38,7 @@ const GriddedTimeseriesPanel = () => {
         },
       ],
       {
-        title: {
-          text: `${variable}${variableAttrs[variable]?.units ? ` (${variableAttrs[variable].units})` : ''} at (${Math.abs(lat).toFixed(4)}°${latHem}, ${Math.abs(lon).toFixed(4)}°${lonHem})`,
-          font: { size: 13 },
-        },
+        title: { text: plotTitle, font: { size: 13 } },
         xaxis: { title: 'Time', type: 'date' },
         yaxis: { title: variable },
         margin: { t: 40, r: 20, b: 50, l: 60 },
@@ -40,13 +48,22 @@ const GriddedTimeseriesPanel = () => {
     );
   }, [timeseriesData]);
 
-  const header = <span className="small fw-bold">Timeseries</span>;
+  const header = (
+    <span className="small fw-bold">
+      Timeseries
+      {timeseriesData?.source && (
+        <span className="text-muted fw-normal ms-2">
+          {timeseriesData.source === 'warehouse' ? 'Warehouse (polygon)' : 'Gridded (point)'}
+        </span>
+      )}
+    </span>
+  );
 
   if (!clickedPoint && !timeseriesData && !timeseriesLoading && !timeseriesError) {
     return (
       <DashboardPanel header={header} style={{ height: '100%' }}>
         <div className="d-flex align-items-center justify-content-center h-100 text-muted small">
-          Click a point on the map to view a timeseries
+          Click a point on the map, or load a timeseries for a selected polygon
         </div>
       </DashboardPanel>
     );

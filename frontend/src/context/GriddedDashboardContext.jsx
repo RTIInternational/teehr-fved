@@ -25,10 +25,23 @@ const initialGriddedState = {
   polygonLayerLoading: false,
   polygonLayerError: null,
 
+  // Which tab the right-hand panel shows. Lives here rather than in local state
+  // because a map click needs to bring the polygon tab forward.
+  rightPanelTab: 'dataset',   // 'dataset' | 'polygons'
+
+  // Every polygon under the last map click, including nested/overlapping ones
+  polygonFeatures: [],        // [{ id, name, ... }] — deduped feature properties
+  polygonClickLngLat: null,   // { lon, lat } | null — where the polygons were picked
+  selectedLocation: null,     // { primary_location_id, name } | null — feature chosen for a warehouse query
+
   clickedPoint: null,       // { lon, lat } | null — last point clicked on the map
   timeseriesLoading: false,
   timeseriesError: null,
-  timeseriesData: null,     // { times: string[], values: number[], lon, lat, variable } | null
+  // One series at a time — the most recent request wins. `source` says which
+  // backend produced it so the panel can label the plot correctly:
+  //   'gridded'   — xpublish EDR point query  { times, values, lon, lat, variable }
+  //   'warehouse' — iceberg query for a polygon { times, values, location_id, name, variable }
+  timeseriesData: null,
 
   mapLoaded: false,
   loading: false,
@@ -45,6 +58,10 @@ export const ActionTypes = {
   SET_ACTIVE_POLYGON_LAYER: 'SET_ACTIVE_POLYGON_LAYER',
   SET_POLYGON_LAYER_LOADING: 'SET_POLYGON_LAYER_LOADING',
   SET_POLYGON_LAYER_ERROR: 'SET_POLYGON_LAYER_ERROR',
+  SET_RIGHT_PANEL_TAB: 'SET_RIGHT_PANEL_TAB',
+  SET_POLYGON_FEATURES: 'SET_POLYGON_FEATURES',
+  CLEAR_POLYGON_FEATURES: 'CLEAR_POLYGON_FEATURES',
+  SELECT_LOCATION: 'SELECT_LOCATION',
   SET_CLICKED_POINT: 'SET_CLICKED_POINT',
   SET_TIMESERIES_LOADING: 'SET_TIMESERIES_LOADING',
   SET_TIMESERIES_DATA: 'SET_TIMESERIES_DATA',
@@ -117,6 +134,37 @@ const griddedDashboardReducer = (state, action) => {
       return {
         ...state,
         activePolygonLayer: action.payload,
+        // Features from the previous layer no longer apply
+        polygonFeatures: [],
+        polygonClickLngLat: null,
+        selectedLocation: null,
+      };
+
+    case ActionTypes.SET_RIGHT_PANEL_TAB:
+      return { ...state, rightPanelTab: action.payload };
+
+    case ActionTypes.SET_POLYGON_FEATURES:
+      return {
+        ...state,
+        polygonFeatures: Array.isArray(action.payload?.features) ? action.payload.features : [],
+        polygonClickLngLat: action.payload?.lngLat ?? null,
+        selectedLocation: null,
+        // Bring the results forward — otherwise the click looks like a no-op
+        rightPanelTab: 'polygons',
+      };
+
+    case ActionTypes.CLEAR_POLYGON_FEATURES:
+      return {
+        ...state,
+        polygonFeatures: [],
+        polygonClickLngLat: null,
+        selectedLocation: null,
+      };
+
+    case ActionTypes.SELECT_LOCATION:
+      return {
+        ...state,
+        selectedLocation: action.payload,
       };
 
     case ActionTypes.SET_POLYGON_LAYER_LOADING:

@@ -52,7 +52,10 @@ export const useGriddedDataFetching = () => {
     dispatch({ type: ActionTypes.SET_TIMESERIES_LOADING, payload: true });
     try {
       const data = await griddedApiService.fetchGriddedEdrTimeseries(dataset, variable, lon, lat, timesteps);
-      dispatch({ type: ActionTypes.SET_TIMESERIES_DATA, payload: { ...data, lon, lat, variable } });
+      dispatch({
+        type: ActionTypes.SET_TIMESERIES_DATA,
+        payload: { ...data, lon, lat, variable, source: 'gridded' },
+      });
     } catch (err) {
       console.error('useGriddedDataFetching: Timeseries query failed:', err);
       dispatch({ type: ActionTypes.SET_TIMESERIES_ERROR, payload: err.message });

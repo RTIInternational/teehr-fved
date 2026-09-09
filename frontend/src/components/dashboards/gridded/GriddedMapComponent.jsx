@@ -12,14 +12,36 @@ maplibregl.addProtocol('pmtiles', new Protocol().tile);
 const escapeHtml = (str) =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+const POLYGON_LAYER_ID = 'polygon-layer';
+const POLYGON_SOURCE_ID = 'polygon-source';
+const POLYGON_SELECTED_LAYER_ID = 'polygon-layer-selected';
+
+// A polygon that spans a tile boundary is split across tiles, so the same feature
+// can come back once per tile. Collapse those down to one entry per location id.
+const dedupePolygonFeatures = (features) => {
+  const seen = new Set();
+  return (features || []).reduce((acc, feature) => {
+    const props = feature.properties || {};
+    const key = props.id ?? feature.id;
+    if (key !== undefined && key !== null) {
+      if (seen.has(key)) return acc;
+      seen.add(key);
+    }
+    acc.push(props);
+    return acc;
+  }, []);
+};
+
 const GriddedMapComponent = () => {
   const { state, dispatch } = useGriddedDashboard();
-  const { mapFilters, mapLoaded, activeOverlays, activePolygonLayer, availablePolygonLayers } = state;
+  const { mapFilters, mapLoaded, activeOverlays, activePolygonLayer, availablePolygonLayers, selectedLocation } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
   const mapContainer = useRef(null);
   const map = useRef(null);
   const popup = useRef(null);
+  // Separate popup for polygon hover so it never clobbers the click popup
+  const hoverPopup = useRef(null);
   // Holds the current Bearer token for synchronous use inside transformRequest
   const tokenRef = useRef(null);
   // Track the click handler so it can be removed when dependencies change
@@ -126,6 +148,12 @@ const GriddedMapComponent = () => {
       maxWidth: '280px',
     });
 
+    hoverPopup.current = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      maxWidth: '280px',
+    });
+
     map.current.on('load', () => {
       map.current.addSource('osm', {
         type: 'raster',
@@ -223,12 +251,55 @@ const GriddedMapComponent = () => {
 
     const s3Endpoint = import.meta.env.VITE_S3_ENDPOINT;
     const pmtilesBucket = import.meta.env.VITE_PMTILES_BUCKET;
-    const polygonLayerId = 'polygon-layer';
-    const polygonSourceId = 'polygon-source';
+    const polygonLayerId = POLYGON_LAYER_ID;
+    const polygonSourceId = POLYGON_SOURCE_ID;
+
+    // Hover shows every polygon under the cursor, so nested features are visible
+    // before committing to a click.
+    const handlePolygonHover = (e) => {
+      const features = dedupePolygonFeatures(e.features);
+      if (features.length === 0) return;
+
+      mapInstance.getCanvas().style.cursor = 'pointer';
+
+      const rows = features
+        .map(
+          (props) => `
+            <div style="padding:1px 0;">
+              <span style="font-weight:600;">${escapeHtml(props.id ?? 'N/A')}</span>
+              <span style="color:#6c757d;"> — ${escapeHtml(props.name ?? 'Unnamed')}</span>
+            </div>
+          `,
+        )
+        .join('');
+
+      hoverPopup.current
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div style="padding:8px; font-size:0.8rem;">
+            <div style="font-weight:600; margin-bottom:4px; color:#495057;">
+              ${features.length} polygon${features.length === 1 ? '' : 's'} here
+            </div>
+            ${rows}
+            <div style="margin-top:4px; font-size:0.7rem; color:#6c757d;">Click to list attributes</div>
+          </div>
+        `)
+        .addTo(mapInstance);
+    };
+
+    const handlePolygonLeave = () => {
+      mapInstance.getCanvas().style.cursor = '';
+      hoverPopup.current.remove();
+    };
 
     const removePolygonLayer = () => {
       const polygonOutlineLayerId = `${polygonLayerId}-outline`;
 
+      hoverPopup.current?.remove();
+
+      if (mapInstance.getLayer(POLYGON_SELECTED_LAYER_ID)) {
+        mapInstance.removeLayer(POLYGON_SELECTED_LAYER_ID);
+      }
       if (mapInstance.getLayer(polygonOutlineLayerId)) {
         mapInstance.removeLayer(polygonOutlineLayerId);
       }
@@ -295,10 +366,45 @@ const GriddedMapComponent = () => {
           'line-width': 2,
         },
       });
+
+      // Highlight for the polygon chosen in the attributes panel. The filter is
+      // set to match nothing until a selection is made.
+      mapInstance.addLayer({
+        id: POLYGON_SELECTED_LAYER_ID,
+        type: 'line',
+        source: polygonSourceId,
+        'source-layer': selectedLayer.source_layer,
+        filter: ['==', 'id', ''],
+        paint: {
+          'line-color': '#dc3545',
+          'line-width': 3,
+        },
+      });
+
+      mapInstance.on('mousemove', polygonLayerId, handlePolygonHover);
+      mapInstance.on('mouseleave', polygonLayerId, handlePolygonLeave);
     } catch (err) {
       console.error('GriddedMapComponent: Failed to load polygon layer:', err);
     }
+
+    return () => {
+      mapInstance.off('mousemove', polygonLayerId, handlePolygonHover);
+      mapInstance.off('mouseleave', polygonLayerId, handlePolygonLeave);
+      hoverPopup.current?.remove();
+    };
   }, [mapLoaded, activePolygonLayer, availablePolygonLayers]);
+
+  // Keep the highlight layer in sync with the polygon chosen in the panel
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !mapLoaded || !mapInstance.getLayer(POLYGON_SELECTED_LAYER_ID)) return;
+
+    mapInstance.setFilter(POLYGON_SELECTED_LAYER_ID, [
+      '==',
+      'id',
+      selectedLocation?.primary_location_id ?? '',
+    ]);
+  }, [mapLoaded, selectedLocation, activePolygonLayer]);
 
   // Update EDR click handler when active filters change
   useEffect(() => {
@@ -313,42 +419,21 @@ const GriddedMapComponent = () => {
     const handleClick = async (e) => {
       const { lng, lat } = e.lngLat;
 
-      // First, try to query polygon features if there's an active polygon layer
+      // Polygons take precedence over the gridded query. Every polygon under the
+      // click — including nested ones — goes to the attributes panel.
       if (activePolygonLayer) {
         const features = mapInstance.queryRenderedFeatures(e.point, {
-          layers: ['polygon-layer'],
+          layers: [POLYGON_LAYER_ID],
         });
         if (features.length > 0) {
-          const feature = features[0];
-          const properties = feature.properties || {};
-          let popupContent = `<div style="padding:8px; font-size:0.85rem;">`;
-          popupContent += `<div style="font-weight:600; margin-bottom:4px; color:#495057;">${escapeHtml(activePolygonLayer)}</div>`;
-
-          if (Object.keys(properties).length > 0) {
-            popupContent += '<table style="width:100%; border-collapse:collapse;">';
-            Object.entries(properties).forEach(([key, value]) => {
-              popupContent += `
-                <tr style="border-bottom:1px solid #e0e0e0;">
-                  <td style="padding:2px 4px; font-weight:500; color:#495057;">${escapeHtml(key)}:</td>
-                  <td style="padding:2px 4px;">${value !== null && value !== undefined ? escapeHtml(String(value)) : 'N/A'}</td>
-                </tr>
-              `;
-            });
-            popupContent += '</table>';
-          } else {
-            popupContent += '<div style="color:#6c757d;">No attributes available</div>';
-          }
-
-          popupContent += `
-            <div style="margin-top:4px; font-size:0.75rem; color:#6c757d;">
-              Lat: ${lat.toFixed(4)}, Lon: ${lng.toFixed(4)}
-            </div>
-          </div>`;
-
-          popup.current
-            .setLngLat([lng, lat])
-            .setHTML(popupContent)
-            .addTo(mapInstance);
+          popup.current.remove();
+          dispatch({
+            type: ActionTypes.SET_POLYGON_FEATURES,
+            payload: {
+              features: dedupePolygonFeatures(features),
+              lngLat: { lon: lng, lat },
+            },
+          });
           return;
         }
       }
