@@ -53,9 +53,9 @@ def run_pipeline(
     s3 = boto3.client("s3")
 
     print(f"=== Step 1: Download inputs from s3://{bucket}/{in_prefix}/ ===")
-    inputs = download_inputs(s3, bucket, in_prefix)
-    if not inputs:
-        raise RuntimeError(f"No input files found at s3://{bucket}/{in_prefix}/")
+    # inputs = download_inputs(s3, bucket, in_prefix)
+    # if not inputs:
+    #     raise RuntimeError(f"No input files found at s3://{bucket}/{in_prefix}/")
     # TODO: process input files into model staging area once input format is defined
 
     print("\n=== Step 2: Execute CRMMS model ===")
