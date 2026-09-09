@@ -3,7 +3,8 @@ from pathlib import Path
 from typing import Union
 import subprocess
 
-import s3fs
+import obstore
+from obstore.store import from_url
 from prefect import task, flow, get_run_logger
 
 from workflows.models.create_vector_tiles_inputs import VectorTilesInput
@@ -28,21 +29,25 @@ def upload_to_s3(
 
     logger.info(f"Uploading {source_filepath} to s3://{dest_s3_path}")
     logger.info(f"Using S3 endpoint: {endpoint_url or 'default'}")
-    client_kwargs = {}
-    if endpoint_url:
-        client_kwargs["endpoint_url"] = endpoint_url
-
-    fs_kwargs = {"client_kwargs": client_kwargs}
+    # Anything left unset falls back to obstore's own env/IRSA credential chain,
+    # so remote runs pick up the pod's role without explicit keys.
+    config = {}
     if key:
-        fs_kwargs["key"] = key
+        config["access_key_id"] = key
     if secret:
-        fs_kwargs["secret"] = secret
+        config["secret_access_key"] = secret
+    if endpoint_url:
+        config["endpoint"] = endpoint_url
 
-    fs = s3fs.S3FileSystem(**fs_kwargs)
-    fs.put_file(
-        str(source_filepath),
-        dest_s3_path,
+    # MinIO is served over plain HTTP in-cluster; obstore rejects http:// otherwise.
+    client_options = {"allow_http": True} if str(endpoint_url).startswith("http://") else None
+
+    store = from_url(
+        f"s3://{target_bucket_name}/",
+        config=config or None,
+        client_options=client_options,
     )
+    obstore.put(store, object_key, Path(source_filepath))
     logger.info(f"Finished uploading {source_filepath} to s3://{dest_s3_path}")
 
 
