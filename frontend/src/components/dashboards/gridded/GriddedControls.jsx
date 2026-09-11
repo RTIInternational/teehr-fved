@@ -36,18 +36,9 @@ const GriddedControls = () => {
   // Fetch polygon layers from discovery endpoint
   useEffect(() => {
     const fetchPolygonLayers = async () => {
-      const bucket = import.meta.env.VITE_PMTILES_BUCKET;
-      const prefix = import.meta.env.VITE_PMTILES_PREFIX;
-      const extension = '.pmtiles';
-
-      if (!bucket || prefix === undefined) {
-        dispatch({ type: ActionTypes.SET_POLYGON_LAYER_ERROR, payload: 'Missing S3 configuration' });
-        return;
-      }
-
       dispatch({ type: ActionTypes.SET_POLYGON_LAYER_LOADING, payload: true });
       try {
-        const data = await griddedApiService.discoverPolygonLayers(bucket, prefix, extension);
+        const data = await griddedApiService.discoverPolygonLayers();
         dispatch({ type: ActionTypes.SET_POLYGON_LAYERS, payload: data.items || [] });
       } catch (error) {
         if (error.message.includes('401')) {

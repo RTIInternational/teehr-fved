@@ -1,5 +1,5 @@
 import maplibregl from 'maplibre-gl';
-import { Protocol } from 'pmtiles';
+import { FetchSource, PMTiles, Protocol } from 'pmtiles';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
@@ -7,7 +7,13 @@ import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/gridd
 import { ensureFreshToken } from '../../../auth/keycloak.js';
 import { OVERLAY_LAYERS } from './overlayLayers.js';
 
-maplibregl.addProtocol('pmtiles', new Protocol().tile);
+// The pmtiles Protocol issues its own fetches, so maplibre's transformRequest
+// never sees them — the archive's bearer token has to be attached to a
+// FetchSource registered here instead. Protocol.add keys the source by its
+// exact URL and silently falls back to an unauthenticated fetch on a mismatch,
+// so the registered URL and the pmtiles:// source URL must agree byte for byte.
+const pmtilesProtocol = new Protocol();
+maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
 
 const escapeHtml = (str) =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -44,10 +50,21 @@ const GriddedMapComponent = () => {
   const hoverPopup = useRef(null);
   // Holds the current Bearer token for synchronous use inside transformRequest
   const tokenRef = useRef(null);
+  // The active archive's FetchSource, so a refreshed token can be pushed into
+  // its headers without tearing the source down.
+  const polygonFetchSource = useRef(null);
   // Track the click handler so it can be removed when dependencies change
   const clickHandlerRef = useRef(null);
 
   const currentTimestep = state.timesteps[timestepIndex] ?? null;
+
+  // Prime the token so a polygon layer selected before the first tile load
+  // still builds its FetchSource with an Authorization header.
+  useEffect(() => {
+    ensureFreshToken().then((token) => {
+      tokenRef.current = token;
+    });
+  }, []);
 
   // Map of overlay id -> array of { label, imageData, contentType, width, height }
   const [overlayLegends, setOverlayLegends] = useState({});
@@ -194,6 +211,13 @@ const GriddedMapComponent = () => {
 
     // Refresh the token before issuing tile requests so transformRequest has a current value.
     tokenRef.current = await ensureFreshToken();
+    // transformRequest does not cover pmtiles, so push the refreshed token into
+    // the archive's own source as well.
+    if (tokenRef.current && polygonFetchSource.current) {
+      polygonFetchSource.current.setHeaders(
+        new Headers({ Authorization: `Bearer ${tokenRef.current}` }),
+      );
+    }
 
     const tileUrl = griddedApiService.buildGriddedTileUrl(
       dataset,
@@ -249,8 +273,6 @@ const GriddedMapComponent = () => {
     const mapInstance = map.current;
     if (!mapInstance || !mapLoaded) return;
 
-    const s3Endpoint = import.meta.env.VITE_S3_ENDPOINT;
-    const pmtilesBucket = import.meta.env.VITE_PMTILES_BUCKET;
     const polygonLayerId = POLYGON_LAYER_ID;
     const polygonSourceId = POLYGON_SOURCE_ID;
 
@@ -295,6 +317,7 @@ const GriddedMapComponent = () => {
     const removePolygonLayer = () => {
       const polygonOutlineLayerId = `${polygonLayerId}-outline`;
 
+      polygonFetchSource.current = null;
       hoverPopup.current?.remove();
 
       if (mapInstance.getLayer(POLYGON_SELECTED_LAYER_ID)) {
@@ -316,12 +339,6 @@ const GriddedMapComponent = () => {
       return;
     }
 
-    if (!s3Endpoint || !pmtilesBucket) {
-      console.error('VITE_S3_ENDPOINT and VITE_PMTILES_BUCKET are required to load polygon layers');
-      removePolygonLayer();
-      return;
-    }
-
     // Find the layer metadata
     const selectedLayer = availablePolygonLayers.find((l) => l.id === activePolygonLayer);
     if (!selectedLayer) {
@@ -333,13 +350,19 @@ const GriddedMapComponent = () => {
       // Remove old layer/source if they exist
       removePolygonLayer();
 
-      const s3Origin = s3Endpoint.replace(/\/+$/, '');
-      const objectPath = selectedLayer.path.replace(/^\/+/, '');
+      // Register an authenticated source before adding it to the map: on a
+      // cache miss the Protocol would otherwise build a plain unauthenticated
+      // FetchSource for this URL and every range request would 401.
+      const archiveUrl = griddedApiService.buildPmtilesUrl(selectedLayer.id);
+      const headers = new Headers();
+      if (tokenRef.current) headers.set('Authorization', `Bearer ${tokenRef.current}`);
+      const fetchSource = new FetchSource(archiveUrl, headers);
+      polygonFetchSource.current = fetchSource;
+      pmtilesProtocol.add(new PMTiles(fetchSource));
 
-      // Add new pmtiles source
       mapInstance.addSource(polygonSourceId, {
         type: 'vector',
-        url: `pmtiles://${s3Origin}/${pmtilesBucket}/${objectPath}`,
+        url: `pmtiles://${archiveUrl}`,
       });
 
       // Add layer with semi-transparent blue fill and dark outline

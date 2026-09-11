@@ -64,21 +64,6 @@ spec:
             configMapKeyRef:
               name: teehr-frontend-config
               key: VITE_KEYCLOAK_CLIENT_ID
-        - name: VITE_S3_ENDPOINT
-          valueFrom:
-            configMapKeyRef:
-              name: teehr-frontend-config
-              key: VITE_S3_ENDPOINT
-        - name: VITE_PMTILES_BUCKET
-          valueFrom:
-            configMapKeyRef:
-              name: teehr-frontend-config
-              key: VITE_PMTILES_BUCKET
-        - name: VITE_PMTILES_PREFIX
-          valueFrom:
-            configMapKeyRef:
-              name: teehr-frontend-config
-              key: VITE_PMTILES_PREFIX
         resources:
           requests:
             memory: "256Mi"

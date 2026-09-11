@@ -51,9 +51,6 @@ environments:
       icechunk:
         bucket: "warehouse"
         prefix: "icechunk-ingests"
-      # Browser-reachable S3 origin for pmtiles; path-style, so the frontend
-      # builds ${s3Endpoint}/${bucket}/${key}. Local uses the minio ingress.
-      s3Endpoint: "https://minio.${var.hostname}"
       pmtiles:
         bucket: "warehouse"
         prefix: "vector-tiles"
@@ -95,9 +92,6 @@ environments:
       icechunk:
         bucket: "dev-fved-icechunk-warehouse-rti-use1"
         prefix: "icechunk-ingests"
-      # Browser-reachable S3 origin for pmtiles; path-style, so the frontend
-      # builds ${s3Endpoint}/${bucket}/${key}.
-      s3Endpoint: "https://s3.${var.aws.region}.amazonaws.com"
       pmtiles:
         bucket: "dev-fved-icechunk-warehouse-rti-use1"
         prefix: "vector-tiles"
