@@ -44,7 +44,7 @@ from teehr.utilities.generate_weights import generate_weights_file
 from shapely.geometry import box
 
 from workflows.utils.common_utils import initialize_evaluation
-from models.mean_areal_inputs import PixelCoverageWeightsInput
+from workflows.models.mean_areal_inputs import PixelCoverageWeightsInput
 
 
 @task(timeout_seconds=60 * 2)

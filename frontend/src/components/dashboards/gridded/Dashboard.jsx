@@ -5,7 +5,13 @@ import { useGriddedVariableStyles } from './useGriddedVariableStyles.js';
 import DashboardPanel from '../../common/dashboard/DashboardPanel.jsx';
 import GriddedMapComponent from './GriddedMapComponent.jsx';
 import GriddedControls from './GriddedControls.jsx';
+import GriddedPolygonPanel from './GriddedPolygonPanel.jsx';
 import GriddedTimeseriesPanel from './GriddedTimeseriesPanel.jsx';
+
+const TABS = [
+  { id: 'dataset',  label: 'Dataset' },
+  { id: 'polygons', label: 'Polygon Attributes' },
+];
 
 const Dashboard = () => {
   const { state, dispatch } = useGriddedDashboard();
@@ -61,7 +67,7 @@ const Dashboard = () => {
           style={{
             display: 'grid',
             gridTemplateColumns: '13fr 7fr',
-            gridTemplateRows: 'auto minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.8fr)',
+            gridTemplateRows: 'auto minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr)',
             gap: '12px',
             padding: '12px',
             height: '100%',
@@ -87,7 +93,7 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* Map panel — upper left */}
+          {/* Map panel — left */}
           <div
             className="map-panel"
             style={{
@@ -103,21 +109,61 @@ const Dashboard = () => {
             <GriddedMapComponent />
           </div>
 
-          {/* Controls panel — upper right */}
+          {/* Tabbed panel — right. Both tabs stay mounted and are hidden with
+              display:none so their state survives switching. */}
           <div
+            className="d-flex flex-column"
             style={{
               gridColumn: '2 / 3',
-              gridRow: state.error ? '2 / 3' : '1 / 2',
+              gridRow: state.error ? '2 / 4' : '1 / 4',
               minHeight: 0,
-              height: '680px',
             }}
           >
-            <DashboardPanel>
-              <GriddedControls />
-            </DashboardPanel>
+            <ul className="nav nav-tabs" style={{ flex: '0 0 auto' }}>
+              {TABS.map((tab) => (
+                <li className="nav-item" key={tab.id}>
+                  <button
+                    type="button"
+                    className={`nav-link${state.rightPanelTab === tab.id ? ' active' : ''}`}
+                    onClick={() =>
+                      dispatch({ type: ActionTypes.SET_RIGHT_PANEL_TAB, payload: tab.id })
+                    }
+                    style={{ fontSize: '0.88rem', padding: '6px 16px' }}
+                  >
+                    {tab.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <div style={{ flex: '1 1 0', minHeight: 0, position: 'relative' }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: state.rightPanelTab === 'dataset' ? 'flex' : 'none',
+                  flexDirection: 'column',
+                }}
+              >
+                <DashboardPanel style={{ height: '100%' }} bodyStyle={{ overflow: 'auto' }}>
+                  <GriddedControls />
+                </DashboardPanel>
+              </div>
+
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: state.rightPanelTab === 'polygons' ? 'flex' : 'none',
+                  flexDirection: 'column',
+                }}
+              >
+                <GriddedPolygonPanel />
+              </div>
+            </div>
           </div>
 
-          {/* Bottom full-width panel — timeseries plot */}
+          {/* Bottom full-width panel — timeseries plot for whichever query ran last */}
           <div
             style={{
               gridColumn: '1 / -1',

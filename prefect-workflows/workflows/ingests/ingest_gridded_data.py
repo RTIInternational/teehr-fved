@@ -8,7 +8,7 @@ import pandas as pd
 
 from utils import grid_utils as gu
 from utils.gridded_source_builders import GriddedSource, UASwan4km
-from models.ingest_gridded_data_input import (
+from workflows.models.ingest_gridded_data_input import (
     StorageType,
     IngestGriddedDataInput,
     ParserType,
@@ -16,7 +16,7 @@ from models.ingest_gridded_data_input import (
     REFERENCES_GROUP_PATH
 )
 from build_geozarr_pyramids import build_pyramids as build_pyramids_flow
-from models.mean_areal_inputs import VARIABLE_AND_UNIT_MAPPER
+from workflows.models.mean_areal_inputs import VARIABLE_AND_UNIT_MAPPER
 from workflows.utils.time_utils import to_naive_utc
 
 
@@ -168,8 +168,6 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
 
         logger.info(f"Dropping potential duplicates from the virtual dataset along dimension: {args.append_dim}.")
         ds = ds.drop_duplicates(dim=args.append_dim)
-
-        ds = gu.rechunk_dataset(ds, args.append_dim, args.chunk_size)
 
         ds = gu.standardize_and_inject_geozarr(
             ds,
