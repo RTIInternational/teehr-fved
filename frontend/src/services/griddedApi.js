@@ -50,7 +50,7 @@ export const griddedApiService = {
   // bytes are covered by the same Keycloak token as every other call. Must be
   // absolute: the pmtiles Protocol keys its registered sources by exact URL.
   buildPmtilesUrl: (layerId) =>
-    `${GRIDDED_API_BASE_URL}/vector-tiles/${encodeURIComponent(layerId)}.pmtiles`,
+    `${GRIDDED_API_BASE_URL}/api/vector-tiles/${encodeURIComponent(layerId)}.pmtiles`,
 
   getGriddedVariables: (datasetId) =>
     griddedApiCall(`/api/dataset-variables/${encodeURIComponent(datasetId)}`),
