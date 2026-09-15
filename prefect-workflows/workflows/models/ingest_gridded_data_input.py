@@ -1,3 +1,4 @@
+"""Define arguments and defaults for the ingest_gridded_data Prefect flow."""
 import os
 from datetime import datetime
 from typing import Any, Union
