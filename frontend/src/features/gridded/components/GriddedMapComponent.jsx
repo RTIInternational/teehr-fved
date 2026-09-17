@@ -4,9 +4,9 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { ensureFreshToken } from '../../../auth/keycloak';
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
 import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi';
-import { OVERLAY_LAYERS } from './overlayLayers';
+import { useGriddedDashboard, ActionTypes } from '../GriddedDashboardContext';
+import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 // The pmtiles Protocol issues its own fetches, so maplibre's transformRequest
 // never sees them — the archive's bearer token has to be attached to a

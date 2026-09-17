@@ -1,5 +1,5 @@
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
-import DashboardPanel from '../../common/dashboard/DashboardPanel.jsx';
+import DashboardPanel from '../../../components/common/dashboard/DashboardPanel.jsx';
+import { useGriddedDashboard, ActionTypes } from '../GriddedDashboardContext.jsx';
 
 // Attribute columns are driven by the pmtiles archive, so render whatever the
 // features carry rather than hard-coding a schema. `id` leads since it is the

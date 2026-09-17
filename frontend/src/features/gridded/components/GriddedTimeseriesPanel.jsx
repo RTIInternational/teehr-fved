@@ -1,8 +1,8 @@
 import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef } from 'react';
 
-import { useGriddedDashboard } from '../../../context/GriddedDashboardContext';
-import DashboardPanel from '../../common/dashboard/DashboardPanel';
+import DashboardPanel from '../../../components/common/dashboard/DashboardPanel';
+import { useGriddedDashboard } from '../GriddedDashboardContext';
 
 const GriddedTimeseriesPanel = () => {
   const { state } = useGriddedDashboard();
