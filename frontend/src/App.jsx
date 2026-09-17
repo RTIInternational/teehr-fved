@@ -1,15 +1,15 @@
 import { Container, Alert } from 'react-bootstrap';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import AdminHome from './components/admin/AdminHome.jsx';
-import AdminLayout from './components/admin/AdminLayout.jsx';
-import ApiKeysAdmin from './components/admin/ApiKeysAdmin.jsx';
-import KeycloakAdmin from './components/admin/KeycloakAdmin.jsx';
+import AdminHome from './components/admin/AdminHome';
+import AdminLayout from './components/admin/AdminLayout';
+import ApiKeysAdmin from './components/admin/ApiKeysAdmin';
+import KeycloakAdmin from './components/admin/KeycloakAdmin';
 import { Home, DashboardsHome, Navbar } from './components/common';
 import { ForecastDashboard } from './components/dashboards/forecast';
-import GriddedDashboard from './components/dashboards/gridded/index.js';
-import { ForecastDashboardProvider } from './context/ForecastDashboardContext.jsx';
-import { GriddedDashboardProvider } from './context/GriddedDashboardContext.jsx';
-import { useAuth } from './hooks/useAuth.js';
+import GriddedDashboard from './components/dashboards/gridded/index';
+import { ForecastDashboardProvider } from './context/ForecastDashboardContext';
+import { GriddedDashboardProvider } from './context/GriddedDashboardContext';
+import { useAuth } from './hooks/useAuth';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -64,7 +64,7 @@ const AdminRoute = ({ children }) => {
     return <Navigate to="/hub" replace />;
   }
 
-  if (!roles.includes("admin")) {
+  if (!roles.includes('admin')) {
     return (
       <Container className="mt-5 text-center">
         <Alert variant="danger">

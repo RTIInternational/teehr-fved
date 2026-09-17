@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { useGriddedDashboard, ActionTypes } from '../context/GriddedDashboardContext.jsx';
-import { griddedApiService } from '../services/griddedApi.js';
+import { useGriddedDashboard, ActionTypes } from '../context/GriddedDashboardContext';
+import { griddedApiService } from '../services/griddedApi';
 
 export const useGriddedDataFetching = () => {
   const { state, dispatch } = useGriddedDashboard();

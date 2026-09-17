@@ -2,10 +2,10 @@ import maplibregl from 'maplibre-gl';
 import { FetchSource, PMTiles, Protocol } from 'pmtiles';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext.jsx';
-import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi.js';
-import { ensureFreshToken } from '../../../auth/keycloak.js';
-import { OVERLAY_LAYERS } from './overlayLayers.js';
+import { ensureFreshToken } from '../../../auth/keycloak';
+import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
+import { griddedApiService, GRIDDED_API_BASE_URL } from '../../../services/griddedApi';
+import { OVERLAY_LAYERS } from './overlayLayers';
 
 // The pmtiles Protocol issues its own fetches, so maplibre's transformRequest
 // never sees them — the archive's bearer token has to be attached to a
