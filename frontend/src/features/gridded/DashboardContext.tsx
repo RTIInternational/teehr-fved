@@ -1,10 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, type Dispatch } from 'react';
 import type { TimeseriesData } from '../../shared/types/gridded/edr';
 import type { ClickedPoint, MapFilters } from '../../shared/types/gridded/maps';
 import type { VariableAttrs } from '../../shared/types/gridded/variableAttrs';
 
-export type GriddedDashboardState = {
+export type DashboardState = {
   datasets: string[];
   variables: string[];
   timesteps: string[];
@@ -22,7 +22,7 @@ export type GriddedDashboardState = {
 
 type UpdateMapFiltersPayload = Partial<MapFilters>;
 
-const initialGriddedState: GriddedDashboardState = {
+const initialState: DashboardState = {
   datasets: [], // string[] — available dataset names from xpublish
   variables: [], // string[] — variables for the selected dataset
   timesteps: [], // string[] — ISO datetime strings for selected dataset+variable
@@ -40,29 +40,10 @@ const initialGriddedState: GriddedDashboardState = {
 
   variableAttrs: {}, // { [varName]: { units, long_name, ... } } — from /variable-attrs endpoint
 
-  // Polygon layers from S3/pmtiles
-  availablePolygonLayers: [], // [{ id, path, source_layer }, ...] — from discovery endpoint
-  activePolygonLayer: null, // string (layer id) | null — exclusive selection
-  polygonLayerLoading: false,
-  polygonLayerError: null,
-
-  // Which tab the right-hand panel shows. Lives here rather than in local state
-  // because a map click needs to bring the polygon tab forward.
-  rightPanelTab: 'dataset', // 'dataset' | 'polygons'
-
-  // Every polygon under the last map click, including nested/overlapping ones
-  polygonFeatures: [], // [{ id, name, ... }] — deduped feature properties
-  polygonClickLngLat: null, // { lon, lat } | null — where the polygons were picked
-  selectedLocation: null, // { primary_location_id, name } | null — feature chosen for a warehouse query
-
   clickedPoint: null, // { lon, lat } | null — last point clicked on the map
   timeseriesLoading: false,
   timeseriesError: null,
-  // One series at a time — the most recent request wins. `source` says which
-  // backend produced it so the panel can label the plot correctly:
-  //   'gridded'   — xpublish EDR point query  { times, values, lon, lat, variable }
-  //   'warehouse' — iceberg query for a polygon { times, values, location_id, name, variable }
-  timeseriesData: null,
+  timeseriesData: null, // { times: string[], values: number[], lon, lat, variable } | null
 
   mapLoaded: false,
   loading: false,
@@ -75,14 +56,6 @@ export const ActionTypes = {
   SET_TIMESTEPS: 'SET_TIMESTEPS',
   UPDATE_MAP_FILTERS: 'UPDATE_MAP_FILTERS',
   TOGGLE_OVERLAY: 'TOGGLE_OVERLAY',
-  SET_POLYGON_LAYERS: 'SET_POLYGON_LAYERS',
-  SET_ACTIVE_POLYGON_LAYER: 'SET_ACTIVE_POLYGON_LAYER',
-  SET_POLYGON_LAYER_LOADING: 'SET_POLYGON_LAYER_LOADING',
-  SET_POLYGON_LAYER_ERROR: 'SET_POLYGON_LAYER_ERROR',
-  SET_RIGHT_PANEL_TAB: 'SET_RIGHT_PANEL_TAB',
-  SET_POLYGON_FEATURES: 'SET_POLYGON_FEATURES',
-  CLEAR_POLYGON_FEATURES: 'CLEAR_POLYGON_FEATURES',
-  SELECT_LOCATION: 'SELECT_LOCATION',
   SET_CLICKED_POINT: 'SET_CLICKED_POINT',
   SET_TIMESERIES_LOADING: 'SET_TIMESERIES_LOADING',
   SET_TIMESERIES_DATA: 'SET_TIMESERIES_DATA',
@@ -94,7 +67,7 @@ export const ActionTypes = {
   CLEAR_ERROR: 'CLEAR_ERROR',
 } as const;
 
-export type GriddedDashboardAction =
+export type DashboardAction =
   | { type: typeof ActionTypes.SET_DATASETS; payload: string[] }
   | { type: typeof ActionTypes.SET_VARIABLES; payload: string[] }
   | { type: typeof ActionTypes.SET_TIMESTEPS; payload: string[] }
@@ -110,12 +83,7 @@ export type GriddedDashboardAction =
   | { type: typeof ActionTypes.SET_ERROR; payload: string | null }
   | { type: typeof ActionTypes.CLEAR_ERROR };
 
-export type GriddedDispatch = Dispatch<GriddedDashboardAction>;
-
-const griddedDashboardReducer = (
-  state: GriddedDashboardState,
-  action: GriddedDashboardAction
-): GriddedDashboardState => {
+const reducer = (state: DashboardState, action: DashboardAction): DashboardState => {
   switch (action.type) {
     case ActionTypes.SET_DATASETS:
       return {
@@ -164,64 +132,6 @@ const griddedDashboardReducer = (
       return { ...state, activeOverlays: next };
     }
 
-    case ActionTypes.SET_POLYGON_LAYERS:
-      return {
-        ...state,
-        availablePolygonLayers: Array.isArray(action.payload) ? action.payload : [],
-        polygonLayerLoading: false,
-        polygonLayerError: null,
-      };
-
-    case ActionTypes.SET_ACTIVE_POLYGON_LAYER:
-      return {
-        ...state,
-        activePolygonLayer: action.payload,
-        // Features from the previous layer no longer apply
-        polygonFeatures: [],
-        polygonClickLngLat: null,
-        selectedLocation: null,
-      };
-
-    case ActionTypes.SET_RIGHT_PANEL_TAB:
-      return { ...state, rightPanelTab: action.payload };
-
-    case ActionTypes.SET_POLYGON_FEATURES:
-      return {
-        ...state,
-        polygonFeatures: Array.isArray(action.payload?.features) ? action.payload.features : [],
-        polygonClickLngLat: action.payload?.lngLat ?? null,
-        selectedLocation: null,
-        // Bring the results forward — otherwise the click looks like a no-op
-        rightPanelTab: 'polygons',
-      };
-
-    case ActionTypes.CLEAR_POLYGON_FEATURES:
-      return {
-        ...state,
-        polygonFeatures: [],
-        polygonClickLngLat: null,
-        selectedLocation: null,
-      };
-
-    case ActionTypes.SELECT_LOCATION:
-      return {
-        ...state,
-        selectedLocation: action.payload,
-      };
-
-    case ActionTypes.SET_POLYGON_LAYER_LOADING:
-      return {
-        ...state,
-        polygonLayerLoading: action.payload,
-      };
-
-    case ActionTypes.SET_POLYGON_LAYER_ERROR:
-      return {
-        ...state,
-        polygonLayerError: action.payload,
-        polygonLayerLoading: false,
-      };
-
     case ActionTypes.SET_CLICKED_POINT:
       return {
         ...state,
@@ -264,19 +174,15 @@ const griddedDashboardReducer = (
   }
 };
 
-export type GriddedDashboardContextValue = {
-  state: GriddedDashboardState;
-  dispatch: GriddedDispatch;
+export type DashboardContextValue = {
+  state: DashboardState;
+  dispatch: Dispatch<DashboardAction>;
 };
 
-const GriddedDashboardContext = createContext<GriddedDashboardContextValue | undefined>(undefined);
+const GriddedDashboardContext = createContext<DashboardContextValue | undefined>(undefined);
 
-type GriddedDashboardProviderProps = {
-  children: ReactNode;
-};
-
-export const GriddedDashboardProvider = ({ children }: GriddedDashboardProviderProps) => {
-  const [state, dispatch] = useReducer(griddedDashboardReducer, initialGriddedState);
+export const GriddedDashboardProvider = ({ children }: React.PropsWithChildren) => {
+  const [state, dispatch] = useReducer(reducer, initialState);
   return (
     <GriddedDashboardContext.Provider value={{ state, dispatch }}>
       {children}
@@ -284,7 +190,7 @@ export const GriddedDashboardProvider = ({ children }: GriddedDashboardProviderP
   );
 };
 
-export const useGriddedDashboard = (): GriddedDashboardContextValue => {
+export const useGriddedDashboard = () => {
   const context = useContext(GriddedDashboardContext);
   if (!context) {
     throw new Error('useGriddedDashboard must be used within a GriddedDashboardProvider');

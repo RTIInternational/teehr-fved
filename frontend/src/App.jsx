@@ -9,7 +9,7 @@ import { Home, DashboardsHome, Navbar } from './components/common';
 import { ForecastDashboard } from './components/dashboards/forecast';
 import GriddedDashboard from './components/dashboards/gridded/index';
 import { ForecastDashboardProvider } from './context/ForecastDashboardContext';
-import { GriddedDashboardProvider } from './features/gridded/GriddedDashboardContext';
+import { GriddedDashboardProvider } from './features/gridded/DashboardContext';
 import { useAuth } from './hooks/useAuth';
 
 import 'bootstrap/dist/css/bootstrap.min.css';

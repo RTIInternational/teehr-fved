@@ -6,7 +6,7 @@ import GriddedControls from './components/GriddedControls';
 import GriddedMapComponent from './components/GriddedMapComponent';
 import GriddedPolygonPanel from './components/GriddedPolygonPanel';
 import GriddedTimeseriesPanel from './components/GriddedTimeseriesPanel';
-import { useGriddedDashboard, ActionTypes } from './GriddedDashboardContext';
+import { useGriddedDashboard, ActionTypes } from './DashboardContext';
 import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
 
 const TABS = [

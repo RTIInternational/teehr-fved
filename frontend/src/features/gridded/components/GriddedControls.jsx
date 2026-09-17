@@ -3,7 +3,7 @@ import { Form, Row, Col, Button, InputGroup, Spinner, Alert } from 'react-bootst
 
 import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching';
 import { griddedApiService } from '../../../services/griddedApi';
-import { useGriddedDashboard, ActionTypes } from '../GriddedDashboardContext';
+import { useGriddedDashboard, ActionTypes } from '../DashboardContext';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 const COLOR_RAMPS = [
