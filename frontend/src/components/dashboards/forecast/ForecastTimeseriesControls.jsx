@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Form, Row, Col, Button, Tabs, Tab } from 'react-bootstrap';
+
 import MultiSelectDropdown from '../../common/MultiSelectDropdown';
 
 const ForecastTimeseriesControls = ({
@@ -8,16 +9,17 @@ const ForecastTimeseriesControls = ({
   updateTimeseriesFilters,
   loadTimeseries,
   selectedLocation,
-  onViewModeChange
+  onViewModeChange,
 }) => {
   const [activeTab, setActiveTab] = useState('observations');
 
   const primaryFilters = useMemo(() => {
     const nested = timeseriesFilters?.primary || {};
     return {
-      variables: nested.variables ?? (timeseriesFilters?.variable ? [timeseriesFilters.variable] : []),
+      variables:
+        nested.variables ?? (timeseriesFilters?.variable ? [timeseriesFilters.variable] : []),
       start_date: nested.start_date ?? timeseriesFilters?.start_date ?? null,
-      end_date: nested.end_date ?? timeseriesFilters?.end_date ?? null
+      end_date: nested.end_date ?? timeseriesFilters?.end_date ?? null,
     };
   }, [timeseriesFilters]);
 
@@ -25,9 +27,12 @@ const ForecastTimeseriesControls = ({
     const nested = timeseriesFilters?.secondary || {};
     return {
       configurations: nested.configurations ?? timeseriesFilters?.configurations ?? [],
-      variables: nested.variables ?? (timeseriesFilters?.variable ? [timeseriesFilters.variable] : []),
-      reference_start_date: nested.reference_start_date ?? timeseriesFilters?.reference_start_date ?? null,
-      reference_end_date: nested.reference_end_date ?? timeseriesFilters?.reference_end_date ?? null
+      variables:
+        nested.variables ?? (timeseriesFilters?.variable ? [timeseriesFilters.variable] : []),
+      reference_start_date:
+        nested.reference_start_date ?? timeseriesFilters?.reference_start_date ?? null,
+      reference_end_date:
+        nested.reference_end_date ?? timeseriesFilters?.reference_end_date ?? null,
     };
   }, [timeseriesFilters]);
 
@@ -35,8 +40,8 @@ const ForecastTimeseriesControls = ({
     updateTimeseriesFilters({
       primary: {
         ...primaryFilters,
-        [field]: value
-      }
+        [field]: value,
+      },
     });
   };
 
@@ -44,16 +49,16 @@ const ForecastTimeseriesControls = ({
     updateTimeseriesFilters({
       secondary: {
         ...secondaryFilters,
-        [field]: value
-      }
+        [field]: value,
+      },
     });
   };
 
   const canLoadTimeseries = Boolean(
-    selectedLocation?.primary_location_id
-    && primaryFilters.variables?.length
-    && secondaryFilters.variables?.length
-    && secondaryFilters.configurations?.length
+    selectedLocation?.primary_location_id &&
+    primaryFilters.variables?.length &&
+    secondaryFilters.variables?.length &&
+    secondaryFilters.configurations?.length
   );
 
   const handleLoadData = async () => {
@@ -62,7 +67,7 @@ const ForecastTimeseriesControls = ({
     await loadTimeseries({
       primary_location_id: selectedLocation.primary_location_id,
       primary: primaryFilters,
-      secondary: secondaryFilters
+      secondary: secondaryFilters,
     });
 
     if (onViewModeChange) {
@@ -102,7 +107,9 @@ const ForecastTimeseriesControls = ({
                     type="datetime-local"
                     size="sm"
                     value={primaryFilters.start_date || ''}
-                    onChange={(e) => handlePrimaryFilterChange('start_date', e.target.value || null)}
+                    onChange={(e) =>
+                      handlePrimaryFilterChange('start_date', e.target.value || null)
+                    }
                   />
                 </Form.Group>
               </Col>
@@ -156,7 +163,9 @@ const ForecastTimeseriesControls = ({
                     type="datetime-local"
                     size="sm"
                     value={secondaryFilters.reference_start_date || ''}
-                    onChange={(e) => handleSecondaryFilterChange('reference_start_date', e.target.value || null)}
+                    onChange={(e) =>
+                      handleSecondaryFilterChange('reference_start_date', e.target.value || null)
+                    }
                   />
                 </Form.Group>
               </Col>
@@ -168,7 +177,9 @@ const ForecastTimeseriesControls = ({
                     type="datetime-local"
                     size="sm"
                     value={secondaryFilters.reference_end_date || ''}
-                    onChange={(e) => handleSecondaryFilterChange('reference_end_date', e.target.value || null)}
+                    onChange={(e) =>
+                      handleSecondaryFilterChange('reference_end_date', e.target.value || null)
+                    }
                   />
                 </Form.Group>
               </Col>

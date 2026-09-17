@@ -82,7 +82,9 @@ const GriddedPolygonPanel = () => {
           <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 1 }}>
             <tr>
               {columns.map((key) => (
-                <th key={key} scope="col" className="text-nowrap">{key}</th>
+                <th key={key} scope="col" className="text-nowrap">
+                  {key}
+                </th>
               ))}
             </tr>
           </thead>
