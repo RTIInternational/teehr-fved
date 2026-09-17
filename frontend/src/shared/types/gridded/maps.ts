@@ -11,3 +11,9 @@ export type MapFilters = {
   colorRampMin: number;
   colorRampMax: number;
 };
+
+export type SelectedLocation = {
+  primary_location_id: string;
+  name: string;
+  coordinates: ClickedPoint;
+};
