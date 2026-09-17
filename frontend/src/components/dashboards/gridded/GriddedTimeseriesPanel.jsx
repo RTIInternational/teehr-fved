@@ -1,5 +1,6 @@
 import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef } from 'react';
+
 import { useGriddedDashboard } from '../../../context/GriddedDashboardContext';
 import DashboardPanel from '../../common/dashboard/DashboardPanel';
 
@@ -44,7 +45,7 @@ const GriddedTimeseriesPanel = () => {
         margin: { t: 40, r: 20, b: 50, l: 60 },
         autosize: true,
       },
-      { responsive: true, displayModeBar: false },
+      { responsive: true, displayModeBar: false }
     );
   }, [timeseriesData]);
 

@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+
 import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
 import { getVariableStyle } from './variableStyles';
 
@@ -10,12 +11,18 @@ export const useGriddedVariableStyles = () => {
     styledVariablesRef.current = new Set();
   }, []);
 
-  const applyVariableStyleIfNew = useCallback((variable) => {
-    if (!variable || styledVariablesRef.current.has(variable)) return;
-    styledVariablesRef.current.add(variable);
-    const { colorRamp, min, max } = getVariableStyle(variable);
-    dispatch({ type: ActionTypes.UPDATE_MAP_FILTERS, payload: { colorRamp, colorRampMin: min, colorRampMax: max } });
-  }, [dispatch]);
+  const applyVariableStyleIfNew = useCallback(
+    (variable) => {
+      if (!variable || styledVariablesRef.current.has(variable)) return;
+      styledVariablesRef.current.add(variable);
+      const { colorRamp, min, max } = getVariableStyle(variable);
+      dispatch({
+        type: ActionTypes.UPDATE_MAP_FILTERS,
+        payload: { colorRamp, colorRampMin: min, colorRampMax: max },
+      });
+    },
+    [dispatch]
+  );
 
   return { resetStyles, applyVariableStyleIfNew };
 };

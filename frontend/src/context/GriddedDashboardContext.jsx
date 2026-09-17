@@ -2,9 +2,9 @@
 import { createContext, useContext, useReducer } from 'react';
 
 const initialGriddedState = {
-  datasets: [],       // string[] — available dataset names from xpublish
-  variables: [],      // string[] — variables for the selected dataset
-  timesteps: [],      // string[] — ISO datetime strings for selected dataset+variable
+  datasets: [], // string[] — available dataset names from xpublish
+  variables: [], // string[] — variables for the selected dataset
+  timesteps: [], // string[] — ISO datetime strings for selected dataset+variable
 
   mapFilters: {
     dataset: null,
@@ -15,26 +15,26 @@ const initialGriddedState = {
     colorRampMax: 100,
   },
 
-  activeOverlays: [],   // string[] of overlay IDs currently shown on the map
+  activeOverlays: [], // string[] of overlay IDs currently shown on the map
 
-  variableAttrs: {},    // { [varName]: { units, long_name, ... } } — from /variable-attrs endpoint
+  variableAttrs: {}, // { [varName]: { units, long_name, ... } } — from /variable-attrs endpoint
 
   // Polygon layers from S3/pmtiles
-  availablePolygonLayers: [],  // [{ id, path, source_layer }, ...] — from discovery endpoint
-  activePolygonLayer: null,     // string (layer id) | null — exclusive selection
+  availablePolygonLayers: [], // [{ id, path, source_layer }, ...] — from discovery endpoint
+  activePolygonLayer: null, // string (layer id) | null — exclusive selection
   polygonLayerLoading: false,
   polygonLayerError: null,
 
   // Which tab the right-hand panel shows. Lives here rather than in local state
   // because a map click needs to bring the polygon tab forward.
-  rightPanelTab: 'dataset',   // 'dataset' | 'polygons'
+  rightPanelTab: 'dataset', // 'dataset' | 'polygons'
 
   // Every polygon under the last map click, including nested/overlapping ones
-  polygonFeatures: [],        // [{ id, name, ... }] — deduped feature properties
-  polygonClickLngLat: null,   // { lon, lat } | null — where the polygons were picked
-  selectedLocation: null,     // { primary_location_id, name } | null — feature chosen for a warehouse query
+  polygonFeatures: [], // [{ id, name, ... }] — deduped feature properties
+  polygonClickLngLat: null, // { lon, lat } | null — where the polygons were picked
+  selectedLocation: null, // { primary_location_id, name } | null — feature chosen for a warehouse query
 
-  clickedPoint: null,       // { lon, lat } | null — last point clicked on the map
+  clickedPoint: null, // { lon, lat } | null — last point clicked on the map
   timeseriesLoading: false,
   timeseriesError: null,
   // One series at a time — the most recent request wins. `source` says which
@@ -192,7 +192,12 @@ const griddedDashboardReducer = (state, action) => {
       return { ...state, timeseriesLoading: action.payload };
 
     case ActionTypes.SET_TIMESERIES_DATA:
-      return { ...state, timeseriesData: action.payload, timeseriesLoading: false, timeseriesError: null };
+      return {
+        ...state,
+        timeseriesData: action.payload,
+        timeseriesLoading: false,
+        timeseriesError: null,
+      };
 
     case ActionTypes.SET_TIMESERIES_ERROR:
       return { ...state, timeseriesError: action.payload, timeseriesLoading: false };

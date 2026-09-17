@@ -7,13 +7,13 @@
 
 export const FORECAST_DASHBOARD_DEFAULTS = {
   // Preferred default configuration for forecasts
-  preferredConfiguration: "nwm30_medium_range",
+  preferredConfiguration: 'nwm30_medium_range',
 
   // Preferred default variable
-  preferredVariable: "streamflow_hourly_inst",
+  preferredVariable: 'streamflow_hourly_inst',
 
   // Default metric for map coloring
-  defaultMetricName: "relative_bias",
+  defaultMetricName: 'relative_bias',
 };
 
 /**

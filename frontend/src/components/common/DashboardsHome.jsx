@@ -6,47 +6,46 @@ const DashboardsHome = () => {
     {
       id: 'forecast-analysis',
       title: 'Forecast Analysis',
-      description: 'Real-time forecast analysis and validation tools for operational and research data streams.',
-      features: [
-        'Live forecast data',
-        'Forecast vs observation comparison',
-        'Lead time analysis'
-      ],
+      description:
+        'Real-time forecast analysis and validation tools for operational and research data streams.',
+      features: ['Live forecast data', 'Forecast vs observation comparison', 'Lead time analysis'],
       path: '/forecast',
       status: 'available',
       image: '/api/static/preview-forecast.png', // placeholder
-      color: 'secondary'
+      color: 'secondary',
     },
     {
       id: 'snow-dashboard',
       title: 'Snow Dashboard',
-      description: 'Explore gridded snow data including SWE, snow depth, and precipitation rate from icechunk datasets.',
+      description:
+        'Explore gridded snow data including SWE, snow depth, and precipitation rate from icechunk datasets.',
       features: [
         'Interactive raster tile map',
         'Variable and timestep selection',
         'Point-based timeseries query',
-        'Overlay layers (NWS CPC, SMAP, VIIRS)'
+        'Overlay layers (NWS CPC, SMAP, VIIRS)',
       ],
       path: '/gridded',
       status: 'available',
       image: '/api/static/preview-snow.png',
-      color: 'info'
+      color: 'info',
     },
     // Future dashboards
     {
       id: 'retrospective-model-comparisons',
       title: 'Retrospective Model Comparisons',
-      description: 'Evaluate multiple historical simulations compared to a baseline, considering sampling uncertainty.',
+      description:
+        'Evaluate multiple historical simulations compared to a baseline, considering sampling uncertainty.',
       features: [
         'Probability of improvement of alternative models over a baseline.',
         'Interactive maps, heatmaps and plots',
         'Aggregated and detailed summaries',
-        'Filter by physical, geographical, temporal or hydrologic attributes to see trends'
+        'Filter by physical, geographical, temporal or hydrologic attributes to see trends',
       ],
       path: '/retrospective-model-comparisons',
       status: 'coming-soon',
       image: '/api/static/preview-data.png', // placeholder
-      color: 'primary'
+      color: 'primary',
     },
 
     {
@@ -60,12 +59,12 @@ const DashboardsHome = () => {
         'Variable flood thresholds',
         'Interactive maps and plots',
         'Warning and lead time assessments',
-        'Sampling uncertainty estimated'
+        'Sampling uncertainty estimated',
       ],
       path: '/forecast-flood-protection',
       status: 'coming-soon',
       image: '/api/static/preview-data.png', // placeholder
-      color: 'secondary'
+      color: 'secondary',
     },
 
     {
@@ -79,12 +78,12 @@ const DashboardsHome = () => {
         'Variable low flow thresholds',
         'Interactive maps and plots',
         'Filter by physical, geographical, temporal or hydrologic attributes to see trends',
-        'Sampling uncertainty estimated'
+        'Sampling uncertainty estimated',
       ],
       path: '/forecast-water-supply',
       status: 'coming-soon',
       image: '/api/static/preview-data.png', // placeholder
-      color: 'success'
+      color: 'success',
     },
 
     {
@@ -95,47 +94,45 @@ const DashboardsHome = () => {
         'Interactive precipitation and streamflow error maps',
         'Spaghetti plots of streamflow forecasts with associated precipitation forecasts',
         'Cycle by cycle error heatmaps',
-        'Cycle by cycle time series plots highlighting warning time'
+        'Cycle by cycle time series plots highlighting warning time',
       ],
       path: '/post-event',
       status: 'coming-soon',
       image: '/api/static/preview-data.png', // placeholder
-      color: 'primary'
+      color: 'primary',
     },
 
     {
       id: 'deterministic-forecast-dam-safety',
       title: 'Deterministic Forecast Evaluation for Dam Safety and Hydropower',
       description: 'Real-time forecast analysis for dam safety and hydropower applications.',
-      features: [
-        'Check back later for details',
-      ],
+      features: ['Check back later for details'],
       path: '/forecast',
       status: 'coming-soon',
       image: '/api/static/preview-forecast.png', // placeholder
-      color: 'secondary'
+      color: 'secondary',
     },
 
     {
       id: 'deterministic-forecast-water-supply',
       title: 'Deterministic Forecast Evaluation for Water Supply',
       description: 'Real-time forecast analysis for water supply applications.',
-      features: [
-        'Check back later for details',
-      ],
+      features: ['Check back later for details'],
       path: '/data',
       status: 'coming-soon',
       image: '/api/static/preview-data.png', // placeholder
-      color: 'success'
+      color: 'success',
     },
-
   ];
 
   const getCardComponent = (dashboard) => {
     if (dashboard.status === 'available') {
       return (
         <Link to={dashboard.path} style={{ textDecoration: 'none' }}>
-          <Card className="h-100 dashboard-card dashboard-card-available" style={{ cursor: 'pointer' }}>
+          <Card
+            className="h-100 dashboard-card dashboard-card-available"
+            style={{ cursor: 'pointer' }}
+          >
             <Card.Header className={`bg-${dashboard.color} text-white`}>
               <Card.Title className="mb-0">{dashboard.title}</Card.Title>
             </Card.Header>
@@ -197,8 +194,8 @@ const DashboardsHome = () => {
             <Col lg={8}>
               <h1 className="display-4 mb-3">TEEHR Dashboard Hub</h1>
               <p className="lead">
-                Tools for Exploratory Evaluation in Hydrologic Research.
-                Choose from our collection of specialized dashboards for hydrologic data analysis.
+                Tools for Exploratory Evaluation in Hydrologic Research. Choose from our collection
+                of specialized dashboards for hydrologic data analysis.
               </p>
             </Col>
           </Row>

@@ -1,21 +1,23 @@
 import { useEffect } from 'react';
+
 import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
 import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching';
-import { useGriddedVariableStyles } from './useGriddedVariableStyles';
 import DashboardPanel from '../../common/dashboard/DashboardPanel';
-import GriddedMapComponent from './GriddedMapComponent';
 import GriddedControls from './GriddedControls';
+import GriddedMapComponent from './GriddedMapComponent';
 import GriddedPolygonPanel from './GriddedPolygonPanel';
 import GriddedTimeseriesPanel from './GriddedTimeseriesPanel';
+import { useGriddedVariableStyles } from './useGriddedVariableStyles';
 
 const TABS = [
-  { id: 'dataset',  label: 'Dataset' },
+  { id: 'dataset', label: 'Dataset' },
   { id: 'polygons', label: 'Polygon Attributes' },
 ];
 
 const Dashboard = () => {
   const { state, dispatch } = useGriddedDashboard();
-  const { loadDatasets, loadVariables, loadTimesteps, loadVariableAttrs, runTimeseriesQuery } = useGriddedDataFetching();
+  const { loadDatasets, loadVariables, loadTimesteps, loadVariableAttrs, runTimeseriesQuery } =
+    useGriddedDataFetching();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
 
   // Load datasets on mount
