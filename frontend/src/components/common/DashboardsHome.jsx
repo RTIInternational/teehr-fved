@@ -4,37 +4,6 @@ import { Link } from 'react-router-dom';
 const DashboardsHome = () => {
   const dashboards = [
     {
-      id: 'data-management',
-      title: 'Data Availability',
-      description: 'Explore contents of the data warehouse spatially and temporally.',
-      features: [
-        'Data summaries by model configuration',
-        'Data summaries by location',
-        'Completeness analysis of timeseries data'
-      ],
-      path: '/data',
-      status: 'available',
-      image: '/api/static/preview-data.png', // placeholder
-      color: 'success'
-    },
-
-    {
-      id: 'retrospective-simulations',
-      title: 'Retrospective Simulations',
-      description: 'Analyze and compare historical simulation data with observed values. Explore metrics, timeseries, and spatial patterns.',
-      features: [
-        'Interactive maps with simulation metrics',
-        'Time series visualization and comparison',
-        'Statistical performance metrics',
-        'Multi-configuration analysis'
-      ],
-      path: '/retrospective',
-      status: 'available',
-      image: '/api/static/preview-retrospective.png', // placeholder
-      color: 'primary'
-    },
-
-    {
       id: 'forecast-analysis',
       title: 'Forecast Analysis',
       description: 'Real-time forecast analysis and validation tools for operational and research data streams.',

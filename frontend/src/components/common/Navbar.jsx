@@ -87,10 +87,7 @@ const Navbar = () => {
 
   const getBreadcrumbs = () => {
     const pathMap = {
-      '/retrospective': 'Retrospective Simulations',
       '/forecast': 'Forecast Analysis',
-      '/data': 'Data Availability',
-      '/nwmd': 'National Water Model Diagnostics',
       '/gridded': 'Snow Dashboard',
       '/admin': 'Admin Page',
       '/admin/api-keys': 'API Keys',
@@ -160,16 +157,6 @@ const Navbar = () => {
               <li>
                 <Link className="dropdown-item" to="/hub" onClick={() => setIsDashboardsOpen(false)}>
                   Dashboard Hub
-                </Link>
-              </li>
-              <li>
-                <Link className="dropdown-item ps-4" to="/data" onClick={() => setIsDashboardsOpen(false)}>
-                  Data Availability
-                </Link>
-              </li>
-              <li>
-                <Link className="dropdown-item ps-4" to="/retrospective" onClick={() => setIsDashboardsOpen(false)}>
-                  Retrospective Simulations
                 </Link>
               </li>
               <li>
