@@ -1,23 +1,23 @@
 import { useCallback, useRef } from 'react';
 
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
-import { getVariableStyle } from './variableStyles';
+import { useDashboard } from '../DashboardContext';
+import { getVariableStyle } from '../utils/variableStyles';
 
 export const useGriddedVariableStyles = () => {
-  const { dispatch } = useGriddedDashboard();
-  const styledVariablesRef = useRef(new Set());
+  const { dispatch } = useDashboard();
+  const styledVariablesRef = useRef<Set<string>>(new Set());
 
   const resetStyles = useCallback(() => {
     styledVariablesRef.current = new Set();
   }, []);
 
   const applyVariableStyleIfNew = useCallback(
-    (variable) => {
+    (variable: string | null) => {
       if (!variable || styledVariablesRef.current.has(variable)) return;
       styledVariablesRef.current.add(variable);
       const { colorRamp, min, max } = getVariableStyle(variable);
       dispatch({
-        type: ActionTypes.UPDATE_MAP_FILTERS,
+        type: 'UPDATE_MAP_FILTERS',
         payload: { colorRamp, colorRampMin: min, colorRampMax: max },
       });
     },

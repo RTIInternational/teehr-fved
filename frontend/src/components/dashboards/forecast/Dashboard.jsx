@@ -39,7 +39,7 @@ const Dashboard = () => {
       }
     };
 
-    initializeData();
+    void initializeData();
   }, [initializeForecastData]);
 
   return (

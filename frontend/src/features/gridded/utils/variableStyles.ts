@@ -6,14 +6,21 @@
 // that exactly-zero pixels are rendered transparent by the TilesPlugin
 // belowmincolor=transparent parameter.
 
-export const DEFAULT_VARIABLE_STYLE = {
+type VariableStyle = {
+  colorRamp: string;
+  min: number;
+  max: number;
+  units: string | null;
+};
+
+export const DEFAULT_VARIABLE_STYLE: VariableStyle = {
   colorRamp: 'raster/turbo',
   min: 0,
   max: 100,
   units: null,
 };
 
-export const VARIABLE_STYLES = {
+export const VARIABLE_STYLES: Record<string, VariableStyle> = {
   swe_daily_mean: {
     colorRamp: 'raster/turbo',
     min: 0.001,
@@ -34,6 +41,6 @@ export const VARIABLE_STYLES = {
   },
 };
 
-export function getVariableStyle(variable) {
+export function getVariableStyle(variable: string) {
   return VARIABLE_STYLES[variable] ?? DEFAULT_VARIABLE_STYLE;
 }

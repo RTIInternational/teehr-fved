@@ -7,9 +7,8 @@ import ApiKeysAdmin from './components/admin/ApiKeysAdmin';
 import KeycloakAdmin from './components/admin/KeycloakAdmin';
 import { Home, DashboardsHome, Navbar } from './components/common';
 import { ForecastDashboard } from './components/dashboards/forecast';
-import GriddedDashboard from './components/dashboards/gridded/index';
 import { ForecastDashboardProvider } from './context/ForecastDashboardContext';
-import { GriddedDashboardProvider } from './context/GriddedDashboardContext';
+import { GriddedDashboard, GriddedDashboardProvider } from './features/gridded';
 import { useAuth } from './hooks/useAuth';
 
 import 'bootstrap/dist/css/bootstrap.min.css';

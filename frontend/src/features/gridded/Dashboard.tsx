@@ -1,60 +1,31 @@
 import { useEffect } from 'react';
 
-import { useGriddedDashboard, ActionTypes } from '../../../context/GriddedDashboardContext';
-import { useGriddedDataFetching } from '../../../hooks/useGriddedDataFetching';
-import DashboardPanel from '../../common/dashboard/DashboardPanel';
-import GriddedControls from './GriddedControls';
-import GriddedMapComponent from './GriddedMapComponent';
-import GriddedPolygonPanel from './GriddedPolygonPanel';
-import GriddedTimeseriesPanel from './GriddedTimeseriesPanel';
-import { useGriddedVariableStyles } from './useGriddedVariableStyles';
+import DashboardPanel from '@/shared/components/DashboardPanel';
 
-const TABS = [
+import GriddedControls from './components/GriddedControls';
+import GriddedMapComponent from './components/GriddedMapComponent';
+import GriddedPolygonPanel from './components/GriddedPolygonPanel';
+import GriddedTimeseriesPanel from './components/GriddedTimeseriesPanel';
+import { useDashboard, ActionTypes } from './DashboardContext';
+import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
+
+export type GriddedTabName = 'dataset' | 'polygons';
+
+const TABS: { id: GriddedTabName; label: string }[] = [
   { id: 'dataset', label: 'Dataset' },
   { id: 'polygons', label: 'Polygon Attributes' },
 ];
 
-const Dashboard = () => {
-  const { state, dispatch } = useGriddedDashboard();
-  const { loadDatasets, loadVariables, loadTimesteps, loadVariableAttrs, runTimeseriesQuery } =
-    useGriddedDataFetching();
+export const Dashboard = () => {
+  const { state, dispatch } = useDashboard();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
 
-  // Load datasets on mount
-  useEffect(() => {
-    loadDatasets();
-  }, [loadDatasets]);
-
-  // Auto-load variables when a dataset is first set
-  useEffect(() => {
-    const { dataset } = state.mapFilters;
-    if (dataset && state.variables.length === 0) {
-      loadVariables(dataset);
-    }
-  }, [state.mapFilters.dataset, state.variables.length, loadVariables]);
-
-  // Auto-load timesteps when a variable is first set
-  useEffect(() => {
-    const { dataset, variable } = state.mapFilters;
-    if (dataset && variable && state.timesteps.length === 0) {
-      loadTimesteps(dataset);
-    }
-  }, [state.mapFilters.dataset, state.mapFilters.variable, state.timesteps.length, loadTimesteps]);
-
-  // Run timeseries query when the user clicks a point on the map
-  useEffect(() => {
-    if (state.clickedPoint) {
-      runTimeseriesQuery(state.clickedPoint.lon, state.clickedPoint.lat);
-    }
-  }, [state.clickedPoint, runTimeseriesQuery]);
-
-  // Fetch variable attrs and reset style-tracking when dataset changes
+  // Reset style-tracking when dataset changes
   useEffect(() => {
     if (state.mapFilters.dataset) {
-      loadVariableAttrs(state.mapFilters.dataset);
       resetStyles();
     }
-  }, [state.mapFilters.dataset, loadVariableAttrs, resetStyles]);
+  }, [state.mapFilters.dataset, resetStyles]);
 
   // Auto-apply variable-specific default styles on first selection of each variable
   useEffect(() => {
@@ -180,5 +151,3 @@ const Dashboard = () => {
     </div>
   );
 };
-
-export default Dashboard;
