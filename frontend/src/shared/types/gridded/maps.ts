@@ -15,5 +15,5 @@ export type MapFilters = {
 export type SelectedLocation = {
   primary_location_id: string;
   name: string;
-  coordinates: ClickedPoint;
+  coordinates: number[] | null;
 };

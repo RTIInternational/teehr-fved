@@ -1,10 +1,12 @@
-import DashboardPanel from '../../../components/common/dashboard/DashboardPanel.jsx';
-import { useGriddedDashboard, ActionTypes } from '../DashboardContext.js';
+import DashboardPanel from '@/shared/components/DashboardPanel';
+import type { PolygonFeatureProps, PolygonFeatures } from '@/shared/types/gridded/tiles';
+
+import { useDashboard, ActionTypes } from '../DashboardContext.js';
 
 // Attribute columns are driven by the pmtiles archive, so render whatever the
 // features carry rather than hard-coding a schema. `id` leads since it is the
 // key a warehouse query is built on.
-const orderedKeys = (features) => {
+const orderedKeys = (features: PolygonFeatures) => {
   const keys = new Set();
   features.forEach((props) => Object.keys(props || {}).forEach((k) => keys.add(k)));
   keys.delete('id');
@@ -12,12 +14,12 @@ const orderedKeys = (features) => {
 };
 
 const GriddedPolygonPanel = () => {
-  const { state, dispatch } = useGriddedDashboard();
+  const { state, dispatch } = useDashboard();
   const { polygonFeatures, polygonClickLngLat, selectedLocation, activePolygonLayer } = state;
 
   const selectedId = selectedLocation?.primary_location_id ?? null;
 
-  const selectFeature = (props) => {
+  const selectFeature = (props: PolygonFeatureProps) => {
     dispatch({
       type: ActionTypes.SELECT_LOCATION,
       payload: {
@@ -81,11 +83,15 @@ const GriddedPolygonPanel = () => {
         <table className="table table-sm table-hover mb-0" style={{ fontSize: '0.8rem' }}>
           <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 1 }}>
             <tr>
-              {columns.map((key) => (
-                <th key={key} scope="col" className="text-nowrap">
-                  {key}
-                </th>
-              ))}
+              {columns.map((key) => {
+                if (typeof key === 'string' || typeof key === 'number') {
+                  return (
+                    <th key={key} scope="col" className="text-nowrap">
+                      {key}
+                    </th>
+                  );
+                }
+              })}
             </tr>
           </thead>
           <tbody>
@@ -98,11 +104,17 @@ const GriddedPolygonPanel = () => {
                   className={isSelected ? 'table-primary' : ''}
                   style={{ cursor: 'pointer' }}
                 >
-                  {columns.map((key) => (
-                    <td key={key} className="text-nowrap">
-                      {props[key] !== null && props[key] !== undefined ? String(props[key]) : 'N/A'}
-                    </td>
-                  ))}
+                  {columns.map((key) => {
+                    if (typeof key === 'string' || typeof key === 'number') {
+                      return (
+                        <td key={key} className="text-nowrap">
+                          {props[key] !== null && props[key] !== undefined
+                            ? String(props[key] as string | number | boolean)
+                            : 'N/A'}
+                        </td>
+                      );
+                    }
+                  })}
                 </tr>
               );
             })}
