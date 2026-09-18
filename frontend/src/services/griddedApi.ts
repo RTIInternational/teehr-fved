@@ -13,7 +13,7 @@ export const GRIDDED_API_BASE_URL =
 export const MAX_TIMESERIES_POINTS = 365;
 
 type GriddedApiCall = {
-  (path: string, options: { raw: true }): Promise<string>;
+  (path: string, options?: { raw: true }): Promise<string>;
   <T>(path: string, options?: { raw?: false }): Promise<T>;
   <T>(path: string, options: { raw: boolean }): Promise<string | T>;
 };

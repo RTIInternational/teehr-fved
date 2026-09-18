@@ -9,7 +9,9 @@ import GriddedTimeseriesPanel from './components/GriddedTimeseriesPanel';
 import { useDashboard, ActionTypes } from './DashboardContext';
 import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
 
-const TABS = [
+export type GriddedTabName = 'dataset' | 'polygons';
+
+const TABS: { id: GriddedTabName; label: string }[] = [
   { id: 'dataset', label: 'Dataset' },
   { id: 'polygons', label: 'Polygon Attributes' },
 ];

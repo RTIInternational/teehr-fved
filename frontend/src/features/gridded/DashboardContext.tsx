@@ -3,15 +3,15 @@ import { createContext, useContext, useReducer, type Dispatch } from 'react';
 import type { ClickedPoint, MapFilters, SelectedLocation } from '@/shared/types/gridded/maps';
 import type { PolygonFeatures } from '@/shared/types/gridded/tiles';
 
-type PolygonFeaturesPayload = { features: PolygonFeatures; lngLat: ClickedPoint };
+import type { GriddedTabName } from './Dashboard';
 
-type TabName = 'dataset' | 'polygons';
+type PolygonFeaturesPayload = { features: PolygonFeatures; lngLat: ClickedPoint };
 
 export type DashboardState = {
   mapFilters: MapFilters;
   activeOverlays: string[];
   activePolygonLayer: string | null;
-  rightPanelTab: TabName;
+  rightPanelTab: GriddedTabName;
   polygonFeatures: PolygonFeatures;
   polygonClickLngLat: ClickedPoint | null;
   selectedLocation: SelectedLocation | null;
@@ -74,7 +74,7 @@ export type DashboardAction =
   | { type: typeof ActionTypes.UPDATE_MAP_FILTERS; payload: UpdateMapFiltersPayload }
   | { type: typeof ActionTypes.TOGGLE_OVERLAY; payload: string }
   | { type: typeof ActionTypes.SET_ACTIVE_POLYGON_LAYER; payload: string | null }
-  | { type: typeof ActionTypes.SET_RIGHT_PANEL_TAB; payload: TabName }
+  | { type: typeof ActionTypes.SET_RIGHT_PANEL_TAB; payload: GriddedTabName }
   | { type: typeof ActionTypes.SET_POLYGON_FEATURES; payload: PolygonFeaturesPayload }
   | { type: typeof ActionTypes.CLEAR_POLYGON_FEATURES }
   | { type: typeof ActionTypes.SELECT_LOCATION; payload: SelectedLocation }
