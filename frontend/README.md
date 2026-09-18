@@ -1,46 +1,17 @@
-# TEEHR Dashboard - React Frontend
+# FVED - React Frontend
 
-This is the React frontend for the TEEHR Dashboard, a hydrological data visualization application built with Vite, MapLibre GL JS, and Plotly.js.
+This is the React frontend for FVED (Forecast Visualization and Evaluation Dashboard), a forecast visualization and evaluation dashboard to collect, evaluate, and visualize short to medium range streamflow forecasts, seasonal water supply forecasts and snow data products, as well as model projected operations in the Colorado River Basin using the Colorado River Midterm Modeling System (CRMMS). Built with Vite, MapLibre GL JS, and Plotly.js.
 
 ## Technologies Used
 
 - **React 19** - Frontend framework
-- **TypeScript 7** - Incrementally adopted for new development and ongoing migration
-- **TanStack Query** - Server-state fetching and caching for migrated features
+- **TypeScript 7** - Primary application language for the frontend codebase
+- **TanStack Query** - Server-state fetching and caching
 - **Vite** - Fast build tool and development server
 - **MapLibre GL JS** - Interactive mapping
 - **Plotly.js** - Data visualization and charting
 - **Bootstrap 5** - UI components and styling
 - **Oxlint + oxfmt** - Linting and formatting toolchain
-
-## TypeScript Migration
-
-This frontend is in the middle of an incremental migration from JavaScript to TypeScript.
-
-- JavaScript to TypeScript
-- React Context based server-state handling to TanStack Query
-- Flat component organization to feature-based structure
-- ESLint/Prettier to oxlint/oxfmt
-
-Current status:
-
-- **Migrated to TypeScript + TanStack Query + feature-based structure**:
-   - Retrospective dashboard and related components/hooks
-   - Forecast dashboard and related components/hooks
-- **Not yet migrated (still primarily JavaScript + existing context/data-fetching patterns)**:
-   - NWMD dashboard and related components/hooks
-   - Data management dashboard and related components/hooks
-
-This mixed architecture is expected during the migration window.
-
-Current migration-related configuration:
-
-- TypeScript config lives in `tsconfig.json`, `tsconfig.app.json`, and `tsconfig.node.json`.
-- Application source files under `src/` are allowed to remain JavaScript during migration via `allowJs: true`.
-- JavaScript files are not type-checked yet via `checkJs: false`.
-- Vite config has already been migrated to TypeScript in `vite.config.ts`.
-- oxlint is configured to lint both JavaScript and TypeScript files.
-- oxfmt is used for formatting JavaScript, TypeScript, and CSS files.
 
 ## Available Scripts
 
@@ -69,33 +40,40 @@ Useful for testing the production build before deployment.
 
 ### `npm run lint` and `npm run lint:fix`
 
-Runs oxlint across JavaScript and TypeScript source files.
+Runs oxlint across the frontend codebase.
 
 ### `npm run format:check` and `npm run format:fix`
 
-Runs oxfmt across JavaScript, TypeScript, and CSS files.
+Runs oxfmt across the frontend source and style files.
 
 ## Project Structure
 
 ```
 src/
-├── components/          # React components and dashboard views
-├── context/             # React context providers
-├── hooks/               # Custom hooks
-├── services/            # API service layer
-├── utils/               # Shared utility functions
-├── App.jsx              # Main app component
-└── index.jsx            # Application entry point
+├── features/
+│   ├── auth/                      # Auth provider and auth hooks
+│   ├── gridded/                   # Gridded data visualization feature
+│   ├── polygon/                   # Polygon-based evaluation feature
+│   └── shared/                    # Shared dashboard utilities
+├── shared/
+│   ├── components/                # Reusable components
+│   ├── hooks/                     # Shared hooks
+│   ├── queries/                   # Shared TanStack Query hooks
+│   ├── types/                     # Shared TypeScript types
+│   └── utils/                     # Shared utilities
+├── config/                        # Frontend configuration
+├── pages/                         # Route-level pages
+├── services/                      # API service layer
+├── App.tsx                        # Main app component
+└── index.tsx                      # Application entry point and QueryClientProvider
 ```
-
-During migration, you will see a mix of `.js`, `.jsx`, `.ts`, and `.tsx` files.
 
 ## Environment Variables
 
 Create a `.env` file in the project root to configure the API endpoint and external service URLs:
 
 ```
-VITE_API_URL=http://localhost:8000
+VITE_API_BASE_URL=http://localhost:8000
 VITE_KEYCLOAK_URL=https://auth.teehr.local.app.garden
 VITE_PREFECT_URL=https://prefect.teehr.local.app.garden
 VITE_JUPYTERHUB_URL=https://hub.teehr.local.app.garden/hub/spawn
@@ -108,50 +86,18 @@ Note: Environment variables must be prefixed with `VITE_` to be accessible in th
 This frontend connects to a FastAPI backend. The Vite development server proxies API requests to the backend:
 
 - Frontend: http://localhost:8080
-- Backend API: configured by `VITE_API_BASE_URL` or defaults to `https://api.teehr.local.app.garden`
+- Backend API: configured by `VITE_API_BASE_URL` or defaults to `http://127.0.0.1:8000`
 - API endpoints are proxied from `/api/*` to the backend
 
 ## Features
 
-- **Interactive Map**: MapLibre GL JS powered map showing USGS gauge locations
-- **Timeseries Visualization**: Plotly.js charts for hydrological data
+- **Interactive Map**: MapLibre GL JS powered map for forecast and evaluation data
+- **Timeseries Visualization**: Plotly.js charts for hydrological data analysis and evaluation
+- **Snow Data Products**: Visualize snow data products in gridded and timeseries format
 - **Real-time Data**: Connect to TEEHR database via FastAPI backend
 - **Responsive Design**: Bootstrap-based responsive UI
 - **Fast Development**: Vite's instant HMR for rapid development
 
-## Getting Started
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-3. Optionally run lint and format checks during development:
-   ```bash
-   npm run lint
-   npm run format:check
-   ```
-
-4. Make sure the API backend is reachable through `VITE_API_BASE_URL` or the default local Garden URL
-
-5. Open http://localhost:8080 to view the dashboard
-
-## Development Guidance
-
-- Prefer `.ts` and `.tsx` for all new modules and components.
-- When modifying older JavaScript-heavy areas, convert nearby files to TypeScript when the added scope remains manageable.
-- Keep migration changes incremental and reviewable rather than attempting broad rewrites.
-- Run `npm run lint`, `npm run format:check`, and `npm run build` before merging substantial migration work.
-
-## Learn More
-
-- [Vite Documentation](https://vitejs.dev/)
-- [React Documentation](https://reactjs.org/)
-- [MapLibre GL JS](https://maplibre.org/)
-- [Plotly.js](https://plotly.com/javascript/)
-- [Bootstrap 5](https://getbootstrap.com/)
+### Upcoming
+- **Forecast Visualization**: Display short to medium range streamflow forecasts and seasonal water supply forecasts
+- **Model Operations**: View model projected operations data from CRMMS

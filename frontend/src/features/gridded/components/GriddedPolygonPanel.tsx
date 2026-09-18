@@ -1,7 +1,7 @@
 import DashboardPanel from '@/shared/components/DashboardPanel';
 import type { PolygonFeatureProps, PolygonFeatures } from '@/shared/types/gridded/tiles';
 
-import { useDashboard, ActionTypes } from '../DashboardContext.js';
+import { useDashboard, ActionTypes } from '../DashboardContext';
 
 // Attribute columns are driven by the pmtiles archive, so render whatever the
 // features carry rather than hard-coding a schema. `id` leads since it is the
