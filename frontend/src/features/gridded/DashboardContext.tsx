@@ -1,5 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useReducer, type Dispatch } from 'react';
+import { createContext, useContext, useReducer, type Dispatch } from 'react';
 
 import type { ClickedPoint, MapFilters, SelectedLocation } from '@/shared/types/gridded/maps';
 import type { PolygonFeatures } from '@/shared/types/gridded/tiles';
