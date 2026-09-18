@@ -7,7 +7,7 @@ import { ensureFreshToken } from '@/auth/keycloak';
 import { griddedApiService, GRIDDED_API_BASE_URL } from '@/services/griddedApi';
 import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
 import { useTimesteps } from '@/shared/queries/gridded/timesteps';
-import type { PolygonFeatures } from '@/shared/types/gridded/tiles';
+import type { PolygonFeatureProps, PolygonFeatures } from '@/shared/types/gridded/tiles';
 
 import { useDashboard, ActionTypes } from '../DashboardContext';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
@@ -55,7 +55,7 @@ const POLYGON_SELECTED_LAYER_ID = 'polygon-layer-selected';
 const dedupePolygonFeatures = (features?: maplibregl.MapGeoJSONFeature[]) => {
   const seen = new Set();
   return (features || []).reduce<PolygonFeatures>((acc, feature) => {
-    const props = (feature.properties || {}) as Record<string, unknown>;
+    const props = (feature.properties || {}) as PolygonFeatureProps;
     const key = props.id ?? feature.id;
     if (key !== undefined && key !== null) {
       if (seen.has(key)) return acc;
