@@ -41,7 +41,7 @@ const GriddedTimeseriesPanel = () => {
       plotTitle = `${variable}${units} at (${Math.abs(lat).toFixed(4)}°${latHem}, ${Math.abs(lon).toFixed(4)}°${lonHem})`;
     }
 
-    Plotly.react(
+    void Plotly.react(
       plotRef.current,
       [
         {

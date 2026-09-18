@@ -94,7 +94,7 @@ const GriddedMapComponent = () => {
   // Prime the token so a polygon layer selected before the first tile load
   // still builds its FetchSource with an Authorization header.
   useEffect(() => {
-    ensureFreshToken().then((token) => {
+    void ensureFreshToken().then((token) => {
       tokenRef.current = token;
     });
   }, []);
@@ -144,7 +144,7 @@ const GriddedMapComponent = () => {
     const controller = new AbortController();
     let cancelled = false;
 
-    (async () => {
+    void (async () => {
       const token = await ensureFreshToken();
       const params = new URLSearchParams({
         variables: variable,
@@ -296,7 +296,7 @@ const GriddedMapComponent = () => {
   }, [mapLoaded, dataset, variable, currentTimestep, colorRamp, colorRampMin, colorRampMax]);
 
   useEffect(() => {
-    updateTileLayer();
+    void updateTileLayer();
   }, [updateTileLayer]);
 
   // Sync external overlay layers to the map whenever the active set changes.
