@@ -1,5 +1,5 @@
 // Gridded / xpublish API service backed by VITE_XPUBLISH_API_BASE_URL
-import { ensureFreshToken } from '@/auth/keycloak';
+import { ensureFreshToken } from '@/features/auth/keycloak';
 import type { DatasetsResponse } from '@/shared/types/gridded/datasets';
 import type { EdrPointResponse, EdrTimeseriesResponse } from '@/shared/types/gridded/edr';
 import type { VectorTilesResponse } from '@/shared/types/gridded/tiles';

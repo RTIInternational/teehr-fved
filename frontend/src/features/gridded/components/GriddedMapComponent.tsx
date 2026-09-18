@@ -3,7 +3,7 @@ import { FetchSource, PMTiles, Protocol } from 'pmtiles';
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { ensureFreshToken } from '@/auth/keycloak';
+import { ensureFreshToken } from '@/features/auth/keycloak';
 import { griddedApiService, GRIDDED_API_BASE_URL } from '@/services/griddedApi';
 import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
 import { useTimesteps } from '@/shared/queries/gridded/timesteps';
