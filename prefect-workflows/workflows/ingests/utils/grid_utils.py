@@ -222,31 +222,6 @@ def create_virtual_xarray_dataset(
 
 
 @task(cache_policy=NO_CACHE)
-def rechunk_dataset(
-    dataset: xr.Dataset,
-    append_dim: str,
-    chunk_size: int,
-) -> xr.Dataset:
-    """Re-chunk an xarray dataset prior to writing to IceChunk.
-
-    The append dimension (e.g. time) is chunked to 1 so that individual
-    time-steps can be appended independently.  All other dimensions are
-    chunked to ``chunk_size``.
-
-    Parameters
-    ----------
-    dataset : xr.Dataset
-        The dataset to re-chunk.
-    append_dim : str
-        The dimension used for appending (chunked to 1).
-    chunk_size : int
-        Chunk size applied to every dimension other than ``append_dim``.
-    """
-    chunks = {d: (1 if d == append_dim else chunk_size) for d in dataset.dims}
-    return dataset.chunk(chunks)
-
-
-@task(cache_policy=NO_CACHE)
 def create_encoding_config(
     dataset: xr.Dataset,
     append_dim: str,
@@ -260,6 +235,11 @@ def create_encoding_config(
 
     Data variables receive chunk/shard/compression encoding.  Non-dimension
     coordinates (e.g. ``spatial_ref`` / CRS grids) are written unchunked.
+
+    Datasets are written numpy-backed (no dask), so this encoding is the only
+    thing that determines the on-disk chunk layout — there is no separate
+    re-chunking step to keep in sync.  Note it applies only on the initial
+    write; appends reuse the existing array metadata.
 
     Parameters
     ----------
