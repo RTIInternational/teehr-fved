@@ -7,7 +7,6 @@ import xarray as xr
 import pandas as pd
 
 from utils import grid_utils as gu
-from utils.gridded_source_builders import GriddedSource, UASwan4km
 from workflows.models.ingest_gridded_data_input import (
     StorageType,
     IngestGriddedDataInput,
@@ -33,17 +32,12 @@ _VIRTUAL_CONTAINER_MAP = {
     StorageType.gcs: lambda: ic.storage.gcs_store(opts={}),
 }
 
-_FILE_LIST_BUILDER_MAP: dict[str, GriddedSource] = {
-    "ua-swann-4km": UASwan4km(),
-}
-
-
 @flow(
     flow_run_name="ingest-gridded-data",
     timeout_seconds=60 * 60
 )
 def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
-    """Ingest gridded data for a known configuration over a derived date range, and write to an IceChunk S3 repository.
+    """Ingest gridded data from a source over a derived date range, and write to an IceChunk S3 repository.
 
     Parameters
     ----------
@@ -51,14 +45,7 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
         Pydantic model containing all flow parameters. See IngestGriddedDataInput for field descriptions.
     """
     logger = get_run_logger()
-
-    if args.configuration_name not in _FILE_LIST_BUILDER_MAP:
-        valid = list(_FILE_LIST_BUILDER_MAP.keys())
-        raise ValueError(
-            f"Unknown configuration_name '{args.configuration_name}'. "
-            f"Valid options: {valid}"
-        )
-    source_config = _FILE_LIST_BUILDER_MAP[args.configuration_name]
+    source_config = args.source
     source_bucket = source_config.source_bucket
 
     parser = _PARSER_MAP[args.parser_type]()
