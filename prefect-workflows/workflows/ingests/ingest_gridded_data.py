@@ -106,7 +106,7 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
     # Create the ObjectStoreRegistry for the source data files
     registry = gu.create_objectstore_registry(
         source_bucket,
-        **args.obstore_kwargs
+        **{**source_config.store_kwargs, **args.obstore_kwargs}
     )
     logger.info(
         f"ObjectStoreRegistry created for source_bucket: {source_bucket}."
@@ -120,6 +120,7 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
         concat_dim=args.append_dim,
         **args.xconcat_kwargs
     )
+    virtual_ds = gu.align_virtual_fill_values(virtual_ds)
     logger.info("Virtual xarray dataset created.")
 
     # append_dim is only valid when data already exists in the store.

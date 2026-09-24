@@ -3,7 +3,8 @@ import os
 from datetime import datetime
 from typing import Any, Union
 from enum import Enum
-from pydantic import BaseModel, Field
+import numpy as np
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 PYRAMID_GROUP_PATH = "/pyramids"
@@ -23,6 +24,34 @@ class StorageType(str, Enum):
     http = "http"
     s3 = "s3"
     gcs = "gcs"
+
+
+class PackedEncoding(BaseModel):
+    """CF packing (integer dtype + scale/offset) for a pyramid variable.
+
+    Values decode as ``stored * scale_factor + add_offset``. uint16 stores 0-65535, and with
+    65535 reserved as ``_FillValue`` the range is ``add_offset`` to ``add_offset + 65534 * scale_factor``,
+    in steps of ``scale_factor``: a larger scale widens the range but coarsens the steps. Pick
+    ``scale_factor = (max - min) / 65534`` for the plausible range; out-of-range values are clipped.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    dtype: str = Field(..., description="Integer dtype to store, e.g. 'uint16'")
+    scale_factor: float = Field(..., description="Decoded value per stored integer step")
+    add_offset: float = Field(default=0.0, description="Decoded value of a stored zero")
+    fill_value: int = Field(..., alias="_FillValue", description="Stored integer marking missing values (NaN)")
+
+    @field_validator("dtype")
+    @classmethod
+    def _integer_dtype(cls, v: str) -> str:
+        if not np.issubdtype(np.dtype(v), np.integer):
+            raise ValueError(f"dtype must be an integer type, got '{v}'")
+        return v
+
+    def to_encoding(self) -> dict[str, Any]:
+        """Return the xarray encoding keys for this packing."""
+        return self.model_dump(by_alias=True)
 
 
 class BaseGriddedDataInput(BaseModel):
@@ -85,6 +114,19 @@ class BuildPyramidsDataInput(BaseGriddedDataInput):
     pyramid_method: str = Field(
         default="mean",
         description="Aggregation method for pyramid downsampling ('mean', 'max', 'min', 'sum')"
+    )
+    time_batch_size: int = Field(
+        default=6,
+        gt=0,
+        description="Number of time steps reprojected and written per pyramid batch. Bounds memory use when many new time steps are pending."
+    )
+    pyramid_encoding: dict[str, PackedEncoding] = Field(
+        default={},
+        description=(
+            "Per-variable CF packing for pyramid levels, keyed by the stored variable name, "
+            "e.g. {'rainrate_hourly_mean': {'dtype': 'uint16', 'scale_factor': 2e-6, '_FillValue': 65535}}. "
+            "Values are clipped to the packed range. Applies only when a pyramid level is first created."
+        )
     )
 
 

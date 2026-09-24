@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 
 class GriddedSource(ABC):
     source_bucket: str
+    # Source-specific obstore kwargs; deployment obstore_kwargs override them
+    store_kwargs: dict = {}
 
     @abstractmethod
     def build_file_list(self, start_dt: datetime, end_dt: datetime) -> list[str]: ...

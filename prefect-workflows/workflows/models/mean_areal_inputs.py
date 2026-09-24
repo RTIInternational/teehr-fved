@@ -1,20 +1,18 @@
 """Define arguments and defaults for the mean_areal Prefect flow."""
 from pydantic import Field, BaseModel
+from teehr.fetching.const import NWM_VARIABLE_MAPPER, UNIT_NAME, VARIABLE_NAME
 
 from workflows.models.ingest_gridded_data_input import BaseGriddedDataInput
 
+# teehr's NWM mapper plus the UA SWANN snow variables it doesn't cover
 VARIABLE_AND_UNIT_MAPPER = {
-    "variable_name": {
-        "streamflow": {"name": "streamflow_hourly_inst", "long_name": "Hourly Instantaneous Streamflow"},
-        "RAINRATE": {"name": "rainrate_hourly_mean", "long_name": "Hourly Mean Rainfall Rate"},
-        "T2D": {"name": "temperature_hourly_mean", "long_name": "Hourly Mean Temperature"},
+    VARIABLE_NAME: {
+        **NWM_VARIABLE_MAPPER[VARIABLE_NAME],
         "SWE": {"name": "swe_daily_mean", "long_name": "Snow Water Equivalent"},
         "DEPTH": {"name": "depth_daily_mean", "long_name": "Snow Depth"}
     },
-    "unit_name": {
-        "m3 s-1": {"name": "m^3/s", "long_name": "Cubic Meters per Second"},
-        "mm s^-1": {"name": "mm/s", "long_name": "Millimeters per Second"},  # NWM 3.0 forcing
-        "mm s-1": {"name": "mm/s", "long_name": "Millimeters per Second"},   # NWM 2.2 forcing
+    UNIT_NAME: {
+        **NWM_VARIABLE_MAPPER[UNIT_NAME],
         "millimeters h20": {"name": "mm", "long_name": "Millimeters"},
         "millimeters snow thickness": {"name": "mm", "long_name": "Millimeters"},
     }

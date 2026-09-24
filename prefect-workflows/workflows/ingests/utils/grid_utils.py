@@ -1,7 +1,12 @@
+import base64
+import struct
+
 import xarray as xr
 from obstore.store import from_url
 from obspec_utils.registry import ObjectStoreRegistry
 from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+from virtualizarr.manifests import ManifestArray
+from zarr.core.metadata import ArrayV3Metadata
 import virtualizarr as vz
 import icechunk as ic
 from pyproj import CRS as PyprojCRS
@@ -218,6 +223,32 @@ def create_virtual_xarray_dataset(
     #     concat_dim=concat_dim,
     #     **kwargs
     # )
+    return virtual_ds
+
+
+@task(cache_policy=NO_CACHE)
+def align_virtual_fill_values(virtual_ds: xr.Dataset) -> xr.Dataset:
+    """Set each virtual data variable's zarr fill_value to its CF _FillValue.
+
+    VirtualiZarr's HDF parser carries HDF5's storage fill (e.g. 0) into fill_value while the
+    CF attribute holds the real missing marker (e.g. -999999), so chunks absent from the
+    manifest would read as valid data. Mirrors teehr's ``_fix_fill_values`` for kerchunk refs.
+    """
+    virtual_ds = virtual_ds.copy()
+    for name, var in virtual_ds.data_vars.items():
+        if not isinstance(var.data, ManifestArray) or var.dtype.kind not in "fiu":
+            continue
+        cf_fill = var.attrs.get("_FillValue", var.attrs.get("missing_value"))
+        if cf_fill is None:
+            continue
+        if isinstance(cf_fill, str):  # float fill attrs are base64-encoded little-endian doubles
+            cf_fill = struct.unpack("<d", base64.b64decode(cf_fill))[0]
+        metadata = var.data.metadata.to_dict()
+        metadata["fill_value"] = cf_fill
+        virtual_ds[name] = var.copy(data=ManifestArray(
+            metadata=ArrayV3Metadata.from_dict(metadata),
+            chunkmanifest=var.data.manifest,
+        ))
     return virtual_ds
 
 
