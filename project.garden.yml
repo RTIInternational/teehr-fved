@@ -29,12 +29,12 @@ environments:
       polaris:
         inCluster: "true"
         catalogS3PathStyleAccess: "true"
-        catalogS3Endpoint: "http://minio:9000"
+        catalogS3Endpoint: "http://local-s3:9000"
         catalogS3Region: ${var.aws.region}
         catalogType: rest
         catalogUri: http://polaris:8181/api/catalog
         catalogWarehouse: s3://warehouse/
-        catalogRoleArn: "" # MinIO has no real STS; Polaris can't assume a role against it
+        catalogRoleArn: "" # local S3 has no real STS; Polaris can't assume a role against it
         skipCredentialSubscopingIndirection: "true"
         storageStsUnavailable: "true"
         defaultRealm: teehr
