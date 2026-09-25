@@ -39,7 +39,7 @@ def upload_to_s3(
     if endpoint_url:
         config["endpoint"] = endpoint_url
 
-    # MinIO is served over plain HTTP in-cluster; obstore rejects http:// otherwise.
+    # Local S3 is served over plain HTTP in-cluster; obstore rejects http:// otherwise.
     client_options = {"allow_http": True} if str(endpoint_url).startswith("http://") else None
 
     store = from_url(
