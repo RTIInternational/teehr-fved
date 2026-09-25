@@ -1,9 +1,12 @@
 import time
 import uuid
+from pathlib import Path
 
 import botocore.session
 from botocore.exceptions import ClientError
 from prefect import flow, get_run_logger, task
+
+from workflows.utils.common_utils import initialize_evaluation
 
 AWS_REGION = "us-east-1"
 RIVERWARE_INSTANCE_ID = "i-0e66f3a0f2bd8d411"
@@ -12,6 +15,7 @@ POLL_INTERVAL_SECONDS = 10
 COMMAND_TIMEOUT_SECONDS = 600
 PYTHON_EXECUTABLE = "uv run"
 S3_BUCKET = "dev-fved-riverware-rti-use1"
+DEFAULT_TEMP_DIR_PATH = "/tmp/teehr-riverware"
 
 
 def _powershell_quote(value: str) -> str:
@@ -163,56 +167,25 @@ def run_ssm_script_with_s3(
     )
 
 
-@task(retries=0)
-def validate_s3_output(run_id: str, bucket: str) -> None:
-    """Verify that the EC2 script wrote at least one file to the output prefix.
-
-    Lists keys under ``runs/{run_id}/output/`` and raises if none are found.
-
-    Parameters
-    ----------
-    run_id:
-        UUID string identifying this specific flow run.
-    bucket:
-        S3 bucket name.
-    """
-    log = get_run_logger()
-    session = botocore.session.get_session()
-    s3 = session.create_client("s3", region_name=AWS_REGION)
-
-    prefix = f"runs/{run_id}/output/"
-    log.info(f"Validating outputs at s3://{bucket}/{prefix}")
-
-    response = s3.list_objects_v2(Bucket=bucket, Prefix=prefix)
-    contents = response.get("Contents", [])
-
-    if not contents:
-        raise RuntimeError(
-            f"No output files found at s3://{bucket}/{prefix} after SSM command completed."
-        )
-
-    for obj in contents:
-        log.info(f"Output key: {obj['Key']} ({obj['Size']} bytes)")
-    log.info(f"Output validation passed: {len(contents)} file(s) found.")
-
-
 @flow
 def run_riverware_s3_workflow(
     script_path: str,
     model_dir: str,
     configuration_name: str,
+    temp_dir_path: str = DEFAULT_TEMP_DIR_PATH,
+    start_spark_cluster: bool = True,
     bucket: str = S3_BUCKET,
     python_executable: str = PYTHON_EXECUTABLE,
     command_timeout_seconds: int = COMMAND_TIMEOUT_SECONDS,
 ) -> None:
-    """Upload inputs to S3, run an EC2 script via SSM, then validate outputs.
+    """Upload inputs to S3, run an EC2 script via SSM, then load output parquet.
 
     A unique run UUID is generated for each invocation. Input data is uploaded
     to ``s3://{bucket}/runs/{run_id}/input/``. The EC2 script receives the
     generated ``--run-id`` plus the configured ``--bucket``, ``--model-dir``,
     and ``--configuration-name`` CLI arguments. After the script completes,
-    Prefect verifies that at least one output file was written to
-    ``s3://{bucket}/runs/{run_id}/output/``.
+    Prefect loads ``s3://{bucket}/runs/{run_id}/output/crmms_output.parquet``
+    into the TEEHR warehouse ``secondary_timeseries`` table.
 
     Parameters
     ----------
@@ -224,6 +197,11 @@ def run_riverware_s3_workflow(
         ``rdfOutput/``, and ``run.log`` for the RiverWare run.
     configuration_name:
         Label that the EC2 script writes to the ``configuration_name`` column.
+    temp_dir_path:
+        Temporary working directory for the TEEHR evaluation used to load the
+        CRMMS parquet into the warehouse.
+    start_spark_cluster:
+        Whether to start a Spark cluster for the remote evaluation load.
     bucket:
         S3 bucket name for data exchange. Defaults to ``dev-fved-riverware-rti-use1``.
     python_executable:
@@ -235,6 +213,12 @@ def run_riverware_s3_workflow(
     """
     log = get_run_logger()
     run_id = str(uuid.uuid4())
+    session = botocore.session.get_session()
+    s3 = session.create_client("s3", region_name=AWS_REGION)
+    local_dir = Path(temp_dir_path) / run_id / "output"
+    local_path = local_dir / "crmms_output.parquet"
+    s3_key = f"runs/{run_id}/output/crmms_output.parquet"
+
     log.info(f"Starting S3 workflow. run_id={run_id}, bucket={bucket}")
 
     upload_input_to_s3(run_id=run_id, bucket=bucket)
@@ -249,5 +233,32 @@ def run_riverware_s3_workflow(
         command_timeout_seconds=command_timeout_seconds,
     )
 
-    validate_s3_output(run_id=run_id, bucket=bucket)
+    log.info(f"Downloading s3://{bucket}/{s3_key} to {local_path}")
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    response = s3.get_object(Bucket=bucket, Key=s3_key)
+    with open(local_path, "wb") as f:
+        f.write(response["Body"].read())
+
+    ev = initialize_evaluation(
+        temp_dir_path=Path(temp_dir_path),
+        start_spark_cluster=start_spark_cluster,
+        update_configs={
+            "spark.sql.shuffle.partitions": "4",
+        },
+    )
+
+    try:
+        log.info(f"Loading local parquet into secondary_timeseries from {local_path}")
+        ev.secondary_timeseries.load_parquet(local_path)
+    finally:
+        ev.spark.stop()
+        if local_path.exists():
+            local_path.unlink()
+        if local_dir.exists() and not any(local_dir.iterdir()):
+            local_dir.rmdir()
+        run_dir = local_dir.parent
+        if run_dir.exists() and not any(run_dir.iterdir()):
+            run_dir.rmdir()
+
     log.info(f"S3 workflow completed successfully. run_id={run_id}")
