@@ -33,7 +33,7 @@ def create_objectstore_registry(bucket: str, **kwargs) -> ObjectStoreRegistry:
 
 
 def build_icechunk_s3_storage(bucket: str, prefix: str, **kwargs) -> ic.storage.Storage:
-    """Build an IceChunk S3 storage object, injecting MinIO connection options from the environment when present.
+    """Build an IceChunk S3 storage object, injecting local S3 connection options from the environment when present.
 
     Parameters
     ----------
@@ -46,7 +46,7 @@ def build_icechunk_s3_storage(bucket: str, prefix: str, **kwargs) -> ic.storage.
         not provided and ``REMOTE_CATALOG_S3_ENDPOINT`` is set, that value is used along
         with ``allow_http=True`` and ``force_path_style=True``.
     """
-    # Inject MinIO endpoint from env when not explicitly provided
+    # Inject the local S3 endpoint from env when not explicitly provided
     endpoint = os.environ.get("REMOTE_CATALOG_S3_ENDPOINT")
     if "endpoint_url" not in kwargs and endpoint:
         kwargs.setdefault("endpoint_url", endpoint)

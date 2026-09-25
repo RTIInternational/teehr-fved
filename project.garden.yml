@@ -23,18 +23,18 @@ environments:
     variables:
       hostname: teehr.local.app.garden
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 441b6eb291b7a0d4b53f0591f09593d8a2263430
+      devTeehrVersion: 9e0bcb137a3f52b8f1699104939d6e2614c2264a
       stableTeehrVersion: place-holder # Needed for sync to work for some reason.
       previousTeehrVersion: place-holder
       polaris:
         inCluster: "true"
         catalogS3PathStyleAccess: "true"
-        catalogS3Endpoint: "http://minio:9000"
+        catalogS3Endpoint: "http://local-s3:9000"
         catalogS3Region: ${var.aws.region}
         catalogType: rest
         catalogUri: http://polaris:8181/api/catalog
         catalogWarehouse: s3://warehouse/
-        catalogRoleArn: "" # MinIO has no real STS; Polaris can't assume a role against it
+        catalogRoleArn: "" # local S3 has no real STS; Polaris can't assume a role against it
         skipCredentialSubscopingIndirection: "true"
         storageStsUnavailable: "true"
         defaultRealm: teehr
@@ -59,7 +59,7 @@ environments:
     variables:
       hostname: dev.low.amzifved.aws.rti.org
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 441b6eb291b7a0d4b53f0591f09593d8a2263430
+      devTeehrVersion: 9e0bcb137a3f52b8f1699104939d6e2614c2264a
       stableTeehrVersion: v0.7.0
       previousTeehrVersion: v0.6.6
       irsa:
