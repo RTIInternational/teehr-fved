@@ -1,13 +1,13 @@
 """Gridded data sources for the ingest_gridded_data Prefect flow, selected by their ``type``."""
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel
 
 
 class GriddedSource(BaseModel, ABC):
-    """A gridded source: its files, its IceChunk repository, and its dataset defaults."""
+    """A gridded source: its files and its IceChunk repository."""
 
     source_bucket: ClassVar[str]
     # Source-specific obstore kwargs; deployment obstore_kwargs override them
@@ -23,10 +23,6 @@ class GriddedSource(BaseModel, ABC):
     @abstractmethod
     def ingest_variables(self) -> list[str]:
         """Source variables to materialize."""
-
-    @abstractmethod
-    def dataset_defaults(self) -> dict[str, Any]:
-        """Defaults for the ingest input fields; values the caller sets win."""
 
 
 class UASwan4km(GriddedSource):
@@ -58,17 +54,6 @@ class UASwan4km(GriddedSource):
 
     def ingest_variables(self) -> list[str]:
         return list(self.variables)
-
-    def dataset_defaults(self) -> dict[str, Any]:
-        return {
-            "x_dim": "lon",
-            "y_dim": "lat",
-            "source_crs": "EPSG:4269",
-            "parser_type": "hdf",
-            "source_data_storage": "http",
-            "obstore_kwargs": {},
-            "xconcat_kwargs": {"coords": "minimal", "compat": "override", "combine_attrs": "override"},
-        }
 
 
 # One source type here; with more, use Annotated[Union[...], Field(discriminator="type")]
