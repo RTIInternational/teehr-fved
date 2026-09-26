@@ -43,6 +43,7 @@ from teehr import Evaluation
 from teehr.utilities.generate_weights import generate_weights_file
 from shapely.geometry import box
 
+from utils import grid_utils as gu
 from workflows.utils.common_utils import initialize_evaluation
 from workflows.models.mean_areal_inputs import PixelCoverageWeightsInput
 
@@ -56,7 +57,7 @@ def get_readonly_repo_store(
 ) -> ic.IcechunkStore:
     """Get a read-only IceChunk S3 repository store for reading the grid data."""
     logger = get_run_logger()
-    storage = ic.s3_storage(
+    storage = gu.build_icechunk_s3_storage(
         bucket=dest_bucket,
         prefix=f"{base_prefix}/{configuration_name}",
         **s3_storage_kwargs
@@ -230,12 +231,11 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
         unique_zone_id="id",
     )
 
-    teehr_variable_name = args.variable_and_unit_mapper.variable_name[args.grid_variable_name].name
     weights_df = format_weights_df(
         weights_df=weights_df,
         grid_da=grid_template_da,
         configuration_name=args.configuration_name,
-        variable_name=teehr_variable_name,
+        variable_name=args.grid_variable_name,
         domain_name=args.domain_name
     )
 

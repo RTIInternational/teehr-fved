@@ -50,6 +50,10 @@ definitions:
       POLARIS_DEFAULT_REALM: "{{ $POLARIS_DEFAULT_REALM }}"
       POLARIS_USE_STS: "true"
       IN_CLUSTER: "{{ $IN_CLUSTER }}"
+      ICECHUNK_BUCKET: "{{ $ICECHUNK_BUCKET }}"
+      ICECHUNK_PREFIX: "{{ $ICECHUNK_PREFIX }}"
+      PMTILES_BUCKET: "{{ $PMTILES_BUCKET }}"
+      PMTILES_PREFIX: "{{ $PMTILES_PREFIX }}"
     node_selector:
       teehr-hub/nodegroup-name: spark-r5-4xlarge
     tolerations:
@@ -720,16 +724,8 @@ deployments:
     entrypoint: workflows/ingests/ingest_gridded_data.py:ingest_gridded_data
     parameters: {
       "args": {
-        "source_data_storage": "http",
-        "configuration_name": "ua-swann-4km",
-        "factors": [1],
-        "parser_type": "hdf",
-        "obstore_kwargs": {},
-        "xconcat_kwargs": {
-          "coords": "minimal",
-          "compat": "override",
-          "combine_attrs": "override"
-        }
+        "source": {"type": "ua-swann-4km"},
+        "factors": [1]
       }
     }
     work_pool: *work_pool
