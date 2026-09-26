@@ -22,13 +22,6 @@ class ParserType(str, Enum):
     zarr = "zarr"
 
 
-class StorageType(str, Enum):
-    """Supported storage types for incoming data."""
-    http = "http"
-    s3 = "s3"
-    gcs = "gcs"
-
-
 class PackedEncoding(BaseModel):
     """CF packing (integer dtype + scale/offset) for a pyramid variable.
 
@@ -136,8 +129,8 @@ class BuildPyramidsDataInput(BaseGriddedDataInput):
 class IngestGriddedDataInput(BuildPyramidsDataInput):
     """Input parameters for the ingest_gridded_data Prefect flow.
 
-    ``source`` selects the data source by its ``type``. Dataset fields (dims, CRS, storage,
-    kwargs, ...) default to UA SWANN's values; deployments for other sources override them. The
+    ``source`` selects the data source by its ``type``. Dataset fields (dims, CRS, kwargs, ...)
+    default to UA SWANN's values; deployments for other sources override them. The
     repository name (``configuration_name``) and ``variable_names`` are derived from the source
     and hidden from the flow's parameters.
     """
@@ -150,10 +143,6 @@ class IngestGriddedDataInput(BuildPyramidsDataInput):
     variable_names: SkipJsonSchema[Optional[list[str]]] = None
 
     # --- Core required parameters ---
-    source_data_storage: StorageType = Field(
-        default=StorageType.http,
-        description="Storage type of the source data (e.g., 's3', 'gcs', 'local', 'http')"
-    )
     end_dt: Union[str, datetime, None] = Field(
         default=None,
         description="End datetime for ingestion. Defaults to current UTC time if not provided."
