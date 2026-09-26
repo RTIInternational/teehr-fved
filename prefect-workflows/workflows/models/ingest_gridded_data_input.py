@@ -6,9 +6,25 @@ from enum import Enum
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
+from teehr.fetching.const import NWM_VARIABLE_MAPPER, UNIT_NAME, VARIABLE_NAME
 
 from workflows.models.gridded_sources import GriddedSourceType
 
+
+# Renames source variables and units to teehr's on ingest: teehr's NWM mapper plus the
+# UA SWANN snow variables it doesn't cover
+VARIABLE_AND_UNIT_MAPPER = {
+    VARIABLE_NAME: {
+        **NWM_VARIABLE_MAPPER[VARIABLE_NAME],
+        "SWE": {"name": "swe_daily_mean", "long_name": "Snow Water Equivalent"},
+        "DEPTH": {"name": "depth_daily_mean", "long_name": "Snow Depth"}
+    },
+    UNIT_NAME: {
+        **NWM_VARIABLE_MAPPER[UNIT_NAME],
+        "millimeters h20": {"name": "mm", "long_name": "Millimeters"},
+        "millimeters snow thickness": {"name": "mm", "long_name": "Millimeters"},
+    }
+}
 
 PYRAMID_GROUP_PATH = "/pyramids"
 RAW_DATA_GROUP_PATH = "/raw_data"

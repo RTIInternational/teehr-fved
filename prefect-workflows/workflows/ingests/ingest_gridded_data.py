@@ -11,10 +11,10 @@ from workflows.models.ingest_gridded_data_input import (
     IngestGriddedDataInput,
     ParserType,
     RAW_DATA_GROUP_PATH,
-    REFERENCES_GROUP_PATH
+    REFERENCES_GROUP_PATH,
+    VARIABLE_AND_UNIT_MAPPER,
 )
 from build_geozarr_pyramids import build_pyramids as build_pyramids_flow
-from workflows.models.mean_areal_inputs import VARIABLE_AND_UNIT_MAPPER
 from workflows.utils.time_utils import to_naive_utc
 
 
