@@ -33,12 +33,6 @@ export const VARIABLE_STYLES: Record<string, VariableStyle> = {
     max: 100,
     units: 'mm',
   },
-  rainrate_hourly_mean: {
-    colorRamp: 'raster/turbo',
-    min: 0.001,
-    max: 0.005,
-    units: 'mm/s',
-  },
 };
 
 export function getVariableStyle(variable: string) {

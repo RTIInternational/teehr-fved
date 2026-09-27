@@ -52,7 +52,7 @@ class PackedEncoding(BaseModel):
     dtype: str = Field(..., description="Integer dtype to store, e.g. 'uint16'")
     max_value: float = Field(..., description="Largest plausible decoded value, in `units`")
     min_value: float = Field(default=0.0, description="Smallest plausible decoded value, in `units`")
-    units: str = Field(..., description="Units of min_value and max_value, e.g. 'mm/s'; must match the variable's units")
+    units: str = Field(..., description="Units of min_value and max_value, e.g. 'mm'; must match the variable's units")
     fill_value: Optional[int] = Field(
         default=None,
         alias="_FillValue",
@@ -175,7 +175,7 @@ class BuildPyramidsDataInput(BaseGriddedDataInput):
         },
         description=(
             "Per-variable CF packing for pyramid levels, keyed by the stored variable name, "
-            "e.g. {'rainrate_hourly_mean': {'dtype': 'uint16', 'max_value': 0.075, 'units': 'mm/s'}}. "
+            "e.g. {'swe_daily_mean': {'dtype': 'uint16', 'max_value': 3500, 'units': 'mm'}}. "
             "Values are clipped to [min_value, max_value]. Applies only when a pyramid level is first created."
         )
     )
