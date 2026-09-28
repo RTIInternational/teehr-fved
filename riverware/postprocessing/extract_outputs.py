@@ -77,6 +77,25 @@ def convert_to_metric(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def check_no_nans(df: pd.DataFrame) -> None:
+    """Raise ValueError listing where NaN values occur, since TEEHR validation rejects them."""
+    nan_rows = df[df["value"].isna()]
+    if nan_rows.empty:
+        return
+    summary = (
+        nan_rows.groupby(["location_id", "variable_name"])
+        .agg(
+            count=("value", "size"),
+            first_time=("value_time", "min"),
+            last_time=("value_time", "max"),
+            members=("member", "nunique"),
+        )
+    )
+    raise ValueError(
+        f"{len(nan_rows):,} NaN values found in {len(df):,} rows:\n{summary.to_string()}"
+    )
+
+
 def extract_rdf_outputs(
     rdf_dir: Path,
     log_path: Path,
@@ -129,4 +148,5 @@ def extract_rdf_outputs(
     )
     df["reference_time"] = pd.to_datetime(df["reference_time"], utc=True)
     df["value_time"] = pd.to_datetime(df["value_time"], utc=True)
+    check_no_nans(df)
     return convert_to_metric(df)
