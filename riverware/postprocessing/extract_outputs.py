@@ -10,25 +10,25 @@ from riverware.utils.riverware_utils import parse_rdf, parse_reference_time_from
 # Slots not listed here fall back to snake_case of the RiverWare slot name.
 CRMMS_VARIABLE_MAP: dict[str, str] = {
     # Reservoir state (end-of-period)
-    "Pool Elevation":              "pool_elevation_monthly_eop",
-    "Storage":                     "storage_monthly_eop",
-    # "Surface Area":                "surface_area_monthly_eop",
-    "Bank Storage":                "bank_storage_monthly_eop",
-    # Flows / volumes (monthly total)
-    "Inflow":                      "inflow_monthly_total",
-    "Local Inflow":                "local_inflow_monthly_total",
-    "Outflow":                     "outflow_monthly_total",
-    "Turbine Release":             "turbine_release_monthly_total",
-    "Regulated Spill":             "regulated_spill_monthly_total",
-    "Unregulated Spill":           "unregulated_spill_monthly_total",
-    "Unregulated":                 "unregulated_inflow_monthly_total",
-    "Bypass":                      "bypass_monthly_total",
-    "Evaporation":                 "evaporation_monthly_total",
+    "Pool Elevation":              "poolelevation_monthly_inst",
+    "Storage":                     "storage_monthly_inst",
+    # "Surface Area":                "surface_area_monthly_inst",
+    # "Bank Storage":                "bank_storage_monthly_inst",
+    # Flows / volumes (mean flow rates)
+    "Inflow":                      "inflow_monthly_mean",
+    "Local Inflow":                "localinflow_monthly_mean",
+    "Outflow":                     "outflow_monthly_mean",
+    "Turbine Release":             "turbinerelease_monthly_mean",
+    "Regulated Spill":             "regulatedspill_monthly_mean",
+    "Unregulated Spill":           "unregulatedspill_monthly_mean",
+    "Unregulated":                 "unregulatedinflow_monthly_mean",
+    "Bypass":                      "bypass_monthly_mean",
+    "Evaporation":                 "evaporation_monthly_inst",
     # "Peak Flow":                   "peak_flow_monthly_total",
     # # Diversions
-    # "Diversion":                   "diversion_monthly_total",
+    # "Diversion":                   "diversion_monthly_sum",
     # "Diversion Requested":         "diversion_requested_monthly_total",
-    # "Total Diversion":             "total_diversion_monthly_total",
+    # "Total Diversion":             "diversion_monthly_sum",
     # "Total Diversion Requested":   "total_diversion_requested_monthly_total",
     # # Energy / operations
     # "Energy":                      "energy_monthly_total",
@@ -40,7 +40,41 @@ CRMMS_VARIABLE_MAP: dict[str, str] = {
     # "Power Plant Cap Fraction":    "power_plant_cap_fraction_monthly",
 }
 
+ACRE_FT_TO_M3 = 1233.48183754752
+FT_TO_M = 0.3048
+CFS_TO_CMS = FT_TO_M ** 3
 
+# RiverWare unit -> (TEEHR unit, conversion factor). "acre-ft/month" is handled separately.
+UNIT_CONVERSIONS: dict[str, tuple[str, float]] = {
+    "acre-ft": ("m^3", ACRE_FT_TO_M3),
+    "cfs":     ("m^3/s", CFS_TO_CMS),
+    "ft":      ("m", FT_TO_M),
+}
+
+
+def convert_to_metric(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert RiverWare English units to TEEHR metric units in place of the originals.
+
+    Monthly volumes (acre-ft/month) become mean flow in m^3/s over the month.
+    Raises ValueError on any unit without a known conversion.
+    """
+    df = df.copy()
+
+    monthly = df["unit_name"] == "acre-ft/month"
+    # value_time is the end-of-period instant, so the month covered ends the day before.
+    seconds = (df.loc[monthly, "value_time"] - pd.Timedelta(days=1)).dt.days_in_month * 86400
+    df.loc[monthly, "value"] = df.loc[monthly, "value"] * ACRE_FT_TO_M3 / seconds
+    df.loc[monthly, "unit_name"] = "m^3/s"
+
+    for unit, (metric_unit, factor) in UNIT_CONVERSIONS.items():
+        mask = df["unit_name"] == unit
+        df.loc[mask, "value"] = df.loc[mask, "value"] * factor
+        df.loc[mask, "unit_name"] = metric_unit
+
+    unknown = set(df["unit_name"].unique()) - {"m^3/s", "m^3", "m"}
+    if unknown:
+        raise ValueError(f"No metric conversion defined for units: {sorted(unknown)}")
+    return df
 
 
 def extract_rdf_outputs(
@@ -95,4 +129,4 @@ def extract_rdf_outputs(
     )
     df["reference_time"] = pd.to_datetime(df["reference_time"], utc=True)
     df["value_time"] = pd.to_datetime(df["value_time"], utc=True)
-    return df
+    return convert_to_metric(df)
