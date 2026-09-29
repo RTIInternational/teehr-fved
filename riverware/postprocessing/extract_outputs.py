@@ -71,7 +71,7 @@ def convert_to_metric(df: pd.DataFrame) -> pd.DataFrame:
         df.loc[mask, "value"] = df.loc[mask, "value"] * factor
         df.loc[mask, "unit_name"] = metric_unit
 
-    unknown = set(df["unit_name"].unique()) - {"m^3/s", "m^3", "m"}
+    unknown = set(df["unit_name"].unique()) - {"m^3/s", "m^3", "m", "GWH"}
     if unknown:
         raise ValueError(f"No metric conversion defined for units: {sorted(unknown)}")
     return df
