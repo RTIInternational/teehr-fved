@@ -23,7 +23,7 @@ CRMMS_VARIABLE_MAP: dict[str, str] = {
     "Unregulated Spill":           "unregulatedspill_monthly_mean",
     "Unregulated":                 "unregulatedinflow_monthly_mean",
     "Bypass":                      "bypass_monthly_mean",
-    "Evaporation":                 "evaporation_monthly_inst",
+    # "Evaporation":                 "evaporation_monthly_inst",
     # "Peak Flow":                   "peak_flow_monthly_total",
     # # Diversions
     # "Diversion":                   "diversion_monthly_sum",
@@ -31,7 +31,7 @@ CRMMS_VARIABLE_MAP: dict[str, str] = {
     # "Total Diversion":             "diversion_monthly_sum",
     # "Total Diversion Requested":   "total_diversion_requested_monthly_total",
     # # Energy / operations
-    # "Energy":                      "energy_monthly_total",
+    "Energy":                      "energy_monthly_sum",
     # "Peak Hours":                  "peak_hours_monthly_total",
     # # Flags / dimensionless indicators
     # "Shortage Flag":               "shortage_flag_monthly",
