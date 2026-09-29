@@ -17,7 +17,7 @@ export const FORECAST_DASHBOARD_DEFAULTS = {
 
   // Default variable and duration for the Observations (primary timeseries) controls
   preferredObservationsVariable: 'streamflow_none_inst',
-  preferredObservationsDuration: 'PT1H',
+  preferredObservationsDuration: 'PT1H'
 };
 
 /**
