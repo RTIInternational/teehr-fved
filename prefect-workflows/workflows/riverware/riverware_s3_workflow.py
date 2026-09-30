@@ -14,6 +14,11 @@ PYTHON_EXECUTABLE = "uv run"
 S3_BUCKET = "dev-fved-riverware-rti-use1"
 
 
+def _powershell_quote(value: str) -> str:
+    """Wrap a value in single quotes for safe PowerShell argument passing."""
+    return "'" + value.replace("'", "''") + "'"
+
+
 @task(retries=0)
 def upload_input_to_s3(run_id: str, bucket: str) -> str:
     """Upload a prototype input file to S3 and return the input prefix URI.
@@ -52,10 +57,12 @@ def run_ssm_script_with_s3(
     script_path: str,
     bucket: str,
     run_id: str,
+    model_dir: str,
+    configuration_name: str,
     python_executable: str = PYTHON_EXECUTABLE,
     command_timeout_seconds: int = COMMAND_TIMEOUT_SECONDS,
 ) -> dict:
-    """Send an SSM RunPowerShellScript command that passes the bucket and run ID to the script.
+    """Send an SSM RunPowerShellScript command that passes required CLI args to the script.
 
     Parameters
     ----------
@@ -66,6 +73,10 @@ def run_ssm_script_with_s3(
     run_id:
         UUID identifying this Prefect flow run. The EC2 script constructs
         ``runs/{run_id}/input`` and ``runs/{run_id}/output`` paths internally.
+    model_dir:
+        Local directory on the EC2 instance containing the RiverWare model files.
+    configuration_name:
+        Label written by the EC2 script to the ``configuration_name`` column.
     python_executable:
         Python runner to invoke. Defaults to ``uv run``. Use ``py`` or a full
         venv path if uv is not available.
@@ -77,7 +88,11 @@ def run_ssm_script_with_s3(
     ssm = session.create_client("ssm", region_name=AWS_REGION)
 
     command = (
-        f'& {python_executable} "{script_path}" --bucket {bucket} --run-id {run_id}'
+        f'& {python_executable} "{script_path}"'
+        f" --bucket {_powershell_quote(bucket)}"
+        f" --run-id {_powershell_quote(run_id)}"
+        f" --model-dir {_powershell_quote(model_dir)}"
+        f" --configuration-name {_powershell_quote(configuration_name)}"
     )
     log.info(f"Sending SSM command to {RIVERWARE_INSTANCE_ID}: {command}")
 
@@ -184,6 +199,8 @@ def validate_s3_output(run_id: str, bucket: str) -> None:
 @flow
 def run_riverware_s3_workflow(
     script_path: str,
+    model_dir: str,
+    configuration_name: str,
     bucket: str = S3_BUCKET,
     python_executable: str = PYTHON_EXECUTABLE,
     command_timeout_seconds: int = COMMAND_TIMEOUT_SECONDS,
@@ -191,16 +208,22 @@ def run_riverware_s3_workflow(
     """Upload inputs to S3, run an EC2 script via SSM, then validate outputs.
 
     A unique run UUID is generated for each invocation. Input data is uploaded
-    to ``s3://{bucket}/runs/{run_id}/input/`` and the full S3 prefix URIs are
-    passed to the EC2 script as ``--input-prefix`` and ``--output-prefix`` CLI
-    arguments. After the script completes, Prefect verifies that at least one
-    output file was written to ``s3://{bucket}/runs/{run_id}/output/``.
+    to ``s3://{bucket}/runs/{run_id}/input/``. The EC2 script receives the
+    generated ``--run-id`` plus the configured ``--bucket``, ``--model-dir``,
+    and ``--configuration-name`` CLI arguments. After the script completes,
+    Prefect verifies that at least one output file was written to
+    ``s3://{bucket}/runs/{run_id}/output/``.
 
     Parameters
     ----------
     script_path:
         Full Windows path of the Python script to execute on the EC2 instance
         (e.g. ``C:\\FVED\\Scripts\\riverware_s3_reader.py``).
+    model_dir:
+        Local directory on the EC2 instance containing ``RW Files/``,
+        ``rdfOutput/``, and ``run.log`` for the RiverWare run.
+    configuration_name:
+        Label that the EC2 script writes to the ``configuration_name`` column.
     bucket:
         S3 bucket name for data exchange. Defaults to ``dev-fved-riverware-rti-use1``.
     python_executable:
@@ -220,6 +243,8 @@ def run_riverware_s3_workflow(
         script_path=script_path,
         bucket=bucket,
         run_id=run_id,
+        model_dir=model_dir,
+        configuration_name=configuration_name,
         python_executable=python_executable,
         command_timeout_seconds=command_timeout_seconds,
     )
