@@ -9,7 +9,7 @@ import xarray as xr
 import pandas as pd
 
 from utils import grid_utils as gu
-from workflows.models.data_status import STATUS_COORD
+from workflows.utils.data_status import STATUS_COORD
 from workflows.models.gridded_sources import GriddedSource
 from workflows.models.ingest_gridded_data_input import (
     IngestGriddedDataInput,

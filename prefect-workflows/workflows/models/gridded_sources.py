@@ -10,7 +10,7 @@ from prefect.blocks.system import Secret
 from pydantic import BaseModel, Field, field_validator
 from teehr.fetching.utils import REMOTE_RETRY_CONFIG
 
-from workflows.models.data_status import STATUS_MEANINGS, with_status
+from workflows.utils.data_status import STATUS_MEANINGS, with_status
 
 
 class GriddedSource(BaseModel, ABC):
