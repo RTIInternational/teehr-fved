@@ -16,9 +16,9 @@ from workflows.models.gridded_sources import GriddedSourceType
 VARIABLE_AND_UNIT_MAPPER = {
     VARIABLE_NAME: {
         **NWM_VARIABLE_MAPPER[VARIABLE_NAME],
-        "SWE": {"name": "swe_daily_mean", "long_name": "Snow Water Equivalent"},
-        "DEPTH": {"name": "depth_daily_mean", "long_name": "Snow Depth"},
-        "specific_mass": {"name": "swe_daily_mean", "long_name": "Snow Water Equivalent"},
+        "SWE": {"name": "swe_daily_inst", "long_name": "Snow Water Equivalent"},
+        "DEPTH": {"name": "depth_daily_inst", "long_name": "Snow Depth"},
+        "specific_mass": {"name": "swe_daily_inst", "long_name": "Snow Water Equivalent"},
     },
     UNIT_NAME: {
         **NWM_VARIABLE_MAPPER[UNIT_NAME],
@@ -192,12 +192,12 @@ class BuildPyramidsDataInput(BaseGriddedDataInput):
     pyramid_encoding: dict[str, PackedEncoding] = Field(
         default={
             # UA SWANN and iSnobal; iSnobal peaks near 7,700 mm (willamette_extended)
-            "swe_daily_mean": PackedEncoding(dtype="uint16", max_value=10000, units="mm"),
-            "depth_daily_mean": PackedEncoding(dtype="uint16", max_value=8000, units="mm"),
+            "swe_daily_inst": PackedEncoding(dtype="uint16", max_value=10000, units="mm"),
+            "depth_daily_inst": PackedEncoding(dtype="uint16", max_value=8000, units="mm"),
         },
         description=(
             "Per-variable CF packing for pyramid levels, keyed by the stored variable name, "
-            "e.g. {'swe_daily_mean': {'dtype': 'uint16', 'max_value': 10000, 'units': 'mm'}}. "
+            "e.g. {'swe_daily_inst': {'dtype': 'uint16', 'max_value': 10000, 'units': 'mm'}}. "
             "Values are clipped to [min_value, max_value]. Applies only when a pyramid level is first created."
         )
     )
