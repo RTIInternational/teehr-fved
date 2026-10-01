@@ -24,13 +24,13 @@ export const VARIABLE_STYLES: Record<string, VariableStyle> = {
   swe_daily_mean: {
     colorRamp: 'raster/turbo',
     min: 0.001,
-    max: 100,
+    max: 500,
     units: 'mm',
   },
   depth_daily_mean: {
     colorRamp: 'raster/turbo',
     min: 0.001,
-    max: 100,
+    max: 2000,
     units: 'mm',
   },
 };

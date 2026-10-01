@@ -30,6 +30,8 @@ VARIABLE_AND_UNIT_MAPPER = {
 }
 
 PYRAMID_GROUP_PATH = "/pyramids"
+# Spatial chunk size of pyramid levels, about one 256 px map tile
+PYRAMID_CHUNK_SIZE = 256
 RAW_DATA_GROUP_PATH = "/raw_data"
 REFERENCES_GROUP_PATH = "/references"
 ICECHUNK_BUCKET = os.getenv("ICECHUNK_BUCKET")
@@ -130,8 +132,11 @@ class BaseGriddedDataInput(BaseModel):
         description="Dimension along which to append data when writing to the IceChunk repository"
     )
     chunk_size: int = Field(
-        default=256,
-        description="Inner chunk size along each spatial dimension of /raw_data and the pyramids"
+        default=128,
+        description=(
+            "Inner chunk size along each spatial dimension of /raw_data. Smaller chunks cut the bytes a "
+            "time-series read fetches; pyramids use PYRAMID_CHUNK_SIZE"
+        )
     )
     num_shard_chunks: int = Field(
         default=30,
