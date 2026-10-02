@@ -530,6 +530,25 @@ deployments:
     }
     work_pool: *work_pool
 
+  - name: ingest-isnobal
+    version:
+    tags: []
+    description: Ingest iSnobal SWE GeoTIFFs for one domain into an IceChunk S3 repository using VirtualiZarr
+    entrypoint: workflows/ingests/ingest_gridded_data.py:ingest_gridded_data
+    parameters: {
+      "args": {
+        "source": {"type": "isnobal", "domain": "boise"},
+        "parser_type": "tiff",
+        "x_dim": "x",
+        "y_dim": "y",
+        "num_lookback_days": null,
+        "factors": [1, 2],
+        "time_batch_size": 30,
+        "ignore_unreadable_file": false
+      }
+    }
+    work_pool: *work_pool
+
   # Gridded Pyramid Builds
   - name: build-ua-4km-grids-pyramids
     version:
