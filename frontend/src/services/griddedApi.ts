@@ -10,7 +10,8 @@ import type { VariablesResponse } from '@/shared/types/gridded/variables';
 export const GRIDDED_API_BASE_URL =
   import.meta.env.VITE_XPUBLISH_API_BASE_URL || 'http://127.0.0.1:8001';
 
-export const MAX_TIMESERIES_POINTS = 365;
+// Per-dataset cap on time steps in one point query
+export const MAX_TIMESERIES_POINTS = 3650;
 
 type GriddedApiCall = {
   (path: string, options?: { raw: true }): Promise<string>;
@@ -150,12 +151,10 @@ export const griddedApiService = {
     variable: string,
     lon: number,
     lat: number,
-    timesteps: string[],
-    maxPoints = MAX_TIMESERIES_POINTS
+    start: string,
+    end: string
   ) => {
-    const slice = maxPoints > 0 ? timesteps.slice(0, maxPoints) : timesteps;
-    if (slice.length === 0) throw new Error('No timesteps available for timeseries query');
-    const datetimeRange = slice.length === 1 ? slice[0] : `${slice[0]}/${slice[slice.length - 1]}`;
+    const datetimeRange = start === end ? start : `${start}/${end}`;
     const params = new URLSearchParams({
       coords: `POINT(${lon} ${lat})`,
       'parameter-name': variable,
