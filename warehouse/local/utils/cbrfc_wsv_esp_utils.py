@@ -12,7 +12,7 @@ def _build_espmvol_urls(lid: str, years: list[int] = None) -> list[str]:
     lid : str
         Location ID (e.g. 'DLAC2')
     years : list[int]
-        Two-digit year integers (e.g. [14, 15]). Defaults to [14, 15].
+        Two-digit year integers (e.g. [14, 15]).
 
     Returns
     -------
@@ -20,7 +20,7 @@ def _build_espmvol_urls(lid: str, years: list[int] = None) -> list[str]:
         One URL per month/year combination, in chronological order.
     """
     if years is None:
-        years = [14, 15]
+        raise ValueError("Years must be provided")
 
     months = ["jan", "feb", "mar", "apr", "may", "jun",
               "jul", "aug", "sep", "oct", "nov", "dec"]
@@ -119,7 +119,7 @@ def query_espmvol_forecast(
     lid : str
         Location ID (e.g. 'DLAC2')
     years : list[int], optional
-        Two-digit year integers (e.g. [14, 15]). Defaults to [14, 15].
+        Two-digit year integers (e.g. [14, 15]).
 
     Returns
     -------
