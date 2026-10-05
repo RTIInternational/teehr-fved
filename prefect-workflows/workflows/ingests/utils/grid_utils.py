@@ -348,8 +348,8 @@ def align_virtual_fill_values(virtual_ds: xr.Dataset) -> xr.Dataset:
 def assign_geotiff_coords(ds: xr.Dataset, fallback_crs: str | None = None) -> xr.Dataset:
     """Add x/y pixel-centre coords, the CRS, and units from the GeoTIFF tags VirtualTIFF keeps as attrs.
 
-    Assumes a north-up grid (no rotation) with a single tiepoint. ``fallback_crs`` is used when
-    the file's CRS has no EPSG code; without one, such a file raises.
+    Assumes a north-up grid (no rotation) with a single tiepoint. ``fallback_crs`` is used, with a
+    warning, when the file's CRS has no EPSG code; without one, such a file raises.
     """
     attrs = next(ds[v].attrs for v in ds.data_vars if {"x", "y"} <= set(ds[v].dims))
     _, _, _, x0, y0, _ = attrs["model_tiepoint"]
@@ -365,9 +365,14 @@ def assign_geotiff_coords(ds: xr.Dataset, fallback_crs: str | None = None) -> xr
     if epsg not in (None, _GEOTIFF_USER_DEFINED):
         ds = ds.rio.write_crs(f"EPSG:{epsg}")
     elif fallback_crs is not None:
+        get_run_logger().warning(
+            f"GeoTIFF CRS has no EPSG code ({attrs.get('citation')!r}); applying fallback_source_crs {fallback_crs}."
+        )
         ds = ds.rio.write_crs(fallback_crs)
     else:
-        raise ValueError(f"GeoTIFF CRS has no EPSG code ({attrs.get('citation')!r}); set source_crs.")
+        raise ValueError(
+            f"GeoTIFF CRS has no EPSG code ({attrs.get('citation')!r}) and no fallback_source_crs was provided."
+        )
     for var in ds.data_vars:
         if "UNITTYPE" in ds[var].attrs:
             ds[var].attrs.setdefault("units", ds[var].attrs["UNITTYPE"])
@@ -445,7 +450,7 @@ def reproject_dataset(
     target_crs: str,
     x_dim: str,
     y_dim: str,
-    source_crs: str | None = None
+    fallback_crs: str | None = None
 ) -> xr.Dataset:
     """Reproject an xarray dataset to a target CRS.
 
@@ -459,8 +464,8 @@ def reproject_dataset(
         The name of the x dimension.
     y_dim : str
         The name of the y dimension.
-    source_crs : str | None
-        The source CRS to use if the dataset does not have one defined.
+    fallback_crs : str | None
+        CRS applied, with a warning, only if the dataset has none. Without either, this raises.
     """
     logger = get_run_logger()
     logger.info(
@@ -468,8 +473,10 @@ def reproject_dataset(
     )
     dataset = dataset.rio.set_spatial_dims(x_dim=x_dim, y_dim=y_dim)
     if dataset.rio.crs is None:
-        logger.info(f"No CRS found in the source dataset. Assigning: {source_crs}.")
-        dataset = dataset.rio.write_crs(source_crs)
+        if fallback_crs is None:
+            raise ValueError("Dataset has no CRS and no fallback_source_crs was provided.")
+        logger.warning(f"No CRS found in the dataset; applying fallback_source_crs {fallback_crs}.")
+        dataset = dataset.rio.write_crs(fallback_crs)
     else:
         logger.info(f"Source dataset has a CRS defined: {dataset.rio.crs}.")
         dataset = dataset.rio.write_crs(dataset.rio.crs)
@@ -480,7 +487,7 @@ def reproject_dataset(
 
 def standardize_and_inject_geozarr(
     ds: xr.Dataset,
-    source_crs: str | None = None,
+    fallback_crs: str | None = None,
     x_dim: str | None = None,
     y_dim: str | None = None,
     variable_and_unit_mapper: dict | None = None
@@ -515,12 +522,10 @@ def standardize_and_inject_geozarr(
     # --- Resolve CRS ---
     crs_obj = ds.rio.crs
     if crs_obj is None:
-        if source_crs is None:
-            raise ValueError(
-                "Dataset has no CRS and no source_crs fallback was provided."
-            )
-        logger.info(f"No CRS found; applying fallback: {source_crs}.")
-        ds = ds.rio.write_crs(source_crs)
+        if fallback_crs is None:
+            raise ValueError("Dataset has no CRS and no fallback_source_crs was provided.")
+        logger.warning(f"No CRS found in the source data; applying fallback_source_crs {fallback_crs}.")
+        ds = ds.rio.write_crs(fallback_crs)
         crs_obj = ds.rio.crs
 
     wkt_string = crs_obj.to_wkt()

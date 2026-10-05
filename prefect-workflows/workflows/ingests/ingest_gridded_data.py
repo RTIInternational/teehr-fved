@@ -98,9 +98,9 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
 def _preprocess(source: GriddedSource, args: IngestGriddedDataInput) -> Callable[[xr.Dataset, str], xr.Dataset]:
     """Per-file preprocessing: GeoTIFF georeferencing for TIFFs, then the source's own."""
     if args.parser_type == ParserType.tiff:
-        # Only a deployment's own source_crs, not the default, stands in for a file without an EPSG code
-        fallback_crs = args.source_crs if "source_crs" in args.model_fields_set else None
-        return lambda ds, url: source.preprocess(gu.assign_geotiff_coords(ds, fallback_crs), url)
+        return lambda ds, url: source.preprocess(
+            gu.assign_geotiff_coords(ds, args.fallback_source_crs), url
+        )
     return source.preprocess
 
 
@@ -113,7 +113,7 @@ def _standardize_references(ds: xr.Dataset, args: IngestGriddedDataInput) -> xr.
     ds = ds.drop_duplicates(dim=args.append_dim).sortby(args.append_dim)
     return gu.standardize_and_inject_geozarr(
         ds,
-        source_crs=args.source_crs,
+        fallback_crs=args.fallback_source_crs,
         x_dim=args.x_dim,
         y_dim=args.y_dim,
         variable_and_unit_mapper=VARIABLE_AND_UNIT_MAPPER,

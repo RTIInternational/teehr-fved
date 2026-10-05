@@ -168,9 +168,12 @@ class BaseGriddedDataInput(BaseModel):
 class BuildPyramidsDataInput(BaseGriddedDataInput):
     """Input parameters for the build_geozarr_pyramids Prefect flow."""
 
-    source_crs: str = Field(
-        default="EPSG:4269",
-        description="Source CRS of the input data"
+    fallback_source_crs: Optional[str] = Field(
+        default=None,
+        description=(
+            "CRS to apply only when a source file has none of its own; a CRS in the file always takes "
+            "precedence. If neither is present, the run fails."
+        )
     )
     target_crs: str = Field(
         default="EPSG:3857",
@@ -206,7 +209,7 @@ class BuildPyramidsDataInput(BaseGriddedDataInput):
 class IngestGriddedDataInput(BuildPyramidsDataInput):
     """Input parameters for the ingest_gridded_data Prefect flow.
 
-    ``source`` selects the data source by its ``type``. Dataset fields (dims, CRS, kwargs, ...)
+    ``source`` selects the data source by its ``type``. Dataset fields (dims, kwargs, ...)
     default to UA SWANN's values; deployments for other sources override them. The
     repository name (``configuration_name``) and ``variable_names`` are derived from the source
     and hidden from the flow's parameters.

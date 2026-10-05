@@ -160,6 +160,7 @@ deployments:
     parameters: {
       "args": {
         "source": {"type": "ua-swann-4km"},
+        "fallback_source_crs": "EPSG:4269",
         "factors": [1]
       }
     }

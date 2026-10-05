@@ -131,7 +131,7 @@ def _write_pyramid_batch(
         target_crs=args.target_crs,
         x_dim=args.x_dim,
         y_dim=args.y_dim,
-        source_crs=args.source_crs
+        fallback_crs=args.fallback_source_crs
     )
     logger.info(f"Reprojected {len(ds_batch.indexes[args.append_dim].unique())} time step(s) to {args.target_crs}.")
 
@@ -183,8 +183,7 @@ def _write_pyramid_batch(
             [v for v in level_ds.data_vars if level_ds[v].ndim == 0]
         )
         level_ds = gu.standardize_and_inject_geozarr(
-            level_ds,
-            source_crs=args.target_crs,  # pyramids are already in target_crs (web mercator)
+            level_ds.rio.write_crs(args.target_crs),  # pyramid levels are in target_crs
             x_dim="x",
             y_dim="y",
         )
