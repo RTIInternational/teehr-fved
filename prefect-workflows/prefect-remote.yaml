@@ -157,16 +157,22 @@ deployments:
   - name: ingest-ua-4km-grids
     version:
     tags: []
-    description: Ingest UA 4km SWE and DEPTH variables into an IceChunk S3 repository using VirtualiZarr
+    description: Ingest UA 4km SWE and DEPTH into an IceChunk S3 repository; upserts new, late and finalized days
     entrypoint: workflows/ingests/ingest_gridded_data.py:ingest_gridded_data
     parameters: {
       "args": {
         "source": {"type": "ua-swann-4km"},
         "fallback_source_crs": "EPSG:4269",
-        "factors": [1]
+        "factors": [1],
+        "write_mode": "upsert",
+        "num_lookback_days": 30
       }
     }
     work_pool: *work_pool
+    # Last 30 days: only new or changed days are downloaded
+    schedule:
+      cron: "0 14 * * *"
+      active: false
 
   - name: ingest-isnobal
     version:

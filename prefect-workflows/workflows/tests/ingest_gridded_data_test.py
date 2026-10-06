@@ -2,7 +2,6 @@
 
 Uses the UA SWANN source pointed at local netCDF files named like UA's. Needs teehr and Prefect.
 """
-import os
 
 import numpy as np
 import pandas as pd

@@ -247,6 +247,76 @@ def stale_steps(source: pd.DataFrame, dest: pd.DataFrame | None) -> pd.DatetimeI
     return written.index[(dest_updated != written["updated_at"]).to_numpy() | dest_updated.isna().to_numpy()]
 
 
+def _groups_along(store: ic.IcechunkStore, dim: str) -> list[str]:
+    """Paths of the groups holding a ``dim`` array, e.g. /references, /raw_data, /pyramids/0."""
+    root = zarr.open_group(store, mode="r", zarr_format=3)
+    return sorted(f"/{path}" for path, node in root.members(max_depth=None) if isinstance(node, zarr.Group) and dim in node)
+
+
+def migrate_repo(
+    repo: ic.Repository,
+    source,
+    configuration_name: str,
+    timeseries_type: str = "primary",
+    dim: str = "time",
+    dry_run: bool = True,
+) -> dict:
+    """Put a repo written before the time grid onto it, in place; no data is read or rewritten.
+
+    Checks every group's axis is sorted, unique and on the source's grid, then records the grid on
+    the root group and adds per-step ``created_at``/``updated_at`` (the last commit's time, the same in
+    every group, so no stage sees a change) and ``source_last_modified`` (from the source listing).
+    Existing gaps stay gaps. Returns a report; ``dry_run`` only checks.
+    """
+    store = repo.readonly_session("main").store
+    if read_grid(store) is not None:
+        return {"migrated": False, "reason": "already on the time grid"}
+    groups = _groups_along(store, dim)
+    axes = {g: xr.open_zarr(store, group=g, consolidated=False, chunks=None)[dim].to_index() for g in groups}
+    origin = min(axis[0] for axis in axes.values())
+    first_available = source.list_files(source.time_origin(), source.time_origin() + pd.Timedelta("366D")).index.min()
+    problems, report = [], {"groups": {}, "time_origin": origin, "first_available_at_source": first_available}
+    for group, axis in axes.items():
+        expected = pd.date_range(axis[0], axis[-1], freq=source.time_step)
+        report["groups"][group] = {"steps": len(axis), "first": axis[0], "last": axis[-1], "gaps": len(expected) - len(axis)}
+        if not axis.is_monotonic_increasing or not axis.is_unique:
+            problems.append(f"{group}: axis is not sorted and unique; re-sort it first")
+        if STATUS_COORD not in zarr.open_group(store, path=group.strip("/"), mode="r", zarr_format=3):
+            problems.append(f"{group}: no {STATUS_COORD} coordinate")
+        try:
+            check_on_grid(axis, origin, source.time_step)
+        except ValueError as e:
+            problems.append(f"{group}: {e}")
+    if origin != first_available:
+        problems.append(f"axis starts {origin}, but the source's record starts {first_available}; earlier steps couldn't be added")
+    report["problems"] = problems
+    if problems or dry_run:
+        report["migrated"] = False
+        return report
+
+    written_at = np.datetime64(pd.Timestamp(next(repo.ancestry(branch="main")).written_at).tz_convert(None), "ms")
+    listing = source.list_files(origin.to_pydatetime(), max(a[-1] for a in axes.values()).to_pydatetime())
+    session = repo.writable_session("main")
+    encoding = step_metadata_encoding(origin, source.time_step, dim)
+    for group, axis in axes.items():
+        n = len(axis)
+        xr.Dataset(coords={
+            dim: axis,
+            "created_at": (dim, np.full(n, written_at)),
+            "updated_at": (dim, np.full(n, written_at)),
+            "source_last_modified": (dim, listing["last_modified"].reindex(axis).to_numpy("datetime64[ms]")),
+        }).to_zarr(session.store, group=group, mode="a", zarr_format=3, consolidated=False,
+                   encoding={name: encoding[name] for name in AUDIT_COORDS})
+    write_grid_attrs(session.store, {
+        "append_dim": dim, "time_origin": origin.isoformat(), "time_step": pd.Timedelta(source.time_step).isoformat(),
+        "configuration_name": configuration_name, "timeseries_type": timeseries_type,
+    })
+    report["snapshot_id"] = session.commit(f"Migrate onto the time grid ({len(groups)} groups)")
+    report["migrated"] = True
+    logger.info(f"Migrated {configuration_name} onto the time grid: {report['snapshot_id']}")
+    return report
+
+
 def shard_batches(times: pd.DatetimeIndex, axis: pd.DatetimeIndex, shard_steps: int) -> list[pd.DatetimeIndex]:
     """Group ``times`` by the shard holding their slot, so each batch writes whole shards once."""
     shard = axis.get_indexer(times) // shard_steps
