@@ -93,8 +93,10 @@ def test_backfill_in_any_order_then_upsert(harness, ua):
     _run("1981-10-03", "1981-10-12")  # then an earlier one
     g = _groups(open_repo)
     expected = list(range(2, 12)) + list(range(50, 60))
+    cf_xarray = pytest.importorskip("cf_xarray")  # noqa: F841  # registers .cf, as xpublish-edr uses it
     for ds in g.values():
         assert ds.time.to_index().is_monotonic_increasing
+        assert ds.cf.axes["T"] == ["time"]  # xpublish-edr selects datetime through it
         assert list(np.flatnonzero(ds.status.values >= 0)) == expected
     raw = g["raw_data"]
     for i in expected:

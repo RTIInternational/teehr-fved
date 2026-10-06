@@ -157,8 +157,11 @@ def create_group(
     then the axis is grown to ``end``.
     """
     step_meta = empty_step_metadata(pd.DatetimeIndex([time_origin]), dim)
+    # cf_xarray (e.g. xpublish-edr) finds the time axis by these; later writes in mode "a" don't add attrs
+    time_attrs = {k: v for k, v in template[dim].attrs.items() if k not in ("units", "calendar")}
+    time_attrs = {"standard_name": "time", "axis": "T", **time_attrs}
     # The axis and step coords go first, with their explicit encoding; later writes keep a stored encoding
-    xr.Dataset(coords={dim: [time_origin], **step_meta}).to_zarr(
+    xr.Dataset(coords={dim: (dim, [time_origin], time_attrs), **step_meta}).to_zarr(
         session.store, group=group, mode="w", zarr_format=3, consolidated=False,
         encoding=step_metadata_encoding(time_origin, time_step, dim),
     )

@@ -81,6 +81,15 @@ def test_create_group_stores_nothing(repo, source):
     assert (meta.status == tg.UNWRITTEN).all() and meta.updated_at.isna().all()
 
 
+def test_time_axis_is_cf_findable(repo, source):
+    cf_xarray = pytest.importorskip("cf_xarray")  # noqa: F841  # registers .cf, as xpublish-edr uses it
+    _, _, open_days = source
+    _write_refs(repo, open_days(DAYS[3:5]), 2)
+    refs = _refs(repo)
+    assert refs.cf.axes["T"] == ["time"]
+    assert "time" in refs.indexes
+
+
 def test_out_of_order_writes_land_in_their_slots(repo, source):
     _, _, open_days = source
     _write_refs(repo, open_days(DAYS[40:50]), 2)
