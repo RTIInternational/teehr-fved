@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from topozarr import create_pyramid
-import rioxarray  # noqa: rio accessor
+import rioxarray  # noqa: F401 (rio accessor)
 
 from utils import grid_utils as gu
 from utils import time_grid as tg
