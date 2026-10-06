@@ -8,7 +8,7 @@ import obstore
 import xarray as xr
 from obstore.store import from_url
 from obspec_utils.registry import ObjectStoreRegistry
-from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+from virtualizarr import open_virtual_dataset
 from virtualizarr.manifests import ManifestArray
 from zarr.core.metadata import ArrayV3Metadata
 import virtualizarr as vz
@@ -308,14 +308,6 @@ def create_virtual_xarray_dataset(
         dim=concat_dim,
         **kwargs
     )
-    # # TODO: open_mfdataset()?
-    # virtual_ds = open_virtual_mfdataset(
-    #     file_list,
-    #     registry=registry,
-    #     parser=parser,
-    #     concat_dim=concat_dim,
-    #     **kwargs
-    # )
     return virtual_ds
 
 
