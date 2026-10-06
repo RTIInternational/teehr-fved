@@ -17,7 +17,7 @@ class PixelCoverageWeightsInput(BaseGriddedDataInput):
     )
     grid_variable_name: str = Field(
         ...,
-        description="Name of variable in the gridded dataset, already the teehr variable name (e.g. 'swe_daily_mean')"
+        description="Name of variable in the gridded dataset, already the teehr variable name (e.g. 'swe_daily_inst')"
     )
     domain_name: str = Field(
         ...,
