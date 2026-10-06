@@ -143,7 +143,9 @@ class ISnobal(GriddedSource):
         return v
 
     def _store(self):
-        return from_url(f"{self.source_bucket}/", **self.store_kwargs, **self.credentials())
+        # A provider rather than keys: with keys, obstore adds any ambient AWS_SESSION_TOKEN to the request
+        creds = {**self.credentials(), "token": None, "expires_at": None}
+        return from_url(f"{self.source_bucket}/", **self.store_kwargs, credential_provider=lambda: creds)
 
     def list_files(self, start_dt: datetime, end_dt: datetime) -> pd.DataFrame:
         """Files laid out as <domain>/wy<YYYY>/run<YYYYMMDD>/<variable>_<time>.tif, listed per water year."""
