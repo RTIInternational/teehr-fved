@@ -33,7 +33,7 @@ definitions:
       PREFECT_LOGGING_LEVEL: *log_level
       TEEHR_SPARK_IMAGE: "{{ $TEEHR_SPARK_IMAGE }}"
       TEEHR_NAMESPACE: "{{ $TEEHR_NAMESPACE }}"
-      PREFECT_LOGGING_EXTRA_LOGGERS: teehr
+      PREFECT_LOGGING_EXTRA_LOGGERS: teehr,workflows.grid
       # Concurrent chunk reads/writes per zarr call (default 10)
       ZARR_ASYNC__CONCURRENCY: "128"
       # Start Local Only
@@ -179,7 +179,6 @@ deployments:
         "parser_type": "tiff",
         "x_dim": "x",
         "y_dim": "y",
-        "num_lookback_days": null,
         "factors": [1, 2],
         "time_batch_size": 30,
         "ignore_unreadable_file": false
@@ -195,7 +194,7 @@ deployments:
     entrypoint: workflows/ingests/build_geozarr_pyramids.py:build_pyramids
     parameters: {
       "args": {
-        "configuration_name": "ua-swann-4km",
+        "configuration_name": "ua_swann_4km",
         "factors": [1]
       }
     }

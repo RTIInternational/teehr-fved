@@ -13,14 +13,17 @@ from virtualizarr.manifests import ManifestArray
 from zarr.core.metadata import ArrayV3Metadata
 import virtualizarr as vz
 import icechunk as ic
-from icechunk.xarray import to_icechunk
 from pyproj import CRS as PyprojCRS
 import zarr
+import logging
 import os
 
-from prefect import task, get_run_logger
+from prefect import task
 from prefect.cache_policies import NO_CACHE
 from teehr.utils.concurrency import resolve_budget, run_concurrent_map
+
+# Usable outside a Prefect run; PREFECT_LOGGING_EXTRA_LOGGERS forwards it to the run's logs
+logger = logging.getLogger("workflows.grid")
 
 
 # Store kwargs whose values are kept out of logs
@@ -54,7 +57,6 @@ def create_objectstore_registry(bucket: str, **kwargs) -> ObjectStoreRegistry:
     **kwargs : dict
         Additional keyword arguments to pass to from_url.
     """
-    logger = get_run_logger()
     bucket_key = bucket if bucket.endswith("/") else f"{bucket}/"
     logged = {k: "<redacted>" if k in _SECRET_KWARGS else v for k, v in kwargs.items()}
     logger.info(f"Creating ObjectStoreRegistry for bucket: {bucket_key} and kwargs: {logged}")
@@ -145,7 +147,6 @@ def configure_icechunk_s3_repo(
     **kwargs : dict
         Additional keyword arguments to pass to the s3_storage function.
     """
-    logger = get_run_logger()
 
     storage = build_icechunk_s3_storage(
         bucket=dest_bucket,
@@ -239,7 +240,6 @@ def _open_virtual_safe(
     preprocess: Callable[[xr.Dataset, str], xr.Dataset] | None = None,
 ) -> xr.Dataset | None:
     """Open a virtual dataset safely, handling missing or unreadable files."""
-    logger = get_run_logger()
     try:
         ds = open_virtual_dataset(url, registry=registry, parser=parser)
     except Exception as e:
@@ -289,9 +289,8 @@ def create_virtual_xarray_dataset(
     **kwargs : dict
         Additional keyword arguments to pass to xr.concat.
     """
-    logger = get_run_logger()
-    # Opening is network-bound, so size the threads by the io budget; each carries the
-    # Prefect run context, which get_run_logger needs and worker threads don't inherit
+    # Opening is network-bound, so size the threads by the io budget; each carries the Prefect
+    # run context, which worker threads don't inherit, so their logs reach the flow run
     ctx = contextvars.copy_context()
     opened = run_concurrent_map(
         lambda url: ctx.copy().run(
@@ -365,7 +364,7 @@ def assign_geotiff_coords(ds: xr.Dataset, fallback_crs: str | None = None) -> xr
     if epsg not in (None, _GEOTIFF_USER_DEFINED):
         ds = ds.rio.write_crs(f"EPSG:{epsg}")
     elif fallback_crs is not None:
-        get_run_logger().warning(
+        logger.warning(
             f"GeoTIFF CRS has no EPSG code ({attrs.get('citation')!r}); applying fallback_source_crs {fallback_crs}."
         )
         ds = ds.rio.write_crs(fallback_crs)
@@ -467,7 +466,6 @@ def reproject_dataset(
     fallback_crs : str | None
         CRS applied, with a warning, only if the dataset has none. Without either, this raises.
     """
-    logger = get_run_logger()
     logger.info(
         f"Reprojecting dataset to target CRS: {target_crs} and setting spatial dims: x={x_dim}, y={y_dim}."
     )
@@ -500,7 +498,6 @@ def standardize_and_inject_geozarr(
     - ``grid_mapping``, ``proj:wkt2``, and ``spatial:dimensions`` on each spatial data var.
     - ``proj:wkt2``, ``spatial:dimensions``, and ``Conventions`` on the dataset itself.
     """
-    logger = get_run_logger()
 
     # --- Resolve spatial dimensions ---
     if x_dim and y_dim and x_dim in ds.dims and y_dim in ds.dims:
@@ -622,47 +619,6 @@ def restore_grid_mapping_attrs(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def filter_for_new_data(
-    incoming_ds: xr.Dataset,
-    existing_ds: xr.Dataset,
-    append_dim: str,
-) -> xr.Dataset | None:
-    """Filter out duplicate time steps from an incoming dataset based on an existing dataset.
-
-    Parameters
-    ----------
-    incoming_ds : xr.Dataset
-        The incoming dataset to filter.
-    existing_ds : xr.Dataset
-        The existing dataset to compare against.
-    append_dim : str
-        The dimension used for appending (e.g. "time").
-
-    Returns
-    -------
-    xr.Dataset | None
-        A filtered dataset containing only new time steps, or None if no new data is found.
-    """
-    logger = get_run_logger()
-    if append_dim not in incoming_ds.dims:
-        raise ValueError(f"Append dimension '{append_dim}' not found in incoming dataset.")
-    if append_dim not in existing_ds.dims:
-        raise ValueError(f"Append dimension '{append_dim}' not found in existing dataset.")
-
-    incoming_steps = set(incoming_ds[append_dim].values)
-    existing_steps = set(existing_ds[append_dim].values)
-    new_steps = incoming_steps - existing_steps
-
-    if not new_steps:
-        logger.info("No new data steps found; all incoming steps already exist.")
-        return None
-
-    ds_filtered = incoming_ds.sel({append_dim: sorted(new_steps)})
-    logger.info(f"Filtered dataset to {len(ds_filtered[append_dim])} new steps along '{append_dim}'.")
-    return ds_filtered
-
-
-
 def group_contains_data(store: ic.IcechunkStore, group_path: str) -> bool:
     """Return True if the group at ``group_path`` (e.g. "/pyramids/0") exists and holds arrays."""
     try:
@@ -670,95 +626,6 @@ def group_contains_data(store: ic.IcechunkStore, group_path: str) -> bool:
     except (zarr.errors.GroupNotFoundError, FileNotFoundError):
         return False
     return any(True for _ in group.array_keys())
-
-
-def drop_existing_steps(
-    ds: xr.Dataset,
-    store: ic.IcechunkStore,
-    group_path: str,
-    append_dim: str,
-) -> xr.Dataset | None:
-    """Drop the steps of ``ds`` already in ``group_path``, keeping duplicates among the rest; None if nothing is new."""
-    if group_contains_data(store, group_path):
-        existing_values = xr.open_zarr(store, group=group_path, consolidated=False)[append_dim].values
-        ds = ds.isel({append_dim: ~np.isin(ds[append_dim].values, existing_values)})
-    return ds if ds.sizes[append_dim] else None
-
-
-def stored_steps(store: ic.IcechunkStore, group_path: str, append_dim: str) -> int:
-    """Number of steps along ``append_dim`` already in ``group_path`` (0 if it has none)."""
-    if not group_contains_data(store, group_path):
-        return 0
-    return xr.open_zarr(store, group=group_path, consolidated=False).sizes[append_dim]
-
-
-def batch_bounds(stored: int, num_steps: int, batch_size: int) -> list[tuple[int, int]]:
-    """(start, stop) of each batch of ``num_steps`` new steps, appended after ``stored`` existing ones.
-
-    Batches end on multiples of ``batch_size`` along the stored axis, so a batch size that is a
-    multiple of the shard length writes each shard once.
-    """
-    starts = [0, *range(batch_size - stored % batch_size, num_steps, batch_size)]
-    return list(zip(starts, [*starts[1:], num_steps]))
-
-
-def new_steps(
-    ds: xr.Dataset,
-    store: ic.IcechunkStore,
-    group_path: str,
-    append_dim: str,
-) -> xr.Dataset | None:
-    """Return the steps of ``ds`` not yet in ``group_path``: all of it for an empty group, None if nothing is new."""
-    if not group_contains_data(store, group_path):
-        return ds
-    existing = open_zarr_group(store=store, group_path=group_path)
-    return filter_for_new_data(incoming_ds=ds, existing_ds=existing, append_dim=append_dim)
-
-
-def _drop_new_append_vars(
-    ds: xr.Dataset,
-    store: ic.IcechunkStore,
-    group_path: str,
-    append_dim: str,
-) -> xr.Dataset:
-    """Drop variables along ``append_dim`` that the existing group lacks; they would cover only the appended steps."""
-    existing = set(zarr.open_group(store, path=group_path.strip("/"), mode="r", zarr_format=3).array_keys())
-    new = [name for name, var in ds.variables.items() if append_dim in var.dims and name not in existing]
-    if new:
-        get_run_logger().warning(f"Not appending {new} to {group_path}: absent from its existing steps.")
-    return ds.drop_vars(new)
-
-
-def write_group(
-    ds: xr.Dataset,
-    session: ic.session.Session,
-    group_path: str,
-    append_dim: str,
-    make_encoding: Callable[[xr.Dataset], dict] | None = None,
-    virtual: bool = False,
-) -> None:
-    """Create ``group_path`` from ``ds`` on the first write, append along ``append_dim`` after.
-
-    ``make_encoding`` builds the encoding for the first write; appends reuse the existing arrays.
-    ``virtual`` writes VirtualiZarr references instead of materialized data.
-    """
-    logger = get_run_logger()
-    exists = group_contains_data(session.store, group_path)
-    logger.info(f"{'Appending to' if exists else 'Creating'} {group_path} ({len(ds[append_dim])} step(s)).")
-    if exists:
-        ds = _drop_new_append_vars(ds, session.store, group_path, append_dim)
-    if virtual:
-        ds.vz.to_icechunk(session.store, group=group_path, append_dim=append_dim if exists else None)
-        return
-    to_icechunk(
-        ds.sortby(append_dim),
-        session,
-        group=group_path,
-        mode="a" if exists else "w",  # TODO: upsert?
-        append_dim=append_dim if exists else None,
-        encoding=None if exists or make_encoding is None else make_encoding(ds),
-        align_chunks=True,
-    )
 
 
 def open_zarr_group(
@@ -785,7 +652,6 @@ def open_zarr_group(
     xr.Dataset
         The opened Xarray dataset.
     """
-    logger = get_run_logger()
     logger.info(
         f"Opening Zarr group at {group_path} from IceChunk repository with decode_coords={decode_coords} and consolidated={consolidated}."
     )
