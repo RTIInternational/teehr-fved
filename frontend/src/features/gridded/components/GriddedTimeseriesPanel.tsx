@@ -35,6 +35,7 @@ const GriddedTimeseriesPanel = () => {
     preferredVariable: mapFilters.variable,
     lon: clickedPoint?.lon,
     lat: clickedPoint?.lat,
+    anchor: clickedPoint?.time,
   });
   const variableAttrs = useQueries({
     queries: datasets.map((ds) => variableAttrsQueryOptions(ds)),

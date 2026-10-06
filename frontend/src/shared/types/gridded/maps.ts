@@ -3,6 +3,9 @@ export type ClickedPoint = {
   lat: number;
 };
 
+// A point query: where the map was clicked and the date it showed
+export type PointQuery = ClickedPoint & { time: string };
+
 export type MapFilters = {
   dataset: string | null;
   variable: string | null;

@@ -60,7 +60,7 @@ const GriddedTimeseriesControls = ({
 
         <div className="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
           <div className="small text-muted">
-            Leave dates empty for each dataset&apos;s latest year.
+            Leave dates empty for up to 25 years before the map&apos;s date.
           </div>
           <Button
             variant="outline-secondary"

@@ -479,7 +479,10 @@ const GriddedMapComponent = () => {
       // Otherwise, query the gridded data if available
       if (!dataset || !variable || !currentTimestep) return;
 
-      dispatch({ type: ActionTypes.SET_CLICKED_POINT, payload: { lon: lng, lat } });
+      dispatch({
+        type: ActionTypes.SET_CLICKED_POINT,
+        payload: { lon: lng, lat, time: currentTimestep },
+      });
 
       popupInstance
         .setLngLat([lng, lat])

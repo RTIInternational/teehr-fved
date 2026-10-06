@@ -7,12 +7,12 @@ import type { GriddedTimeseriesFilters } from '@/shared/types/gridded/timeseries
 import { timestepsQueryOptions } from './timesteps';
 import { variablesQueryOptions } from './variables';
 
-const DEFAULT_SPAN_STEPS = 365;
-
 type EdrTimeseriesArgs = GriddedTimeseriesFilters & {
   preferredVariable: string | null;
   lon?: number;
   lat?: number;
+  // End of the default span: the map's date when the point was clicked
+  anchor?: string;
 };
 
 type SeriesPlan = { variable: string | null; start?: string; end?: string; skipped?: string };
@@ -26,7 +26,8 @@ const planSeries = (
   timesteps: string[],
   preferredVariable: string | null,
   startDate: string | null,
-  endDate: string | null
+  endDate: string | null,
+  anchor: string | undefined
 ): SeriesPlan => {
   const variable =
     preferredVariable && variables.includes(preferredVariable)
@@ -37,10 +38,13 @@ const planSeries = (
   const first = timesteps[0];
   const last = timesteps[timesteps.length - 1];
   if (!startDate && !endDate) {
+    const upTo = anchor ? timesteps.filter((t) => t <= anchor) : timesteps;
+    if (upTo.length === 0)
+      return { variable, skipped: `${datasetId}: no data on or before ${anchor}` };
     return {
       variable,
-      start: timesteps[Math.max(0, timesteps.length - DEFAULT_SPAN_STEPS)],
-      end: last,
+      start: upTo[Math.max(0, upTo.length - MAX_TIMESERIES_POINTS)],
+      end: upTo[upTo.length - 1],
     };
   }
 
@@ -64,6 +68,7 @@ export const useEdrTimeseries = ({
   lat,
   start_date,
   end_date,
+  anchor,
 }: EdrTimeseriesArgs): DatasetTimeseries[] => {
   const variables = useQueries({ queries: datasets.map((ds) => variablesQueryOptions(ds)) });
   const timesteps = useQueries({ queries: datasets.map((ds) => timestepsQueryOptions(ds)) });
@@ -74,7 +79,8 @@ export const useEdrTimeseries = ({
       timesteps[i].data ?? [],
       preferredVariable,
       start_date,
-      end_date
+      end_date,
+      anchor
     )
   );
 
