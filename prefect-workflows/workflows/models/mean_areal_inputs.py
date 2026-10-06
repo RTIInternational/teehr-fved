@@ -1,4 +1,7 @@
 """Define arguments and defaults for the mean_areal Prefect flow."""
+from datetime import datetime
+from typing import Union
+
 from pydantic import Field
 
 from workflows.models.ingest_gridded_data_input import BaseGriddedDataInput
@@ -45,4 +48,19 @@ class MeanArealValuesInput(PixelCoverageWeightsInput):
             "Name of the timeseries table in the teehr warehouse to write the mean areal values to. "
             "Default is 'primary_timeseries'."
         )
+    )
+    write_mode: str = Field(
+        "upsert",
+        description=(
+            "Write mode for the timeseries table, passed to ev._write.to_warehouse(). 'upsert' replaces "
+            "values for steps the grid has rewritten (e.g. provisional to stable)."
+        )
+    )
+    start_dt: Union[str, datetime, None] = Field(
+        default=None,
+        description="First grid step to compute. Defaults to the first written step."
+    )
+    end_dt: Union[str, datetime, None] = Field(
+        default=None,
+        description="Last grid step to compute. Defaults to the last written step."
     )
