@@ -36,7 +36,7 @@ _PARSER_MAP = {
 
 @flow(
     flow_run_name="ingest-gridded-data",
-    timeout_seconds=60 * 60
+    timeout_seconds=3 * 60 * 60
 )
 def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
     """Ingest gridded data from a source over a date range into an IceChunk S3 repository.

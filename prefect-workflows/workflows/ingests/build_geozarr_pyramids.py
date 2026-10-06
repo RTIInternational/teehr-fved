@@ -23,7 +23,7 @@ logging.getLogger("workflows.grid").setLevel(logging.INFO)
 
 @flow(
     flow_run_name="build-pyramids",
-    timeout_seconds=60 * 60
+    timeout_seconds=3 * 60 * 60
 )
 def build_pyramids(args: BuildPyramidsDataInput) -> None:
     """Build multiscale pyramids for the steps the data group changed, and write them into their slots.
