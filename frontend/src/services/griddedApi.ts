@@ -45,15 +45,14 @@ function parseTimeseriesCsv(csvText: string, variable: string) {
   }
   const varColIdx = headers.findIndex((h) => h === variable);
   if (varColIdx === -1) throw new Error(`Variable '${variable}' not found in timeseries response`);
-  const times = [];
-  const values = [];
+  const times: string[] = [];
+  const values: (number | null)[] = [];
   for (const line of lines.slice(1)) {
     const cols = line.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
     const val = parseFloat(cols[varColIdx]);
-    if (Number.isFinite(val)) {
-      times.push(timeColIdx !== -1 ? cols[timeColIdx] : '');
-      values.push(val);
-    }
+    times.push(timeColIdx !== -1 ? cols[timeColIdx] : '');
+    // Steps without data stay as null, so the plot shows a gap rather than joining across it
+    values.push(Number.isFinite(val) ? val : null);
   }
   return { times, values };
 }

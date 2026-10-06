@@ -45,7 +45,7 @@ const GriddedTimeseriesPanel = () => {
   );
   const plotted = series
     .map((s, i) => ({ ...s, unit: units[i] }))
-    .filter((s) => s.data && s.data.times.length > 0);
+    .filter((s) => s.data?.values.some((v) => v !== null));
   const notes = series.flatMap((s) =>
     s.skipped ? [s.skipped] : s.error ? [`${s.datasetId}: ${s.error}`] : []
   );
@@ -61,6 +61,7 @@ const GriddedTimeseriesPanel = () => {
         name: `${s.datasetId} · ${varName}${s.unit ? ` (${s.unit})` : ''}`,
         type: 'scatter',
         mode: 'lines+markers',
+        connectgaps: false,
         marker: { size: 4 },
         line: { color: seriesColor(i) },
         hovertemplate:
