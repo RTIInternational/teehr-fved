@@ -1,22 +1,24 @@
-from prefect import flow, get_run_logger
-from datetime import timedelta
+from prefect import flow, task, get_run_logger
+from prefect.cache_policies import NO_CACHE
+from datetime import datetime, timedelta
+from typing import Callable
 import icechunk as ic
-from icechunk.xarray import to_icechunk
 import virtualizarr as vz
+from virtual_tiff import VirtualTIFF
 import xarray as xr
 import pandas as pd
 
 from utils import grid_utils as gu
-from utils.gridded_source_builders import GriddedSource, UASwan4km
+from workflows.utils.data_status import STATUS_COORD
+from workflows.models.gridded_sources import GriddedSource
 from workflows.models.ingest_gridded_data_input import (
-    StorageType,
     IngestGriddedDataInput,
     ParserType,
     RAW_DATA_GROUP_PATH,
-    REFERENCES_GROUP_PATH
+    REFERENCES_GROUP_PATH,
+    VARIABLE_AND_UNIT_MAPPER,
 )
 from build_geozarr_pyramids import build_pyramids as build_pyramids_flow
-from workflows.models.mean_areal_inputs import VARIABLE_AND_UNIT_MAPPER
 from workflows.utils.time_utils import to_naive_utc
 
 
@@ -25,16 +27,8 @@ DEFAULT_LOOKBACK_DAYS = 1
 _PARSER_MAP = {
     ParserType.hdf: vz.parsers.HDFParser,
     ParserType.zarr: vz.parsers.ZarrParser,
-}
-
-_VIRTUAL_CONTAINER_MAP = {
-    StorageType.http: lambda: ic.storage.http_store(opts={}),
-    StorageType.s3: lambda: ic.storage.s3_store(opts={}),
-    StorageType.gcs: lambda: ic.storage.gcs_store(opts={}),
-}
-
-_FILE_LIST_BUILDER_MAP: dict[str, GriddedSource] = {
-    "ua-swann-4km": UASwan4km(),
+    # IFD 0 is full resolution; overviews are rebuilt as pyramids
+    ParserType.tiff: lambda: VirtualTIFF(ifd=0),
 }
 
 
@@ -43,7 +37,13 @@ _FILE_LIST_BUILDER_MAP: dict[str, GriddedSource] = {
     timeout_seconds=60 * 60
 )
 def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
-    """Ingest gridded data for a known configuration over a derived date range, and write to an IceChunk S3 repository.
+    """Ingest gridded data from a source over a derived date range, and write to an IceChunk S3 repository.
+
+    Runs up to three stages, each catching up from the one before: source files to standardized
+    ``/references``, ``/references`` to ``/raw_data`` (unless ``write_materialized`` is False), and
+    the repo's data group to the pyramids. The data group, recorded on the repo for readers, is
+    ``/raw_data`` when materialized and ``/references`` otherwise. A stage with nothing new is a
+    no-op, so a run that failed part-way is completed by the next one.
 
     Parameters
     ----------
@@ -51,178 +51,139 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
         Pydantic model containing all flow parameters. See IngestGriddedDataInput for field descriptions.
     """
     logger = get_run_logger()
+    source = args.source
 
-    if args.configuration_name not in _FILE_LIST_BUILDER_MAP:
-        valid = list(_FILE_LIST_BUILDER_MAP.keys())
-        raise ValueError(
-            f"Unknown configuration_name '{args.configuration_name}'. "
-            f"Valid options: {valid}"
-        )
-    source_config = _FILE_LIST_BUILDER_MAP[args.configuration_name]
-    source_bucket = source_config.source_bucket
-
-    parser = _PARSER_MAP[args.parser_type]()
-    virtual_store = _VIRTUAL_CONTAINER_MAP[args.source_data_storage]()
-
-    end_dt = to_naive_utc(args.end_dt)
-
-    # Configure the IceChunk S3 repository with a virtual chunk container
+    credentials = source.credentials()
     repo = gu.configure_icechunk_s3_repo(
-        source_bucket,
+        source.source_bucket,
         args.dest_bucket,
         prefix=f"{args.base_prefix}/{args.configuration_name}",
-        virtual_store=virtual_store,
+        vc_credentials_kwargs=credentials,
+        vc_store_kwargs=source.virtual_store_kwargs,
         **args.s3_storage_kwargs
     )
-    logger.info(
-        f"IceChunk S3 repo configured at: {args.dest_bucket}/{args.base_prefix}/{args.configuration_name}."
-    )
 
-    # Determine start_dt from lookback days or latest value in store
-    if args.num_lookback_days is None:
-        logger.info("No lookback days provided, determining start date from latest data in store.")
-        ro_session = repo.writable_session("main")
-        if gu.group_contains_data(ro_session.store, RAW_DATA_GROUP_PATH):
-            existing_ds = gu.open_zarr_group(store=ro_session.store, group_path=RAW_DATA_GROUP_PATH)
-            latest_val = pd.Timestamp(existing_ds[args.append_dim].values.max()).to_pydatetime().replace(tzinfo=None)
-            start_dt = latest_val + timedelta(days=1)
-            logger.info(f"Latest {args.append_dim} in store: {latest_val}. Setting start_dt to {start_dt}.")
-        else:
-            start_dt = end_dt - timedelta(days=DEFAULT_LOOKBACK_DAYS)
-            logger.info(f"No existing data found. Falling back to {DEFAULT_LOOKBACK_DAYS}-day lookback: start_dt={start_dt}.")
-    else:
-        start_dt = end_dt - timedelta(days=args.num_lookback_days)
-        logger.info(f"Setting start_dt to {args.num_lookback_days} days before end_dt: start_dt={start_dt}.")
-
+    end_dt = to_naive_utc(args.end_dt)
+    start_dt = _resolve_start_dt(repo, args, end_dt)
     logger.info(f"Ingesting {args.configuration_name} from {start_dt} to {end_dt}.")
 
-    # Build the list of files for the resolved date range
-    file_list = source_config.build_file_list(start_dt, end_dt)
+    file_list = source.build_file_list(start_dt, end_dt)
     if len(file_list) == 0:
-        logger.warning(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
         raise ValueError(f"No files found for {args.configuration_name} between {start_dt} and {end_dt}.")
     logger.info(f"Attempting to ingest {len(file_list)} files.")
 
-    # Create the ObjectStoreRegistry for the source data files
-    registry = gu.create_objectstore_registry(
-        source_bucket,
-        **args.obstore_kwargs
-    )
-    logger.info(
-        f"ObjectStoreRegistry created for source_bucket: {source_bucket}."
-    )
-
-    # Read the data into a virtual (lazy) xarray dataset
+    obstore_kwargs = {**source.store_kwargs, **credentials, **args.obstore_kwargs}
+    if credentials:
+        # An unsigned request ignores the credentials
+        obstore_kwargs.pop("skip_signature", None)
+    registry = gu.create_objectstore_registry(source.source_bucket, **obstore_kwargs)
     virtual_ds = gu.create_virtual_xarray_dataset(
         file_list,
         registry=registry,
-        parser=parser,
+        parser=_PARSER_MAP[args.parser_type](),
         concat_dim=args.append_dim,
+        ignore_unreadable_file=args.ignore_unreadable_file,
+        preprocess=_preprocess(source, args),
         **args.xconcat_kwargs
     )
-    logger.info("Virtual xarray dataset created.")
+    virtual_ds = _standardize_references(gu.align_virtual_fill_values(virtual_ds), args)
 
-    # append_dim is only valid when data already exists in the store.
-    # On a fresh repo the root group is empty, so omit it on the first write.
-    rw_session = repo.writable_session("main")
-    if gu.group_contains_data(rw_session.store, REFERENCES_GROUP_PATH):
-        initial_append_dim = args.append_dim
-        existing_ds = gu.open_zarr_group(
-            store=rw_session.store,
-            group_path=REFERENCES_GROUP_PATH
-        )
-        virtual_ds = gu.filter_for_new_data(
-            incoming_ds=virtual_ds,
-            existing_ds=existing_ds,
-            append_dim=args.append_dim,
-        )
-    else:
-        initial_append_dim = None
-
-    if virtual_ds is None:
-        logger.info(f"No new data steps found in {REFERENCES_GROUP_PATH}. Shutting down.")
-        return
-
-    # Write virtual references to the IceChunk repository
-    logger.info(f"Writing virtual references.")
-    rw_session = repo.writable_session("main")
-    virtual_ds.vz.to_icechunk(
-        rw_session.store,
-        group=REFERENCES_GROUP_PATH,
-        append_dim=initial_append_dim
-    )
-    snapshot_id = rw_session.commit(
-        f"Wrote virtual references into {args.dest_bucket}/{args.base_prefix}/{args.configuration_name}"
-    )
-    logger.info(f"Wrote virtual references into {args.dest_bucket}/{args.base_prefix}/{args.configuration_name} with snapshot ID: {snapshot_id}")
-
+    write_references(repo, virtual_ds, args)
     if args.write_materialized:
-        rw_session = repo.writable_session("main")  # After any commit a session is reset to read-only
-        # Materialize and write the virtual chunks to the IceChunk repository
-        ds = gu.open_zarr_group(
-            store=rw_session.store,
-            group_path=REFERENCES_GROUP_PATH
-        )
-        logger.info("Selecting variables to ingest from the dataset.")
-        ds = ds[args.variable_names]
+        materialize_references(repo, args)
+    if args.build_pyramids_on_ingest:
+        build_pyramids_flow(args)
 
-        logger.info(f"Dropping potential duplicates from the virtual dataset along dimension: {args.append_dim}.")
-        ds = ds.drop_duplicates(dim=args.append_dim)
 
-        ds = gu.standardize_and_inject_geozarr(
-            ds,
-            source_crs=args.source_crs,
-            x_dim=args.x_dim,
-            y_dim=args.y_dim,
-            variable_and_unit_mapper=VARIABLE_AND_UNIT_MAPPER,
-        )
+def _preprocess(source: GriddedSource, args: IngestGriddedDataInput) -> Callable[[xr.Dataset, str], xr.Dataset]:
+    """Per-file preprocessing: GeoTIFF georeferencing for TIFFs, then the source's own."""
+    if args.parser_type == ParserType.tiff:
+        # Only a deployment's own source_crs, not the default, stands in for a file without an EPSG code
+        fallback_crs = args.source_crs if "source_crs" in args.model_fields_set else None
+        return lambda ds, url: source.preprocess(gu.assign_geotiff_coords(ds, fallback_crs), url)
+    return source.preprocess
 
-        # Check to see if data exists
-        if not gu.group_contains_data(rw_session.store, RAW_DATA_GROUP_PATH):
-            encoding_config = gu.create_encoding_config(
-                ds,
+
+def _standardize_references(ds: xr.Dataset, args: IngestGriddedDataInput) -> xr.Dataset:
+    """Keep the ingested variables and one version of each step, under teehr's names and metadata."""
+    ds = ds[args.variable_names]
+    if STATUS_COORD in ds.coords:
+        # drop_duplicates keeps the first, so put the most final version of each step first
+        ds = ds.sortby(STATUS_COORD, ascending=False)
+    ds = ds.drop_duplicates(dim=args.append_dim).sortby(args.append_dim)
+    return gu.standardize_and_inject_geozarr(
+        ds,
+        source_crs=args.source_crs,
+        x_dim=args.x_dim,
+        y_dim=args.y_dim,
+        variable_and_unit_mapper=VARIABLE_AND_UNIT_MAPPER,
+    )
+
+
+def _resolve_start_dt(repo: ic.Repository, args: IngestGriddedDataInput, end_dt: datetime) -> datetime:
+    """Start from start_dt or the lookback window, else from the latest stored step."""
+    if args.start_dt is not None:
+        return to_naive_utc(args.start_dt)
+    if args.num_lookback_days is not None:
+        return end_dt - timedelta(days=args.num_lookback_days)
+    store = repo.readonly_session("main").store
+    if not gu.group_contains_data(store, REFERENCES_GROUP_PATH):
+        return end_dt - timedelta(days=DEFAULT_LOOKBACK_DAYS)
+    # Overlap with stored steps is filtered out before writing
+    existing = gu.open_zarr_group(store=store, group_path=REFERENCES_GROUP_PATH)
+    return pd.Timestamp(existing[args.append_dim].values.max()).to_pydatetime().replace(tzinfo=None)
+
+
+@task(cache_policy=NO_CACHE)
+def write_references(repo: ic.Repository, virtual_ds: xr.Dataset, args: IngestGriddedDataInput) -> None:
+    """Write virtual references for steps not yet in ``/references``, and record the repo's data group."""
+    logger = get_run_logger()
+    session = repo.writable_session("main")
+    ds = gu.new_steps(virtual_ds, session.store, REFERENCES_GROUP_PATH, args.append_dim)
+    if ds is not None:
+        gu.write_group(ds, session, REFERENCES_GROUP_PATH, args.append_dim, virtual=True)
+    data_group = RAW_DATA_GROUP_PATH if args.write_materialized else REFERENCES_GROUP_PATH
+    if not gu.write_data_group(session.store, data_group) and ds is None:
+        logger.info(f"No new steps for {REFERENCES_GROUP_PATH}.")
+        return
+    steps = 0 if ds is None else len(ds[args.append_dim])
+    snapshot_id = session.commit(f"Wrote {steps} step(s) of virtual references; data group {data_group}")
+    logger.info(f"Committed virtual references: {snapshot_id}")
+
+
+# Retried because reading source chunks can drop connections. Each shard's worth of steps is committed
+# on its own, so a retry (or the next run) resumes after the last committed batch.
+@task(cache_policy=NO_CACHE, retries=3, retry_delay_seconds=30)
+def materialize_references(repo: ic.Repository, args: IngestGriddedDataInput) -> None:
+    """Copy referenced steps not yet in ``/raw_data`` into it, in its own chunk/shard layout."""
+    logger = get_run_logger()
+    store = repo.readonly_session("main").store
+    if not gu.group_contains_data(store, REFERENCES_GROUP_PATH):
+        logger.info(f"No data in {REFERENCES_GROUP_PATH} to materialize.")
+        return
+    ds = gu.restore_grid_mapping_attrs(gu.open_zarr_group(store=store, group_path=REFERENCES_GROUP_PATH))
+    # References are already standardized and de-duplicated; select only the new steps
+    ds = gu.drop_existing_steps(ds, store, RAW_DATA_GROUP_PATH, args.append_dim)
+    if ds is None:
+        logger.info(f"No new steps for {RAW_DATA_GROUP_PATH}.")
+        return
+    num_steps = ds.sizes[args.append_dim]
+    shard_steps = args.time_chunk_size * args.num_shard_chunks
+    stored = gu.stored_steps(store, RAW_DATA_GROUP_PATH, args.append_dim)
+    for start, stop in gu.batch_bounds(stored, num_steps, shard_steps):
+        session = repo.writable_session("main")
+        gu.write_group(
+            ds.isel({args.append_dim: slice(start, stop)}),
+            session,
+            RAW_DATA_GROUP_PATH,
+            args.append_dim,
+            make_encoding=lambda d: gu.create_encoding_config(
+                d,
                 append_dim=args.append_dim,
                 chunk_size=args.chunk_size,
                 num_shard_chunks=args.num_shard_chunks,
-            )
-            write_mode = "w"
-            append_dim = None
-        else:
-            encoding_config = None
-            write_mode = "a"  # append
-            append_dim = args.append_dim
-            existing_ds = gu.open_zarr_group(
-                store=rw_session.store,
-                group_path=RAW_DATA_GROUP_PATH
-            )
-            ds = gu.filter_for_new_data(
-                incoming_ds=ds,
-                existing_ds=existing_ds,
-                append_dim=args.append_dim,
-            )
-            if ds is None:
-                logger.info(f"No new data steps found in {RAW_DATA_GROUP_PATH}. Shutting down.")
-                return
-
-        logger.info(f"Writing the chunked dataset to the Icechunk repository with mode: {write_mode}.")
-        ds = ds.sortby(args.append_dim)
-
-        to_icechunk(
-            ds,
-            rw_session,
-            mode=write_mode,  # TODO: upsert?
-            group=RAW_DATA_GROUP_PATH,
-            encoding=encoding_config,
-            align_chunks=True,
-            append_dim=append_dim
+                time_chunk_size=args.time_chunk_size,
+            ),
         )
-        snapshot_id = rw_session.commit(
-            f"Materialized and wrote {len(file_list)} files into {args.dest_bucket}/{args.base_prefix}/{args.configuration_name}"
-        )
-        logger.info(f"Materialized and wrote {len(file_list)} files into {args.dest_bucket}/{args.base_prefix}/{args.configuration_name} with snapshot ID: {snapshot_id}")
-
-    if args.build_pyramids_on_ingest:
-        build_pyramids_flow(args)
-        logger.info("Pyramid building subflow completed.")
-
-
+        snapshot_id = session.commit(f"Materialized {stop - start} step(s) into {RAW_DATA_GROUP_PATH}")
+        logger.info(f"Committed materialized steps {start + 1}-{stop} of {num_steps}: {snapshot_id}")

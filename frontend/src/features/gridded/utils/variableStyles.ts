@@ -21,23 +21,17 @@ export const DEFAULT_VARIABLE_STYLE: VariableStyle = {
 };
 
 export const VARIABLE_STYLES: Record<string, VariableStyle> = {
-  swe_daily_mean: {
+  swe_daily_inst: {
     colorRamp: 'raster/turbo',
     min: 0.001,
-    max: 100,
+    max: 500,
     units: 'mm',
   },
-  depth_daily_mean: {
+  depth_daily_inst: {
     colorRamp: 'raster/turbo',
     min: 0.001,
-    max: 100,
+    max: 2000,
     units: 'mm',
-  },
-  rainrate_hourly_mean: {
-    colorRamp: 'raster/turbo',
-    min: 0.001,
-    max: 0.005,
-    units: 'mm/s',
   },
 };
 

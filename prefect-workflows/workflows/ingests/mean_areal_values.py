@@ -7,6 +7,7 @@ import pyspark.sql.functions as F
 
 from teehr import Evaluation
 
+from utils import grid_utils as gu
 from workflows.utils.common_utils import initialize_evaluation
 from workflows.models.mean_areal_inputs import MeanArealValuesInput
 from pixel_coverage_weights import get_readonly_repo_store, write_dataframe_to_warehouse
@@ -154,12 +155,11 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
     )
 
     # Read the pixel coverage weights from the iceberg warehouse table
-    teehr_variable_name = args.variable_and_unit_mapper.variable_name[args.grid_variable_name].name
     weights_df = read_weights_from_warehouse(
         ev=ev,
         location_id_prefix=args.location_id_prefix,
         weights_domain_name=args.domain_name,
-        weights_variable_name=teehr_variable_name
+        weights_variable_name=args.grid_variable_name
     )
 
     # Read all timesteps of the grid from the Icechunk repo
@@ -172,7 +172,7 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
 
     grid_template_da = xr.open_zarr(
         store,
-        group="raw_data",
+        group=gu.read_data_group(store),
         decode_coords="all"
     )[args.grid_variable_name]
 
@@ -181,19 +181,19 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
         grid_template_da, weights_df, append_dim=args.append_dim
     )
 
+    # Ingest already stored the grid under teehr variable and unit names
     grid_unit_name = grid_template_da.attrs.get("units", None)
     if grid_unit_name is None:
         raise ValueError(f"Grid variable '{args.grid_variable_name}' does not have a 'units' attribute.")
-    teehr_unit_name = args.variable_and_unit_mapper.unit_name[grid_unit_name].name
 
     # Format to teehr timeseries table format
     mean_areal_values_df = format_to_teehr_timeseries(
         results=mean_areal_values_results,
         value_time_array=grid_template_da[args.append_dim].values,
         configuration_name=args.configuration_name,
-        variable_name=teehr_variable_name,
+        variable_name=args.grid_variable_name,
         reference_time=None,  # Placeholder for reference_time column
-        unit_name=teehr_unit_name,
+        unit_name=grid_unit_name,
         timeseries_table_name=args.timeseries_table_name
     )
 
