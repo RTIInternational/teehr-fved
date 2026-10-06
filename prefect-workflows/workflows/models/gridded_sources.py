@@ -10,7 +10,6 @@ import pandas as pd
 import requests
 import xarray as xr
 from obstore.store import from_url
-from prefect.blocks.system import Secret
 from pydantic import BaseModel, Field, field_validator
 from teehr.fetching.utils import REMOTE_RETRY_CONFIG
 
@@ -181,10 +180,13 @@ class ISnobal(GriddedSource):
     def credentials(self) -> dict:
         # Env vars (e.g. set in a notebook) take precedence over the Prefect Secret blocks
         blocks = {"access_key_id": "m3works-aws-access-key-id", "secret_access_key": "m3works-aws-secret-access-key"}
-        return {
-            key: os.environ.get(block.upper().replace("-", "_")) or Secret.load(block).get()
-            for key, block in blocks.items()
-        }
+        creds = {key: os.environ.get(block.upper().replace("-", "_")) for key, block in blocks.items()}
+        if all(creds.values()):
+            return creds
+        # Imported here so the listing works without Prefect when the env vars are set
+        from prefect.blocks.system import Secret
+
+        return {key: creds[key] or Secret.load(block).get() for key, block in blocks.items()}
 
     def preprocess(self, ds: xr.Dataset, url: str) -> xr.Dataset:
         # Parsed with IFD 0 (full resolution), the only variable is "0"
