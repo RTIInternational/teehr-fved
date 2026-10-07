@@ -1,4 +1,3 @@
-import logging
 from prefect import flow, task, get_run_logger
 from prefect.cache_policies import NO_CACHE
 from datetime import datetime, timedelta
@@ -22,8 +21,6 @@ from workflows.models.ingest_gridded_data_input import (
 )
 from build_geozarr_pyramids import build_pyramids as build_pyramids_flow
 from workflows.utils.time_utils import to_naive_utc
-
-logging.getLogger("workflows.grid").setLevel(logging.INFO)
 
 
 _PARSER_MAP = {
@@ -150,9 +147,10 @@ def write_references(
             "configuration_name": args.configuration_name, "timeseries_type": "primary",
         })
         tg.create_group(session, REFERENCES_GROUP_PATH, virtual_ds, origin, time_step, dim, end, virtual=True)
+        logger.info(f"Created {REFERENCES_GROUP_PATH} on a {time_step} grid from {origin} to {end}.")
         stored = tg.read_step_metadata(session.store, REFERENCES_GROUP_PATH, dim)
-    else:
-        tg.ensure_axis(session, REFERENCES_GROUP_PATH, end, time_step, dim)
+    elif added := tg.ensure_axis(session, REFERENCES_GROUP_PATH, end, time_step, dim):
+        logger.info(f"Extended {REFERENCES_GROUP_PATH} by {added} slot(s) to {end}.")
     ds = tg.with_step_metadata(
         virtual_ds,
         dim,
@@ -201,9 +199,10 @@ def materialize_references(repo: ic.Repository, args: IngestGriddedDataInput) ->
                 time_chunk_size=args.time_chunk_size,
             )
             tg.create_group(session, RAW_DATA_GROUP_PATH, refs, origin, time_step, dim, refs_meta.index[-1], encoding=encoding)
+            logger.info(f"Created {RAW_DATA_GROUP_PATH} on a {time_step} grid from {origin} to {refs_meta.index[-1]}.")
             raw_meta = tg.read_step_metadata(session.store, RAW_DATA_GROUP_PATH, dim)
-        else:
-            tg.ensure_axis(session, RAW_DATA_GROUP_PATH, refs_meta.index[-1], time_step, dim)
+        elif added := tg.ensure_axis(session, RAW_DATA_GROUP_PATH, refs_meta.index[-1], time_step, dim):
+            logger.info(f"Extended {RAW_DATA_GROUP_PATH} by {added} slot(s) to {refs_meta.index[-1]}.")
         meta = refs_meta.loc[batch]
         part = tg.with_step_metadata(
             refs.sel({dim: batch}).load(),

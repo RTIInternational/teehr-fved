@@ -15,16 +15,11 @@ import virtualizarr as vz
 import icechunk as ic
 from pyproj import CRS as PyprojCRS
 import zarr
-import logging
 import os
 
-from prefect import task
+from prefect import task, get_run_logger
 from prefect.cache_policies import NO_CACHE
 from teehr.utils.concurrency import resolve_budget, run_concurrent_map
-
-# Usable outside a Prefect run; PREFECT_LOGGING_EXTRA_LOGGERS forwards it to the run's logs
-logger = logging.getLogger("workflows.grid")
-
 
 # Store kwargs whose values are kept out of logs
 _SECRET_KWARGS = {"access_key_id", "secret_access_key", "session_token", "service_account_key", "bearer_token"}
@@ -57,6 +52,7 @@ def create_objectstore_registry(bucket: str, **kwargs) -> ObjectStoreRegistry:
     **kwargs : dict
         Additional keyword arguments to pass to from_url.
     """
+    logger = get_run_logger()
     bucket_key = bucket if bucket.endswith("/") else f"{bucket}/"
     logged = {k: "<redacted>" if k in _SECRET_KWARGS else v for k, v in kwargs.items()}
     logger.info(f"Creating ObjectStoreRegistry for bucket: {bucket_key} and kwargs: {logged}")
@@ -147,6 +143,7 @@ def configure_icechunk_s3_repo(
     **kwargs : dict
         Additional keyword arguments to pass to the s3_storage function.
     """
+    logger = get_run_logger()
 
     storage = build_icechunk_s3_storage(
         bucket=dest_bucket,
@@ -240,6 +237,7 @@ def _open_virtual_safe(
     preprocess: Callable[[xr.Dataset, str], xr.Dataset] | None = None,
 ) -> xr.Dataset | None:
     """Open a virtual dataset safely, handling missing or unreadable files."""
+    logger = get_run_logger()
     try:
         ds = open_virtual_dataset(url, registry=registry, parser=parser)
     except Exception as e:
@@ -289,8 +287,9 @@ def create_virtual_xarray_dataset(
     **kwargs : dict
         Additional keyword arguments to pass to xr.concat.
     """
-    # Opening is network-bound, so size the threads by the io budget; each carries the Prefect
-    # run context, which worker threads don't inherit, so their logs reach the flow run
+    logger = get_run_logger()
+    # Opening is network-bound, so size the threads by the io budget; each carries the
+    # Prefect run context, which get_run_logger needs and worker threads don't inherit
     ctx = contextvars.copy_context()
     opened = run_concurrent_map(
         lambda url: ctx.copy().run(
@@ -342,6 +341,7 @@ def assign_geotiff_coords(ds: xr.Dataset, fallback_crs: str | None = None) -> xr
     Assumes a north-up grid (no rotation) with a single tiepoint. ``fallback_crs`` is used, with a
     warning, when the file's CRS has no EPSG code; without one, such a file raises.
     """
+    logger = get_run_logger()
     attrs = next(ds[v].attrs for v in ds.data_vars if {"x", "y"} <= set(ds[v].dims))
     _, _, _, x0, y0, _ = attrs["model_tiepoint"]
     dx, dy, _ = attrs["model_pixel_scale"]
@@ -458,6 +458,7 @@ def reproject_dataset(
     fallback_crs : str | None
         CRS applied, with a warning, only if the dataset has none. Without either, this raises.
     """
+    logger = get_run_logger()
     logger.info(
         f"Reprojecting dataset to target CRS: {target_crs} and setting spatial dims: x={x_dim}, y={y_dim}."
     )
@@ -490,6 +491,7 @@ def standardize_and_inject_geozarr(
     - ``grid_mapping``, ``proj:wkt2``, and ``spatial:dimensions`` on each spatial data var.
     - ``proj:wkt2``, ``spatial:dimensions``, and ``Conventions`` on the dataset itself.
     """
+    logger = get_run_logger()
 
     # --- Resolve spatial dimensions ---
     if x_dim and y_dim and x_dim in ds.dims and y_dim in ds.dims:
@@ -644,6 +646,7 @@ def open_zarr_group(
     xr.Dataset
         The opened Xarray dataset.
     """
+    logger = get_run_logger()
     logger.info(
         f"Opening Zarr group at {group_path} from IceChunk repository with decode_coords={decode_coords} and consolidated={consolidated}."
     )

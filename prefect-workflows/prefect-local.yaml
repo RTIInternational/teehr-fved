@@ -35,7 +35,7 @@ definitions:
         PREFECT_LOGGING_LEVEL: *log_level
         TEEHR_SPARK_IMAGE: "{{ $TEEHR_SPARK_IMAGE }}"
         TEEHR_NAMESPACE: "{{ $TEEHR_NAMESPACE }}"
-        PREFECT_LOGGING_EXTRA_LOGGERS: teehr,workflows.grid
+        PREFECT_LOGGING_EXTRA_LOGGERS: teehr
         # Start Local Only
         AWS_ACCESS_KEY_ID: "{{ $AWS_ACCESS_KEY_ID }}"
         AWS_SECRET_ACCESS_KEY: "{{ $AWS_SECRET_ACCESS_KEY }}"

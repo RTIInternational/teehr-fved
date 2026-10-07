@@ -4,7 +4,6 @@ Every step has a slot on a regular axis that starts at the source's ``time_origi
 their slots (region writes), so steps can be written in any order and rewritten (upsert). Slots
 not yet written hold no chunks. Per-step metadata coordinates record each slot's state.
 """
-import logging
 from typing import Literal
 
 import icechunk as ic
@@ -16,8 +15,6 @@ from icechunk.xarray import to_icechunk
 from virtualizarr.manifests import ChunkManifest, ManifestArray
 
 from workflows.utils.data_status import STATUS_ATTRS, STATUS_COORD, STATUS_MEANINGS
-
-logger = logging.getLogger("workflows.grid")
 
 UNWRITTEN = -1
 AUDIT_COORDS = ("created_at", "updated_at", "source_last_modified")
@@ -128,7 +125,6 @@ def ensure_axis(session: ic.Session, group: str, end: pd.Timestamp, time_step: p
     for name in AUDIT_COORDS:
         if name in g:
             g[name][old_n:] = _NAT_INT
-    logger.info(f"Extended {group} by {len(new)} slot(s) to {end}.")
     return len(new)
 
 
@@ -178,7 +174,6 @@ def create_group(
             one[name] = one[name].copy(data=np.full(one[name].shape, fill, one[name].dtype))
         to_icechunk(one, session, group=group, mode="a", encoding=encoding)
     ensure_axis(session, group, end, time_step, dim)
-    logger.info(f"Created {group} on a {time_step} grid from {time_origin} to {end}.")
 
 
 def with_step_metadata(
