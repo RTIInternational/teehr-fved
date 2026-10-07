@@ -169,7 +169,8 @@ class ISnobal(GriddedSource):
     def time_origin(self) -> pd.Timestamp:
         """Start of the domain's first water year in the bucket; domains start in different years."""
         listed = obstore.list_with_delimiter(self._store(), prefix=f"{self.prefix}/{self.domain}/")
-        years = sorted(int(m.group(1)) for p in listed["common_prefixes"] if (m := re.search(r"/wy(\d{4})/?$", p)))
+        matches = (re.search(r"/wy(\d{4})/?$", p) for p in listed["common_prefixes"])
+        years = sorted(int(m.group(1)) for m in matches if m)
         if not years:
             raise ValueError(f"No water years found for iSnobal domain '{self.domain}'.")
         return pd.Timestamp(f"{years[0] - 1}-10-01T23:00")

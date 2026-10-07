@@ -192,8 +192,10 @@ def _write_pyramid_batch(
             tg.create_group(rw_session, group, level_ds, origin, time_step, dim, axis_end, encoding=_pyramid_encoding(level_ds, args))
             logger.info(f"Created {group} on a {time_step} grid from {origin} to {axis_end}.")
             existing = tg.read_step_metadata(rw_session.store, group, dim)
-        elif added := tg.ensure_axis(rw_session, group, axis_end, time_step, dim):
-            logger.info(f"Extended {group} by {added} slot(s) to {axis_end}.")
+        else:
+            added = tg.ensure_axis(rw_session, group, axis_end, time_step, dim)
+            if added:
+                logger.info(f"Extended {group} by {added} slot(s) to {axis_end}.")
         level_ds = tg.with_step_metadata(
             level_ds,
             dim,

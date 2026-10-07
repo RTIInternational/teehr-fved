@@ -149,8 +149,10 @@ def write_references(
         tg.create_group(session, REFERENCES_GROUP_PATH, virtual_ds, origin, time_step, dim, end, virtual=True)
         logger.info(f"Created {REFERENCES_GROUP_PATH} on a {time_step} grid from {origin} to {end}.")
         stored = tg.read_step_metadata(session.store, REFERENCES_GROUP_PATH, dim)
-    elif added := tg.ensure_axis(session, REFERENCES_GROUP_PATH, end, time_step, dim):
-        logger.info(f"Extended {REFERENCES_GROUP_PATH} by {added} slot(s) to {end}.")
+    else:
+        added = tg.ensure_axis(session, REFERENCES_GROUP_PATH, end, time_step, dim)
+        if added:
+            logger.info(f"Extended {REFERENCES_GROUP_PATH} by {added} slot(s) to {end}.")
     ds = tg.with_step_metadata(
         virtual_ds,
         dim,
@@ -201,8 +203,10 @@ def materialize_references(repo: ic.Repository, args: IngestGriddedDataInput) ->
             tg.create_group(session, RAW_DATA_GROUP_PATH, refs, origin, time_step, dim, refs_meta.index[-1], encoding=encoding)
             logger.info(f"Created {RAW_DATA_GROUP_PATH} on a {time_step} grid from {origin} to {refs_meta.index[-1]}.")
             raw_meta = tg.read_step_metadata(session.store, RAW_DATA_GROUP_PATH, dim)
-        elif added := tg.ensure_axis(session, RAW_DATA_GROUP_PATH, refs_meta.index[-1], time_step, dim):
-            logger.info(f"Extended {RAW_DATA_GROUP_PATH} by {added} slot(s) to {refs_meta.index[-1]}.")
+        else:
+            added = tg.ensure_axis(session, RAW_DATA_GROUP_PATH, refs_meta.index[-1], time_step, dim)
+            if added:
+                logger.info(f"Extended {RAW_DATA_GROUP_PATH} by {added} slot(s) to {refs_meta.index[-1]}.")
         meta = refs_meta.loc[batch]
         part = tg.with_step_metadata(
             refs.sel({dim: batch}).load(),
