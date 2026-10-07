@@ -8,6 +8,9 @@ import pyspark.sql.functions as F
 from teehr import Evaluation
 
 from utils import grid_utils as gu
+from utils import time_grid as tg
+from workflows.utils.data_status import STATUS_COORD
+from workflows.utils.time_utils import to_naive_utc
 from workflows.utils.common_utils import initialize_evaluation
 from workflows.models.mean_areal_inputs import MeanArealValuesInput
 from pixel_coverage_weights import get_readonly_repo_store, write_dataframe_to_warehouse
@@ -94,6 +97,16 @@ def calculate_all_polygons(dataarray: xr.DataArray, weights_df, append_dim: str)
     return results
 
 
+def _written_steps(da: xr.DataArray, args: MeanArealValuesInput) -> xr.DataArray:
+    """Grid steps that hold data (time-grid slots not yet written are skipped), within start_dt..end_dt."""
+    dim = args.append_dim
+    if STATUS_COORD in da.coords:
+        da = da.isel({dim: da[STATUS_COORD].values != tg.UNWRITTEN})
+    start = to_naive_utc(args.start_dt) if args.start_dt is not None else None
+    end = to_naive_utc(args.end_dt) if args.end_dt is not None else None
+    return da.sel({dim: slice(start, end)})
+
+
 @task(cache_policy=NO_CACHE, timeout_seconds=60 * 10)
 def read_weights_from_warehouse(
     ev: Evaluation,
@@ -170,11 +183,12 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
         s3_storage_kwargs=args.s3_storage_kwargs
     )
 
-    grid_template_da = xr.open_zarr(
-        store,
-        group=gu.read_data_group(store),
-        decode_coords="all"
-    )[args.grid_variable_name]
+    grid_template_da = _written_steps(
+        xr.open_zarr(store, group=gu.read_data_group(store), decode_coords="all")[args.grid_variable_name], args
+    )
+    if grid_template_da.sizes[args.append_dim] == 0:
+        logger.info("No written grid steps in the requested window.")
+        return
 
     # Calculate mean areal values for each polygon at each timestep
     mean_areal_values_results = calculate_all_polygons(
@@ -202,6 +216,6 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
         ev=ev,
         dataframe=mean_areal_values_df,
         table_name=args.timeseries_table_name,
-        write_mode="append",
+        write_mode=args.write_mode,
     )
     logger.info("Mean areal values calculation flow completed.")

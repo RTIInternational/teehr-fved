@@ -1,33 +1,46 @@
 """Gridded data sources for the ingest_gridded_data Prefect flow, selected by their ``type``."""
 import os
+import re
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import date, datetime
 from typing import Annotated, ClassVar, Literal, Union
 
+import obstore
 import pandas as pd
+import requests
 import xarray as xr
+from obstore.store import from_url
 from prefect.blocks.system import Secret
 from pydantic import BaseModel, Field, field_validator
 from teehr.fetching.utils import REMOTE_RETRY_CONFIG
 
-from workflows.utils.data_status import STATUS_MEANINGS, with_status
+from workflows.utils.data_status import STATUS_COORD, STATUS_MEANINGS, with_status
+
+# Columns of a source listing, indexed by each file's timestamp
+LISTING_COLUMNS = ["url", STATUS_COORD, "last_modified"]
 
 
 class GriddedSource(BaseModel, ABC):
-    """A gridded source: its files and its IceChunk repository."""
+    """A gridded source: its files, its time grid, and its IceChunk repository."""
 
     source_bucket: ClassVar[str]
     # Source-specific obstore kwargs; deployment obstore_kwargs override them
     store_kwargs: ClassVar[dict] = {}
     # Options for the IceChunk virtual chunk container's object store, e.g. region
     virtual_store_kwargs: ClassVar[dict] = {}
+    time_step: ClassVar[pd.Timedelta]
 
     @abstractmethod
-    def build_file_list(self, start_dt: datetime, end_dt: datetime) -> list[str]: ...
+    def list_files(self, start_dt: datetime, end_dt: datetime) -> pd.DataFrame:
+        """Files published for the range, one per step: ``LISTING_COLUMNS`` indexed by time."""
+
+    @abstractmethod
+    def time_origin(self) -> pd.Timestamp:
+        """First step of the source's record; the repo's time grid starts here."""
 
     @abstractmethod
     def repository_name(self) -> str:
-        """IceChunk repository (configuration) name."""
+        """IceChunk repository (configuration) name; teehr-valid (letters, digits, underscores)."""
 
     @abstractmethod
     def ingest_variables(self) -> list[str]:
@@ -47,36 +60,58 @@ class GriddedSource(BaseModel, ABC):
         return ds
 
 
-def _water_year(dt: datetime) -> int:
+def _water_year(dt: date) -> int:
     """Water years start October 1."""
     return dt.year + 1 if dt.month >= 10 else dt.year
 
 
+def _listing(rows: list[dict]) -> pd.DataFrame:
+    df = pd.DataFrame(rows, columns=["time", *LISTING_COLUMNS])
+    return df.set_index(pd.DatetimeIndex(df.pop("time"), name="time")).sort_index()
+
+
 class UASwan4km(GriddedSource):
     type: Literal["ua-swann-4km"] = "ua-swann-4km"
-    # status controls which data variant to fetch: "stable", "provisional", or "early".
+    # Variants that may be used; each day takes the most final one published
     status: list[str] = ["stable", "provisional", "early"]
     variables: list[str] = ["SWE", "DEPTH"]
 
     source_bucket: ClassVar[str] = "https://climate.arizona.edu"
+    base_url: ClassVar[str] = "https://climate.arizona.edu/data/UA_SWE/DailyData_4km"
+    time_step: ClassVar[pd.Timedelta] = pd.Timedelta("1D")
+    # A listing row: file name, then its last-modified time (the server's local time; only compared with itself)
+    row_pattern: ClassVar[re.Pattern] = re.compile(
+        r'href="(UA_SWE_Depth_4km_v1_(\d{8})_(early|provisional|stable)\.nc)".*?(\d{4}-\d{2}-\d{2} \d{2}:\d{2})'
+    )
 
-    def build_file_list(self, start_dt: datetime, end_dt: datetime) -> list[str]:
-        """Build UA SWANN 4km daily SWE/depth file URLs for the given date range and status(es)."""
-        file_list = []
-        current = start_dt.date()
-        end = end_dt.date()
-        while current <= end:
-            wy = _water_year(current)
-            for s in self.status:
-                file_list.append(
-                    f"https://climate.arizona.edu/data/UA_SWE/DailyData_4km/"
-                    f"WY{wy}/UA_SWE_Depth_4km_v1_{current:%Y%m%d}_{s}.nc"
-                )
-            current += timedelta(days=1)
-        return file_list
+    def list_files(self, start_dt: datetime, end_dt: datetime) -> pd.DataFrame:
+        """One file per day in the range: the most final allowed variant in each water year's directory."""
+        start, end = start_dt.date(), end_dt.date()
+        best: dict[date, dict] = {}
+        for wy in range(_water_year(start), _water_year(end) + 1):
+            resp = requests.get(f"{self.base_url}/WY{wy}/", timeout=60)
+            if resp.status_code == 404:  # water year not published yet
+                continue
+            resp.raise_for_status()
+            for name, stamp, status, modified in self.row_pattern.findall(resp.text):
+                day = datetime.strptime(stamp, "%Y%m%d").date()
+                if status not in self.status or not start <= day <= end:
+                    continue
+                if day not in best or STATUS_MEANINGS.index(status) > STATUS_MEANINGS.index(best[day][STATUS_COORD]):
+                    best[day] = {
+                        "time": pd.Timestamp(day),
+                        "url": f"{self.base_url}/WY{wy}/{name}",
+                        STATUS_COORD: status,
+                        "last_modified": pd.Timestamp(modified),
+                    }
+        return _listing(list(best.values()))
+
+    def time_origin(self) -> pd.Timestamp:
+        # The archive starts with WY1982
+        return pd.Timestamp("1981-10-01T00:00")
 
     def repository_name(self) -> str:
-        return "ua-swann-4km"
+        return "ua_swann_4km"
 
     def ingest_variables(self) -> list[str]:
         return list(self.variables)
@@ -97,6 +132,7 @@ class ISnobal(GriddedSource):
     source_bucket: ClassVar[str] = "s3://m3w-transfer"
     store_kwargs: ClassVar[dict] = {"region": "us-west-2", "retry_config": REMOTE_RETRY_CONFIG}
     virtual_store_kwargs: ClassVar[dict] = {"region": "us-west-2"}
+    time_step: ClassVar[pd.Timedelta] = pd.Timedelta("1D")
     # Units per variable; only some files carry a units tag
     units: ClassVar[dict] = {"specific_mass": "kg m-2"}
 
@@ -107,13 +143,37 @@ class ISnobal(GriddedSource):
             raise ValueError(f"status must be one of {STATUS_MEANINGS}, got '{v}'")
         return v
 
-    def build_file_list(self, start_dt: datetime, end_dt: datetime) -> list[str]:
-        """Build one file URL per day, laid out as <domain>/wy<YYYY>/run<YYYYMMDD>/<variable>_<time>.tif."""
-        return [
-            f"{self.source_bucket}/{self.prefix}/{self.domain}/wy{_water_year(day)}/"
-            f"run{day:%Y%m%d}/{self.variable}_{day:%Y-%m-%d}T23:00:00.tif"
-            for day in pd.date_range(start_dt.date(), end_dt.date(), freq="D")
-        ]
+    def _store(self):
+        # A provider rather than keys: with keys, obstore adds any ambient AWS_SESSION_TOKEN to the request
+        creds = {**self.credentials(), "token": None, "expires_at": None}
+        return from_url(f"{self.source_bucket}/", **self.store_kwargs, credential_provider=lambda: creds)
+
+    def list_files(self, start_dt: datetime, end_dt: datetime) -> pd.DataFrame:
+        """Files laid out as <domain>/wy<YYYY>/run<YYYYMMDD>/<variable>_<time>.tif, listed per water year."""
+        start, end = start_dt.date(), end_dt.date()
+        pattern = re.compile(rf"/run\d{{8}}/{re.escape(self.variable)}_(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}})\.tif$")
+        store, rows = self._store(), []
+        for wy in range(_water_year(start), _water_year(end) + 1):
+            for batch in obstore.list(store, prefix=f"{self.prefix}/{self.domain}/wy{wy}/"):
+                for obj in batch:
+                    match = pattern.search(obj["path"])
+                    if match and start <= pd.Timestamp(match.group(1)).date() <= end:
+                        rows.append({
+                            "time": pd.Timestamp(match.group(1)),
+                            "url": f"{self.source_bucket}/{obj['path']}",
+                            STATUS_COORD: self.status,
+                            "last_modified": pd.Timestamp(obj["last_modified"]).tz_convert(None),
+                        })
+        return _listing(rows)
+
+    def time_origin(self) -> pd.Timestamp:
+        """Start of the domain's first water year in the bucket; domains start in different years."""
+        listed = obstore.list_with_delimiter(self._store(), prefix=f"{self.prefix}/{self.domain}/")
+        matches = (re.search(r"/wy(\d{4})/?$", p) for p in listed["common_prefixes"])
+        years = sorted(int(m.group(1)) for m in matches if m)
+        if not years:
+            raise ValueError(f"No water years found for iSnobal domain '{self.domain}'.")
+        return pd.Timestamp(f"{years[0] - 1}-10-01T23:00")
 
     def repository_name(self) -> str:
         return f"isnobal_{self.domain}"

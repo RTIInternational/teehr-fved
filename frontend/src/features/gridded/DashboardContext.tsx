@@ -1,7 +1,13 @@
 import { createContext, useContext, useReducer, type Dispatch } from 'react';
 
-import type { ClickedPoint, MapFilters, SelectedLocation } from '@/shared/types/gridded/maps';
+import type {
+  ClickedPoint,
+  MapFilters,
+  PointQuery,
+  SelectedLocation,
+} from '@/shared/types/gridded/maps';
 import type { PolygonFeatures } from '@/shared/types/gridded/tiles';
+import type { GriddedTimeseriesFilters } from '@/shared/types/gridded/timeseries';
 
 import type { GriddedTabName } from './Dashboard';
 
@@ -15,13 +21,26 @@ export type DashboardState = {
   polygonFeatures: PolygonFeatures;
   polygonClickLngLat: ClickedPoint | null;
   selectedLocation: SelectedLocation | null;
-  clickedPoint: ClickedPoint | null;
+  clickedPoint: PointQuery | null;
+  timeseriesFilters: GriddedTimeseriesFilters;
   mapLoaded: boolean;
   loading: boolean;
   error: string | null;
 };
 
 type UpdateMapFiltersPayload = Partial<MapFilters>;
+
+export const DEFAULT_TIMESERIES_FILTERS: GriddedTimeseriesFilters = {
+  datasets: [],
+  start_date: null,
+  end_date: null,
+};
+
+// Datasets in the point query: those checked, else the map's active dataset
+export const timeseriesDatasets = (
+  filters: GriddedTimeseriesFilters,
+  activeDataset: string | null
+) => (filters.datasets.length > 0 ? filters.datasets : activeDataset ? [activeDataset] : []);
 
 const initialState: DashboardState = {
   mapFilters: {
@@ -47,7 +66,10 @@ const initialState: DashboardState = {
   polygonClickLngLat: null, // { lon, lat } | null — where the polygons were picked
   selectedLocation: null, // { primary_location_id, name } | null — feature chosen for a warehouse query
 
-  clickedPoint: null, // { lon, lat } | null — last point clicked on the map
+  clickedPoint: null, // { lon, lat, time } | null — last point clicked on the map, with the map's date
+
+  // Datasets and time span for the point query on map click
+  timeseriesFilters: DEFAULT_TIMESERIES_FILTERS,
 
   mapLoaded: false,
   loading: false,
@@ -55,8 +77,8 @@ const initialState: DashboardState = {
 };
 
 export const ActionTypes = {
-  SET_TIMESTEPS: 'SET_TIMESTEPS',
   UPDATE_MAP_FILTERS: 'UPDATE_MAP_FILTERS',
+  UPDATE_TIMESERIES_FILTERS: 'UPDATE_TIMESERIES_FILTERS',
   TOGGLE_OVERLAY: 'TOGGLE_OVERLAY',
   SET_ACTIVE_POLYGON_LAYER: 'SET_ACTIVE_POLYGON_LAYER',
   SET_RIGHT_PANEL_TAB: 'SET_RIGHT_PANEL_TAB',
@@ -72,13 +94,17 @@ export const ActionTypes = {
 
 export type DashboardAction =
   | { type: typeof ActionTypes.UPDATE_MAP_FILTERS; payload: UpdateMapFiltersPayload }
+  | {
+      type: typeof ActionTypes.UPDATE_TIMESERIES_FILTERS;
+      payload: Partial<GriddedTimeseriesFilters>;
+    }
   | { type: typeof ActionTypes.TOGGLE_OVERLAY; payload: string }
   | { type: typeof ActionTypes.SET_ACTIVE_POLYGON_LAYER; payload: string | null }
   | { type: typeof ActionTypes.SET_RIGHT_PANEL_TAB; payload: GriddedTabName }
   | { type: typeof ActionTypes.SET_POLYGON_FEATURES; payload: PolygonFeaturesPayload }
   | { type: typeof ActionTypes.CLEAR_POLYGON_FEATURES }
   | { type: typeof ActionTypes.SELECT_LOCATION; payload: SelectedLocation }
-  | { type: typeof ActionTypes.SET_CLICKED_POINT; payload: ClickedPoint | null }
+  | { type: typeof ActionTypes.SET_CLICKED_POINT; payload: PointQuery | null }
   | { type: typeof ActionTypes.SET_MAP_LOADED; payload: boolean }
   | { type: typeof ActionTypes.SET_LOADING; payload: boolean }
   | { type: typeof ActionTypes.SET_ERROR; payload: string | null }
@@ -91,6 +117,15 @@ const reducer = (state: DashboardState, action: DashboardAction): DashboardState
         ...state,
         mapFilters: {
           ...state.mapFilters,
+          ...action.payload,
+        },
+      };
+
+    case ActionTypes.UPDATE_TIMESERIES_FILTERS:
+      return {
+        ...state,
+        timeseriesFilters: {
+          ...state.timeseriesFilters,
           ...action.payload,
         },
       };

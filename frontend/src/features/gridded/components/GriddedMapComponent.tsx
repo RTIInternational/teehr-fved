@@ -142,8 +142,11 @@ const GriddedMapComponent = () => {
         sources: {},
         layers: [],
       },
-      center: [-105.2, 41.48],
-      zoom: 4.6,
+      // Reclamation regions' extent
+      bounds: [
+        [-124.8, 25.8],
+        [-93.5, 49.0],
+      ],
       attributionControl: false,
       // Add the Bearer token to every tile request aimed at the xpublish-api.
       // transformRequest is synchronous — tokenRef is kept current by updateTileLayer.
@@ -476,7 +479,10 @@ const GriddedMapComponent = () => {
       // Otherwise, query the gridded data if available
       if (!dataset || !variable || !currentTimestep) return;
 
-      dispatch({ type: ActionTypes.SET_CLICKED_POINT, payload: { lon: lng, lat } });
+      dispatch({
+        type: ActionTypes.SET_CLICKED_POINT,
+        payload: { lon: lng, lat, time: currentTimestep },
+      });
 
       popupInstance
         .setLngLat([lng, lat])
