@@ -1,6 +1,8 @@
 import re
 import pandas as pd
 import requests
+from teehr.models.pandera_dataframe_schemas import primary_timeseries_schema
+from teehr.models.pandera_dataframe_schemas import secondary_timeseries_schema
 
 
 CBRFC_SEASONAL_WSUP_URL = "https://www.cbrfc.noaa.gov/wsup/graph/esptxt.py"
@@ -10,26 +12,11 @@ SEASONAL_WSUP_UNIT_NAME = "m^3"
 KAF_TO_CUBIC_METERS = 1000 * 1233.48184
 OBS_RAW_KEY = "Obs"
 
-SIM_SCHEMA_COLUMNS = [
-    "reference_time",
-    "value_time",
-    "value",
-    "variable_name",
-    "configuration_name",
-    "unit_name",
-    "location_id",
-    "member",
-]
-
-OBS_SCHEMA_COLUMNS = [
-    "reference_time",
-    "value_time",
-    "value",
-    "variable_name",
-    "configuration_name",
-    "unit_name",
-    "location_id",
-]
+sim_cols_raw = list(secondary_timeseries_schema(type="pandas").columns.keys())
+obs_cols_raw = list(primary_timeseries_schema(type="pandas").columns.keys())
+cols_to_remove = ['created_at', 'updated_at']
+SIM_SCHEMA_COLUMNS = [x for x in sim_cols_raw if x not in cols_to_remove]
+OBS_SCHEMA_COLUMNS = [x for x in obs_cols_raw if x not in cols_to_remove]
 
 RAW_KEYS_TO_TEEHR_VARIABLES = {
     "max": "max",
