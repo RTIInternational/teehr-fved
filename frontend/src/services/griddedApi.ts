@@ -10,8 +10,8 @@ import type { VariablesResponse } from '@/shared/types/gridded/variables';
 export const GRIDDED_API_BASE_URL =
   import.meta.env.VITE_XPUBLISH_API_BASE_URL || 'http://127.0.0.1:8001';
 
-// Per-dataset cap on time steps in one point query: about 25 years of daily steps
-export const MAX_TIMESERIES_POINTS = 25 * 365;
+// Per-dataset cap on time steps in one point query: about 20 years of daily steps
+export const MAX_TIMESERIES_POINTS = 20 * 365;
 
 type GriddedApiCall = {
   (path: string, options?: { raw: true }): Promise<string>;

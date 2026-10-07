@@ -7,6 +7,9 @@ import type { GriddedTimeseriesFilters } from '@/shared/types/gridded/timeseries
 import { timestepsQueryOptions } from './timesteps';
 import { variablesQueryOptions } from './variables';
 
+// Default span without dates: about 3 years of daily steps
+const DEFAULT_SPAN_STEPS = 3 * 365;
+
 type EdrTimeseriesArgs = GriddedTimeseriesFilters & {
   preferredVariable: string | null;
   lon?: number;
@@ -43,7 +46,7 @@ const planSeries = (
       return { variable, skipped: `${datasetId}: no data on or before ${anchor}` };
     return {
       variable,
-      start: upTo[Math.max(0, upTo.length - MAX_TIMESERIES_POINTS)],
+      start: upTo[Math.max(0, upTo.length - DEFAULT_SPAN_STEPS)],
       end: upTo[upTo.length - 1],
     };
   }
