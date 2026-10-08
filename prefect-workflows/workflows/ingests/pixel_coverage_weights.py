@@ -7,7 +7,6 @@ in the table.
 """
 import geopandas as gpd
 import icechunk as ic
-import numpy as np
 import pandas as pd
 import rioxarray  # noqa: F401
 import xarray as xr
@@ -166,18 +165,15 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
     )
     grid_ds = xr.open_zarr(store, group=gu.read_data_group(store), decode_coords="all", chunks=None)
     variable_name = args.grid_variable_name or next(iter(grid_ds.data_vars))
-    grid_template_da = grid_ds[variable_name].isel({args.append_dim: 0}).squeeze(drop=True)
+    grid_template_da = grid_ds[variable_name]
     missing_dims = {args.x_dim, args.y_dim} - set(grid_template_da.dims)
     if missing_dims:
         raise ValueError(
             f"Grid has no dimension(s) {sorted(missing_dims)}; set x_dim/y_dim. Dims: {grid_template_da.dims}"
         )
     # teehr requires x/y dims; positions are unchanged, so row/col still index the stored grid.
-    # Zero-filled so weights depend only on geometry: exactextract skips NaN cells.
-    # Loaded so exactextract's window reads don't re-read lazy coords from the store.
-    grid_template_da = grid_template_da.rename({args.x_dim: "x", args.y_dim: "y"}).copy(
-        data=np.zeros(grid_template_da.shape, dtype="float32")
-    ).load()
+    # teehr uses only the grid geometry, so the data isn't read.
+    grid_template_da = grid_template_da.rename({args.x_dim: "x", args.y_dim: "y"})
     logger.info(f"Using the '{variable_name}' grid as the template.")
 
     polygons_gdf = polygons_gdf.to_crs(grid_template_da.rio.crs)
