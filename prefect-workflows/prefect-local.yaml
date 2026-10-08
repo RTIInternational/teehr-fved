@@ -53,6 +53,8 @@ definitions:
         IN_CLUSTER: "{{ $IN_CLUSTER }}"
         ICECHUNK_BUCKET: "{{ $ICECHUNK_BUCKET }}"
         ICECHUNK_PREFIX: "{{ $ICECHUNK_PREFIX }}"
+        PMTILES_BUCKET: "{{ $PMTILES_BUCKET }}"
+        PMTILES_PREFIX: "{{ $PMTILES_PREFIX }}"
       node_selector:
         teehr-hub/nodegroup-name: spark-r5-4xlarge
       tolerations:
@@ -518,20 +520,33 @@ deployments:
   - name: ingest-ua-4km-grids
     version:
     tags: []
-    description: Ingest UA 4km SWE and DEPTH variables into an IceChunk S3 repository using VirtualiZarr
+    description: Ingest UA 4km SWE and DEPTH into an IceChunk S3 repository; upserts new, late and finalized days
     entrypoint: workflows/ingests/ingest_gridded_data.py:ingest_gridded_data
     parameters: {
       "args": {
-        "source_data_storage": "http",
-        "configuration_name": "ua-swann-4km",
+        "source": {"type": "ua-swann-4km"},
+        "fallback_source_crs": "EPSG:4269",
         "factors": [1],
-        "parser_type": "hdf",
-        "obstore_kwargs": {},
-        "xconcat_kwargs": {
-          "coords": "minimal",
-          "compat": "override",
-          "combine_attrs": "override"
-        }
+        "write_mode": "upsert",
+        "num_lookback_days": 30
+      }
+    }
+    work_pool: *work_pool
+
+  - name: ingest-isnobal
+    version:
+    tags: []
+    description: Ingest iSnobal SWE GeoTIFFs for one domain into an IceChunk S3 repository using VirtualiZarr
+    entrypoint: workflows/ingests/ingest_gridded_data.py:ingest_gridded_data
+    parameters: {
+      "args": {
+        "source": {"type": "isnobal", "domain": "boise"},
+        "parser_type": "tiff",
+        "x_dim": "x",
+        "y_dim": "y",
+        "factors": [1, 2],
+        "time_batch_size": 30,
+        "ignore_unreadable_file": false
       }
     }
     work_pool: *work_pool
@@ -544,8 +559,23 @@ deployments:
     entrypoint: workflows/ingests/build_geozarr_pyramids.py:build_pyramids
     parameters: {
       "args": {
-        "configuration_name": "ua-swann-4km",
+        "configuration_name": "ua_swann_4km",
         "factors": [1]
+      }
+    }
+    work_pool: *work_pool
+
+  # Create Vector Tiles
+  - name: create-vector-tiles
+    version:
+    tags: []
+    description: Create vector tiles from the locations table and upload to S3
+    entrypoint: workflows/data_management/create_vector_tiles.py:create_vector_tile_archive
+    parameters: {
+      "args": {
+        "temp_dir_path": *temp_dir_path,
+        "location_id_prefix": "cpnr",
+        "output_layer_name": "cpnr_basins"
       }
     }
     work_pool: *work_pool
@@ -612,6 +642,14 @@ deployments:
     tags: []
     description: Calculate configuration summary statistics and update the configuration summary table
     entrypoint: workflows/data_management/update_configurations_summary.py:update_configurations_summary_table
+    parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
+    work_pool: *work_pool
+
+  - name: update-queryable-combinations
+    version:
+    tags: []
+    description: Precompute distinct group_by combinations that back the API queryable values endpoint
+    entrypoint: workflows/data_management/update_queryable_combinations.py:update_queryable_combinations
     parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
     work_pool: *work_pool
 

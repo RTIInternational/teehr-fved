@@ -1,7 +1,16 @@
+import base64
+import contextvars
+import struct
+from typing import Callable
+
+import numpy as np
+import obstore
 import xarray as xr
 from obstore.store import from_url
 from obspec_utils.registry import ObjectStoreRegistry
-from virtualizarr import open_virtual_dataset, open_virtual_mfdataset
+from virtualizarr import open_virtual_dataset
+from virtualizarr.manifests import ManifestArray
+from zarr.core.metadata import ArrayV3Metadata
 import virtualizarr as vz
 import icechunk as ic
 from pyproj import CRS as PyprojCRS
@@ -10,9 +19,28 @@ import os
 
 from prefect import task, get_run_logger
 from prefect.cache_policies import NO_CACHE
+from teehr.utils.concurrency import resolve_budget, run_concurrent_map
+
+# Store kwargs whose values are kept out of logs
+_SECRET_KWARGS = {"access_key_id", "secret_access_key", "session_token", "service_account_key", "bearer_token"}
+
+# Object store config for each virtual chunk container URL scheme
+_VIRTUAL_STORES = {
+    "http": ic.storage.http_store,
+    "https": ic.storage.http_store,
+    "s3": ic.storage.s3_store,
+    "gs": ic.storage.gcs_store,
+    "gcs": ic.storage.gcs_store,
+}
+
+# Root-group attribute naming the group that holds a repo's full-resolution data
+DATA_GROUP_ATTR = "data_group"
+_DEFAULT_DATA_GROUP = "/raw_data"
+
+# GeoTIFF geokey value for a user-defined CRS, i.e. one without an EPSG code
+_GEOTIFF_USER_DEFINED = 32767
 
 
-@task(cache_policy=NO_CACHE)
 def create_objectstore_registry(bucket: str, **kwargs) -> ObjectStoreRegistry:
     """Create an ObjectStoreRegistry for a given bucket.
 
@@ -26,14 +54,15 @@ def create_objectstore_registry(bucket: str, **kwargs) -> ObjectStoreRegistry:
     """
     logger = get_run_logger()
     bucket_key = bucket if bucket.endswith("/") else f"{bucket}/"
-    logger.info(f"Creating ObjectStoreRegistry for bucket: {bucket_key} and kwargs: {kwargs}")
+    logged = {k: "<redacted>" if k in _SECRET_KWARGS else v for k, v in kwargs.items()}
+    logger.info(f"Creating ObjectStoreRegistry for bucket: {bucket_key} and kwargs: {logged}")
     store = from_url(bucket_key, **kwargs)
     registry = ObjectStoreRegistry({bucket_key: store})
     return registry
 
 
 def build_icechunk_s3_storage(bucket: str, prefix: str, **kwargs) -> ic.storage.Storage:
-    """Build an IceChunk S3 storage object, injecting MinIO connection options from the environment when present.
+    """Build an IceChunk S3 storage object, injecting local S3 connection options from the environment when present.
 
     Parameters
     ----------
@@ -46,7 +75,7 @@ def build_icechunk_s3_storage(bucket: str, prefix: str, **kwargs) -> ic.storage.
         not provided and ``REMOTE_CATALOG_S3_ENDPOINT`` is set, that value is used along
         with ``allow_http=True`` and ``force_path_style=True``.
     """
-    # Inject MinIO endpoint from env when not explicitly provided
+    # Inject the local S3 endpoint from env when not explicitly provided
     endpoint = os.environ.get("REMOTE_CATALOG_S3_ENDPOINT")
     if "endpoint_url" not in kwargs and endpoint:
         kwargs.setdefault("endpoint_url", endpoint)
@@ -77,12 +106,21 @@ def _resolve_virtual_chunk_credentials(
     return None
 
 
+def _virtual_chunk_store(url_prefix: str, **kwargs) -> ic.storage.ObjectStoreConfig:
+    """Return the object store config for a virtual chunk container, from the URL scheme."""
+    scheme = url_prefix.split("://", 1)[0]
+    if scheme not in _VIRTUAL_STORES:
+        raise ValueError(f"Unsupported source URL scheme '{scheme}' in {url_prefix}")
+    return _VIRTUAL_STORES[scheme](**kwargs)
+
+
 @task(cache_policy=NO_CACHE)
 def configure_icechunk_s3_repo(
     source_bucket: str,
     dest_bucket: str,
     prefix: str,
-    virtual_store: ic.storage.ObjectStoreConfig,
+    vc_credentials_kwargs: dict | None = None,
+    vc_store_kwargs: dict | None = None,
     **kwargs
 ) -> ic.repository.Repository:
     """Configure an IceChunk S3 repository with a virtual chunk container.
@@ -97,8 +135,11 @@ def configure_icechunk_s3_repo(
         The destination S3 bucket for the IceChunk repository (e.g., "warehouse").
     prefix : str
         The prefix within the destination bucket where the data is stored.
-    virtual_store : ic.storage.ObjectStoreConfig
-        The virtual store configuration to use.
+    vc_credentials_kwargs : dict, optional
+        Credentials for reading the source (e.g., access_key_id, secret_access_key). Anonymous if empty.
+        Given only when opening the repository; never saved in its config.
+    vc_store_kwargs : dict, optional
+        Options for the source's object store config (e.g., region).
     **kwargs : dict
         Additional keyword arguments to pass to the s3_storage function.
     """
@@ -122,10 +163,10 @@ def configure_icechunk_s3_repo(
     url_prefix = source_bucket if source_bucket.endswith("/") else f"{source_bucket}/"
     container = ic.virtual.VirtualChunkContainer(
         url_prefix=url_prefix,
-        store=virtual_store
+        store=_virtual_chunk_store(url_prefix, **(vc_store_kwargs or {}))
     )
     config.set_virtual_chunk_container(container)
-    vc_credentials = _resolve_virtual_chunk_credentials(url_prefix)
+    vc_credentials = _resolve_virtual_chunk_credentials(url_prefix, vc_credentials_kwargs or {"anonymous": True})
 
     if ic.Repository.exists(storage):
         logger.info(f"Existing IceChunk repository found at bucket: {dest_bucket}, prefix: {prefix}. Opening repository.")
@@ -146,26 +187,71 @@ def configure_icechunk_s3_repo(
     return repo
 
 
+def write_data_group(store: ic.IcechunkStore, group_path: str) -> bool:
+    """Record ``group_path`` as the repo's data group, for readers; True if that changed it."""
+    root = zarr.open_group(store, mode="a", zarr_format=3)
+    if root.attrs.get(DATA_GROUP_ATTR) == group_path:
+        return False
+    root.attrs[DATA_GROUP_ATTR] = group_path
+    return True
+
+
+def read_data_group(store: ic.IcechunkStore) -> str:
+    """The repo's data group: ``/references`` or ``/raw_data`` (repos built before it was recorded)."""
+    try:
+        attrs = zarr.open_group(store, mode="r", zarr_format=3).attrs
+    except (zarr.errors.GroupNotFoundError, FileNotFoundError):
+        return _DEFAULT_DATA_GROUP
+    return attrs.get(DATA_GROUP_ATTR, _DEFAULT_DATA_GROUP)
+
+
+def open_repo_for_reading(storage: ic.storage.Storage, vc_credentials_kwargs: dict | None = None) -> ic.Repository:
+    """Open a repo with read access to its virtual chunk containers, anonymous unless credentials are given."""
+    config = ic.Repository.fetch_config(storage)
+    containers = config.virtual_chunk_containers if config else {}
+    authorize = {
+        prefix: _resolve_virtual_chunk_credentials(prefix, vc_credentials_kwargs or {"anonymous": True})
+        for prefix in (containers or {})
+    }
+    return ic.Repository.open(storage, authorize_virtual_chunk_access=authorize)
+
+
+def _is_missing(registry: ObjectStoreRegistry, url: str) -> bool:
+    """True only if the store confirms the object doesn't exist."""
+    store, path = registry.resolve(url)
+    try:
+        obstore.head(store, path)
+    except FileNotFoundError:
+        return True
+    except Exception:
+        return False
+    return False
+
+
 def _open_virtual_safe(
     url: str,
     registry: ObjectStoreRegistry,
     parser: vz.parsers,
     ignore_missing_file: bool,
+    ignore_unreadable_file: bool = True,
+    preprocess: Callable[[xr.Dataset, str], xr.Dataset] | None = None,
 ) -> xr.Dataset | None:
     """Open a virtual dataset safely, handling missing or unreadable files."""
     logger = get_run_logger()
     try:
-        return open_virtual_dataset(url, registry=registry, parser=parser)
-    except FileNotFoundError:
-        if not ignore_missing_file:
-            raise
-        logger.warning(f"Missing file skipped: {url}")
-        return None
+        ds = open_virtual_dataset(url, registry=registry, parser=parser)
     except Exception as e:
-        if not ignore_missing_file:
+        # Some parsers (e.g. VirtualTIFF) wrap a missing object in their own error, so ask the store
+        if isinstance(e, FileNotFoundError) or _is_missing(registry, url):
+            if not ignore_missing_file:
+                raise
+            logger.warning(f"Missing file skipped: {url}")
+            return None
+        if not ignore_unreadable_file:
             raise
         logger.warning(f"Corrupt or unreadable file skipped: {url} ({e})")
         return None
+    return preprocess(ds, url) if preprocess else ds
 
 
 @task(cache_policy=NO_CACHE)
@@ -175,6 +261,8 @@ def create_virtual_xarray_dataset(
     parser: vz.parsers,
     concat_dim: str,
     ignore_missing_file: bool = True,
+    ignore_unreadable_file: bool = True,
+    preprocess: Callable[[xr.Dataset, str], xr.Dataset] | None = None,
     **kwargs
 ) -> xr.Dataset:
     """Create a virtual xarray dataset from a list of files.
@@ -190,18 +278,27 @@ def create_virtual_xarray_dataset(
     concat_dim : str
         The dimension along which to concatenate the datasets.
     ignore_missing_file : bool, optional
-        Whether to ignore missing or unreadable files. Default is True.
+        Whether to skip files that don't exist. Default is True.
+    ignore_unreadable_file : bool, optional
+        Whether to skip files that exist but can't be opened, including after a network error.
+        Default is True; with False, such a file fails the run before anything is written.
+    preprocess : Callable[[xr.Dataset, str], xr.Dataset], optional
+        Applied to each file's virtual dataset, with its URL, before concatenation.
     **kwargs : dict
         Additional keyword arguments to pass to xr.concat.
     """
     logger = get_run_logger()
-    virtual_datasets = [
-        ds for ds in (
-            _open_virtual_safe(url, registry, parser, ignore_missing_file)
-            for url in file_list
-        )
-        if ds is not None
-    ]
+    # Opening is network-bound, so size the threads by the io budget; each carries the
+    # Prefect run context, which get_run_logger needs and worker threads don't inherit
+    ctx = contextvars.copy_context()
+    opened = run_concurrent_map(
+        lambda url: ctx.copy().run(
+            _open_virtual_safe, url, registry, parser, ignore_missing_file, ignore_unreadable_file, preprocess
+        ),
+        file_list,
+        max_workers=resolve_budget().io,
+    )
+    virtual_datasets = [ds for ds in opened if ds is not None]
     if len(virtual_datasets) == 0:
         raise ValueError("No virtual datasets were created. Check the file list and registry of the source data.")
     logger.info(f"Found {len(virtual_datasets)} virtual datasets from {len(file_list)} files.")
@@ -210,48 +307,75 @@ def create_virtual_xarray_dataset(
         dim=concat_dim,
         **kwargs
     )
-    # # TODO: open_mfdataset()?
-    # virtual_ds = open_virtual_mfdataset(
-    #     file_list,
-    #     registry=registry,
-    #     parser=parser,
-    #     concat_dim=concat_dim,
-    #     **kwargs
-    # )
     return virtual_ds
 
 
-@task(cache_policy=NO_CACHE)
-def rechunk_dataset(
-    dataset: xr.Dataset,
-    append_dim: str,
-    chunk_size: int,
-) -> xr.Dataset:
-    """Re-chunk an xarray dataset prior to writing to IceChunk.
+def align_virtual_fill_values(virtual_ds: xr.Dataset) -> xr.Dataset:
+    """Set each virtual data variable's zarr fill_value to its CF _FillValue.
 
-    The append dimension (e.g. time) is chunked to 1 so that individual
-    time-steps can be appended independently.  All other dimensions are
-    chunked to ``chunk_size``.
-
-    Parameters
-    ----------
-    dataset : xr.Dataset
-        The dataset to re-chunk.
-    append_dim : str
-        The dimension used for appending (chunked to 1).
-    chunk_size : int
-        Chunk size applied to every dimension other than ``append_dim``.
+    VirtualiZarr's HDF parser carries HDF5's storage fill (e.g. 0) into fill_value while the
+    CF attribute holds the real missing marker (e.g. -999999), so chunks absent from the
+    manifest would read as valid data. Mirrors teehr's ``_fix_fill_values`` for kerchunk refs.
     """
-    chunks = {d: (1 if d == append_dim else chunk_size) for d in dataset.dims}
-    return dataset.chunk(chunks)
+    virtual_ds = virtual_ds.copy()
+    for name, var in virtual_ds.data_vars.items():
+        if not isinstance(var.data, ManifestArray) or var.dtype.kind not in "fiu":
+            continue
+        cf_fill = var.attrs.get("_FillValue", var.attrs.get("missing_value"))
+        if cf_fill is None:
+            continue
+        if isinstance(cf_fill, str):  # float fill attrs are base64-encoded little-endian doubles
+            cf_fill = struct.unpack("<d", base64.b64decode(cf_fill))[0]
+        metadata = var.data.metadata.to_dict()
+        metadata["fill_value"] = cf_fill
+        virtual_ds[name] = var.copy(data=ManifestArray(
+            metadata=ArrayV3Metadata.from_dict(metadata),
+            chunkmanifest=var.data.manifest,
+        ))
+    return virtual_ds
 
 
-@task(cache_policy=NO_CACHE)
+def assign_geotiff_coords(ds: xr.Dataset, fallback_crs: str | None = None) -> xr.Dataset:
+    """Add x/y pixel-centre coords, the CRS, and units from the GeoTIFF tags VirtualTIFF keeps as attrs.
+
+    Assumes a north-up grid (no rotation) with a single tiepoint. ``fallback_crs`` is used, with a
+    warning, when the file's CRS has no EPSG code; without one, such a file raises.
+    """
+    logger = get_run_logger()
+    attrs = next(ds[v].attrs for v in ds.data_vars if {"x", "y"} <= set(ds[v].dims))
+    _, _, _, x0, y0, _ = attrs["model_tiepoint"]
+    dx, dy, _ = attrs["model_pixel_scale"]
+    # PixelIsPoint (raster_type 2) tiepoints are already pixel centres
+    half = 0.0 if attrs.get("raster_type") == 2 else 0.5
+    ds = ds.assign_coords(
+        x=x0 + (np.arange(ds.sizes["x"]) + half) * dx,
+        y=y0 - (np.arange(ds.sizes["y"]) + half) * dy,
+    )
+    # model_type 2 is geographic; a projected CRS may also carry its base geographic code
+    epsg = attrs.get("geographic_type" if attrs.get("model_type") == 2 else "projected_type")
+    if epsg not in (None, _GEOTIFF_USER_DEFINED):
+        ds = ds.rio.write_crs(f"EPSG:{epsg}")
+    elif fallback_crs is not None:
+        logger.warning(
+            f"GeoTIFF CRS has no EPSG code ({attrs.get('citation')!r}); applying fallback_source_crs {fallback_crs}."
+        )
+        ds = ds.rio.write_crs(fallback_crs)
+    else:
+        raise ValueError(
+            f"GeoTIFF CRS has no EPSG code ({attrs.get('citation')!r}) and no fallback_source_crs was provided."
+        )
+    for var in ds.data_vars:
+        if "UNITTYPE" in ds[var].attrs:
+            ds[var].attrs.setdefault("units", ds[var].attrs["UNITTYPE"])
+    return ds
+
+
 def create_encoding_config(
     dataset: xr.Dataset,
     append_dim: str,
     chunk_size: int = 512,
     num_shard_chunks: int = 30,
+    time_chunk_size: int = 1,
     compression: str = "zstd",
     compression_level: int = 3,
     shuffle: str = "shuffle",
@@ -261,18 +385,25 @@ def create_encoding_config(
     Data variables receive chunk/shard/compression encoding.  Non-dimension
     coordinates (e.g. ``spatial_ref`` / CRS grids) are written unchunked.
 
+    Datasets are written numpy-backed (no dask), so this encoding is the only
+    thing that determines the on-disk chunk layout — there is no separate
+    re-chunking step to keep in sync.  Note it applies only on the initial
+    write; appends reuse the existing array metadata.
+
     Parameters
     ----------
     dataset : xr.Dataset
         The dataset to create encoding for.
     append_dim : str
         The dimension used for appending (e.g. "time").  Inner chunks along
-        this dimension are set to 1; shards pack ``num_shard_chunks`` of them.
+        this dimension hold ``time_chunk_size`` steps; shards pack ``num_shard_chunks`` of them.
     chunk_size : int
-        Inner chunk size for all non-append dimensions (default 512).
+        Inner chunk size for all non-append (spatial) dimensions (default 512).
     num_shard_chunks : int
         Number of inner chunks to group into a single shard along ``append_dim``
         (default 30).
+    time_chunk_size : int
+        Steps per inner chunk along ``append_dim`` (default 1).
     compression : str
         Compression algorithm to use (default "zstd").
     compression_level : int
@@ -283,8 +414,8 @@ def create_encoding_config(
     encoding_config = {}
     for var in dataset.data_vars:
         dims = dataset[var].dims
-        chunks = tuple(1 if d == append_dim else chunk_size for d in dims)
-        shards = tuple(num_shard_chunks if d == append_dim else chunk_size for d in dims)
+        chunks = tuple(time_chunk_size if d == append_dim else chunk_size for d in dims)
+        shards = tuple(time_chunk_size * num_shard_chunks if d == append_dim else chunk_size for d in dims)
         encoding_config[var] = {
             "chunks": chunks,
             "shards": shards,
@@ -305,13 +436,12 @@ def create_encoding_config(
     return encoding_config
 
 
-@task(cache_policy=NO_CACHE)
 def reproject_dataset(
     dataset: xr.Dataset,
     target_crs: str,
     x_dim: str,
     y_dim: str,
-    source_crs: str | None = None
+    fallback_crs: str | None = None
 ) -> xr.Dataset:
     """Reproject an xarray dataset to a target CRS.
 
@@ -325,8 +455,8 @@ def reproject_dataset(
         The name of the x dimension.
     y_dim : str
         The name of the y dimension.
-    source_crs : str | None
-        The source CRS to use if the dataset does not have one defined.
+    fallback_crs : str | None
+        CRS applied, with a warning, only if the dataset has none. Without either, this raises.
     """
     logger = get_run_logger()
     logger.info(
@@ -334,8 +464,10 @@ def reproject_dataset(
     )
     dataset = dataset.rio.set_spatial_dims(x_dim=x_dim, y_dim=y_dim)
     if dataset.rio.crs is None:
-        logger.info(f"No CRS found in the source dataset. Assigning: {source_crs}.")
-        dataset = dataset.rio.write_crs(source_crs)
+        if fallback_crs is None:
+            raise ValueError("Dataset has no CRS and no fallback_source_crs was provided.")
+        logger.warning(f"No CRS found in the dataset; applying fallback_source_crs {fallback_crs}.")
+        dataset = dataset.rio.write_crs(fallback_crs)
     else:
         logger.info(f"Source dataset has a CRS defined: {dataset.rio.crs}.")
         dataset = dataset.rio.write_crs(dataset.rio.crs)
@@ -344,10 +476,9 @@ def reproject_dataset(
     return ds_mercator
 
 
-@task(cache_policy=NO_CACHE)
 def standardize_and_inject_geozarr(
     ds: xr.Dataset,
-    source_crs: str | None = None,
+    fallback_crs: str | None = None,
     x_dim: str | None = None,
     y_dim: str | None = None,
     variable_and_unit_mapper: dict | None = None
@@ -382,12 +513,10 @@ def standardize_and_inject_geozarr(
     # --- Resolve CRS ---
     crs_obj = ds.rio.crs
     if crs_obj is None:
-        if source_crs is None:
-            raise ValueError(
-                "Dataset has no CRS and no source_crs fallback was provided."
-            )
-        logger.info(f"No CRS found; applying fallback: {source_crs}.")
-        ds = ds.rio.write_crs(source_crs)
+        if fallback_crs is None:
+            raise ValueError("Dataset has no CRS and no fallback_source_crs was provided.")
+        logger.warning(f"No CRS found in the source data; applying fallback_source_crs {fallback_crs}.")
+        ds = ds.rio.write_crs(fallback_crs)
         crs_obj = ds.rio.crs
 
     wkt_string = crs_obj.to_wkt()
@@ -431,6 +560,12 @@ def standardize_and_inject_geozarr(
             "standard_name", "latitude" if is_geographic else "projection_y_coordinate"
         )
 
+    # --- Time coordinate attrs; cf_xarray (e.g. xpublish-edr) finds the T axis by them ---
+    for name in ds.dims:
+        if name in ds.coords and np.issubdtype(ds[name].dtype, np.datetime64):
+            ds[name].attrs.setdefault("standard_name", "time")
+            ds[name].attrs.setdefault("axis", "T")
+
     # --- Dataset-level attrs ---
     conventions = ds.attrs.get("Conventions")
     if conventions is None:
@@ -454,103 +589,39 @@ def standardize_and_inject_geozarr(
                 new_var_name = variable_and_unit_mapper["variable_name"].get(var_name, {}).get("name", var_name)
                 new_long_name = variable_and_unit_mapper["variable_name"].get(var_name, {}).get("long_name", var_name)
                 ds[var_name].attrs["long_name"] = new_long_name
+                ds[var_name].attrs.setdefault("source_name", var_name)
                 unit_name = ds[var_name].attrs.get("units")
                 if unit_name:
                     new_unit_name = variable_and_unit_mapper["unit_name"].get(unit_name, {}).get("name", unit_name)
+                    if new_unit_name != unit_name:
+                        ds[var_name].attrs.setdefault("source_units", unit_name)
                     ds[var_name].attrs["units"] = new_unit_name
                 ds = ds.rename({var_name: new_var_name})
 
     return ds
 
 
-@task(cache_policy=NO_CACHE)
-def filter_for_new_data(
-    incoming_ds: xr.Dataset,
-    existing_ds: xr.Dataset,
-    append_dim: str,
-) -> xr.Dataset | None:
-    """Filter out duplicate time steps from an incoming dataset based on an existing dataset.
+def restore_grid_mapping_attrs(ds: xr.Dataset) -> xr.Dataset:
+    """Move each variable's ``grid_mapping`` from encoding back to attrs.
 
-    Parameters
-    ----------
-    incoming_ds : xr.Dataset
-        The incoming dataset to filter.
-    existing_ds : xr.Dataset
-        The existing dataset to compare against.
-    append_dim : str
-        The dimension used for appending (e.g. "time").
-
-    Returns
-    -------
-    xr.Dataset | None
-        A filtered dataset containing only new time steps, or None if no new data is found.
+    Opening with ``decode_coords="all"`` moves it into encoding, which an explicit write encoding
+    replaces, so a copy would lose its link to the CRS coordinate.
     """
-    logger = get_run_logger()
-    if append_dim not in incoming_ds.dims:
-        raise ValueError(f"Append dimension '{append_dim}' not found in incoming dataset.")
-    if append_dim not in existing_ds.dims:
-        raise ValueError(f"Append dimension '{append_dim}' not found in existing dataset.")
-
-    incoming_steps = set(incoming_ds[append_dim].values)
-    existing_steps = set(existing_ds[append_dim].values)
-    new_steps = incoming_steps - existing_steps
-
-    if not new_steps:
-        logger.info("No new data steps found; all incoming steps already exist.")
-        return None
-
-    ds_filtered = incoming_ds.sel({append_dim: sorted(new_steps)})
-    logger.info(f"Filtered dataset to {len(ds_filtered[append_dim])} new steps along '{append_dim}'.")
-    return ds_filtered
+    for var in ds.data_vars:
+        if "grid_mapping" in ds[var].encoding:
+            ds[var].attrs["grid_mapping"] = ds[var].encoding.pop("grid_mapping")
+    return ds
 
 
-
-@task(cache_policy=NO_CACHE)
-def group_contains_data(
-    store: ic.storage.ObjectStoreConfig,
-    group_path: str,
-    sub_group_name: str = None
-) -> bool:
-    """Check if a group in the IceChunk repository contains any data.
-
-    Parameters
-    ----------
-    store : ic.storage.ObjectStoreConfig
-        The IceChunk storage configuration.
-    group_path : str
-        The group path in the IceChunk repository to check.
-    sub_group_name : str, optional
-        If provided, checks for data in a sub-group of the specified group path.
-        
-    Returns
-    ------- 
-    bool
-        True if the group contains data, False otherwise.
-    """
-    logger = get_run_logger()
-    group_path = group_path.removeprefix("/")
+def group_contains_data(store: ic.IcechunkStore, group_path: str) -> bool:
+    """Return True if the group at ``group_path`` (e.g. "/pyramids/0") exists and holds arrays."""
     try:
-        existing_store = zarr.open_group(store, mode="r", zarr_format=3)
-    except Exception:
-        logger.info("Unable to open IceChunk store; treating as empty.")
+        group = zarr.open_group(store, path=group_path.strip("/"), mode="r", zarr_format=3)
+    except (zarr.errors.GroupNotFoundError, FileNotFoundError):
         return False
-    if group_path not in list(existing_store.group_keys()):
-        logger.info(f"Group {group_path} does not exist in the IceChunk repository.")
-        return False
-    if sub_group_name is not None:
-        if sub_group_name not in list(existing_store[group_path].group_keys()):
-            logger.info(f"Sub-group {sub_group_name} does not exist in {group_path}.")
-            return False
-        group_path = f"{group_path}/{sub_group_name}"
-    if len(list(existing_store[group_path].array_keys())) > 0:
-        logger.info(f"Group {group_path} exists and contains data.")
-        return True
-    else:
-        logger.info(f"Group {group_path} exists but contains no data.")
-        return False
+    return any(True for _ in group.array_keys())
 
 
-@task(cache_policy=NO_CACHE)
 def open_zarr_group(
     store: ic.storage.ObjectStoreConfig,
     group_path: str,
