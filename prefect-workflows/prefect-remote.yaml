@@ -329,5 +329,5 @@ deployments:
     parameters:
       script_path: 'C:\FVED\teehr-fved\riverware\run_pipeline.py'
       model_dir: 'C:\FVED\Models\CRMMS-ESP\CRMMS_July2026'
-      configuration_name: crmms_esp_july2026
+      configuration_name: crmms_esp
     work_pool: *work_pool
