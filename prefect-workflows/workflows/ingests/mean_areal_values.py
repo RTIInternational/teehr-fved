@@ -96,8 +96,7 @@ def compute_batch_group(batches: list[pd.DatetimeIndex], workers: int, batch_kwa
 def read_weights_from_warehouse(
     ev: Evaluation,
     location_id_prefix: str,
-    configuration_name: str,
-    domain_name: str
+    grid_name: str
 ) -> pd.DataFrame:
     """Get the pixel coverage weights of the locations on this grid from the warehouse."""
     logger = get_run_logger()
@@ -105,8 +104,7 @@ def read_weights_from_warehouse(
         ev.table(WEIGHTS_TABLE_NAME)
         .filter([
             {"column": "location_id", "operator": "like", "value": f"{location_id_prefix}-%"},
-            {"column": "configuration_name", "operator": "=", "value": configuration_name},
-            {"column": "domain_name", "operator": "=", "value": domain_name},
+            {"column": "grid_name", "operator": "=", "value": grid_name},
         ])
         .to_sdf()
         .select("fraction_covered", "location_id", "row", "col")
@@ -115,8 +113,8 @@ def read_weights_from_warehouse(
     logger.info(f"Retrieved {len(df)} rows of pixel coverage weights from the warehouse table.")
     if len(df) == 0:
         raise ValueError(
-            f"No pixel coverage weights were found for configuration '{configuration_name}', domain "
-            f"'{domain_name}' and location prefix '{location_id_prefix}'."
+            f"No pixel coverage weights were found for grid '{grid_name}' and location prefix "
+            f"'{location_id_prefix}'."
         )
     return df
 
@@ -180,8 +178,7 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
     weights_df = read_weights_from_warehouse(
         ev=ev,
         location_id_prefix=args.location_id_prefix,
-        configuration_name=args.configuration_name,
-        domain_name=args.domain_name
+        grid_name=args.grid_name
     )
 
     store = get_readonly_repo_store(

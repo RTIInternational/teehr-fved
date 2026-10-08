@@ -1,8 +1,8 @@
 """Calculate pixel coverage weights of location polygons on an Icechunk grid.
 
-Weights are written to the warehouse keyed by location and pixel. They are valid only
-for the grid of their configuration_name/domain_name and are shared by every variable
-on that grid. A MERGE never deletes, so pixels a re-drawn polygon no longer covers stay
+Weights are written to the warehouse keyed by location, pixel and grid_name, the grid they
+index (CRS, pixel size, extent). They are shared by every variable and configuration on
+that grid. A MERGE never deletes, so pixels a re-drawn polygon no longer covers stay
 in the table.
 """
 import geopandas as gpd
@@ -22,7 +22,7 @@ from workflows.utils.common_utils import initialize_evaluation
 from workflows.models.mean_areal_inputs import PixelCoverageWeightsInput
 
 WEIGHTS_TABLE_NAME = "grid_pixel_coverage_weights"
-WEIGHTS_UNIQUENESS_FIELDS = ["location_id", "row", "col", "configuration_name", "domain_name"]
+WEIGHTS_UNIQUENESS_FIELDS = ["location_id", "row", "col", "grid_name"]
 # Equal-area CRS for comparing polygon areas
 EQUAL_AREA_CRS = "EPSG:6933"
 
@@ -79,11 +79,11 @@ def write_dataframe_to_warehouse(
 def format_weights_df(
     weights_df: pd.DataFrame,
     configuration_name: str,
-    domain_name: str
+    grid_name: str
 ) -> pd.DataFrame:
     """Format teehr's weights to the warehouse table schema.
 
-    ``row``/``col`` index the full stored grid, identified by configuration_name/domain_name.
+    ``row``/``col`` index the full stored grid named ``grid_name``.
     """
     logger = get_run_logger()
     if weights_df.empty:
@@ -96,7 +96,7 @@ def format_weights_df(
             f"{weights_df.loc[duplicated, 'location_id'].unique()[:5].tolist()}. Check for duplicate location ids."
         )
     weights_df["configuration_name"] = configuration_name
-    weights_df["domain_name"] = domain_name
+    weights_df["grid_name"] = grid_name
     weights_df["row"] = weights_df["row"].astype(int)
     weights_df["col"] = weights_df["col"].astype(int)
     weights_df["fraction_covered"] = weights_df["fraction_covered"].astype("float32")
@@ -196,7 +196,7 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
     weights_df = format_weights_df(
         weights_df=weights_df,
         configuration_name=args.configuration_name,
-        domain_name=args.domain_name
+        grid_name=args.grid_name
     )
 
     write_dataframe_to_warehouse(

@@ -27,7 +27,7 @@ TIMES = pd.date_range("2000-01-01", periods=6, freq="D")
 def _args(**kwargs):
     return MeanArealValuesInput(
         configuration_name="c", temp_dir_path="/tmp", location_id_prefix="p", grid_variable_name="v",
-        domain_name="d", dest_bucket="b", base_prefix="p", **kwargs,
+        dest_bucket="b", base_prefix="p", **kwargs,
     )
 
 
@@ -52,6 +52,11 @@ def test_repo_without_status_keeps_all_steps():
 
 def test_defaults_to_upsert():
     assert _args().write_mode == "upsert"
+
+
+def test_grid_name_defaults_to_configuration_name():
+    assert _args().grid_name == "c"
+    assert _args(grid_name="g").grid_name == "g"
 
 
 def _lat_lon_grid(values, crs="EPSG:4326"):

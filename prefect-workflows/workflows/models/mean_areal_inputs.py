@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Literal, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from workflows.models.ingest_gridded_data_input import BaseGriddedDataInput
 
@@ -25,9 +25,12 @@ class PixelCoverageWeightsInput(BaseGriddedDataInput):
             "variable on the grid"
         )
     )
-    domain_name: str = Field(
-        "conus",
-        description="Name of the domain for which pixel coverage weights are being calculated"
+    grid_name: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name of the grid the weights index (CRS, pixel size, extent), shared by every configuration "
+            "on it. Defaults to configuration_name"
+        )
     )
     min_valid_coverage: float = Field(
         0.9,
@@ -47,6 +50,12 @@ class PixelCoverageWeightsInput(BaseGriddedDataInput):
         "append",
         description="Write mode for the pixel coverage weights table, passed to ev._write.to_warehouse()"
     )
+
+    @model_validator(mode="after")
+    def _default_grid_name(self) -> "PixelCoverageWeightsInput":
+        if self.grid_name is None:
+            self.grid_name = self.configuration_name
+        return self
 
 
 class MeanArealValuesInput(PixelCoverageWeightsInput):
