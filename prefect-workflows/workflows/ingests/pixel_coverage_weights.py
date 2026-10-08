@@ -7,6 +7,7 @@ in the table.
 """
 import geopandas as gpd
 import icechunk as ic
+import numpy as np
 import pandas as pd
 import rioxarray  # noqa: F401
 import xarray as xr
@@ -85,6 +86,8 @@ def format_weights_df(
     ``row``/``col`` index the full stored grid, identified by configuration_name/domain_name.
     """
     logger = get_run_logger()
+    if weights_df.empty:
+        raise ValueError("No grid pixels intersect the polygons.")
     weights_df = weights_df.rename(columns={"weight": "fraction_covered"})
     duplicated = weights_df.duplicated(subset=["location_id", "row", "col"])
     if duplicated.any():
@@ -166,9 +169,12 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
         raise ValueError(
             f"Grid has no dimension(s) {sorted(missing_dims)}; set x_dim/y_dim. Dims: {grid_template_da.dims}"
         )
-    # teehr requires x/y dims; positions are unchanged, so row/col still index the stored grid
-    grid_template_da = grid_template_da.rename({args.x_dim: "x", args.y_dim: "y"})
-    logger.info(f"Using '{variable_name}' at the first {args.append_dim} step as the template grid.")
+    # teehr requires x/y dims; positions are unchanged, so row/col still index the stored grid.
+    # Zero-filled so weights depend only on geometry: exactextract skips NaN cells.
+    grid_template_da = grid_template_da.rename({args.x_dim: "x", args.y_dim: "y"}).copy(
+        data=np.zeros(grid_template_da.shape, dtype="float32")
+    )
+    logger.info(f"Using the '{variable_name}' grid as the template.")
 
     polygons_gdf = polygons_gdf.to_crs(grid_template_da.rio.crs)
     polygons_gdf = filter_polygons_by_coverage(
@@ -176,9 +182,6 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
         grid_da=grid_template_da,
         min_coverage=args.min_valid_coverage
     )
-
-    # Load into memory for exactextract
-    grid_template_da = grid_template_da.load()
 
     # Shared with standalone teehr: one implementation, one row/col convention.
     weights_df = generate_weights_file(
