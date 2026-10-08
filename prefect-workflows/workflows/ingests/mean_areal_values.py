@@ -152,6 +152,18 @@ def register_domain_values(
             logger.info(f"Added '{entry.name}' to the '{table_name}' table.")
 
 
+@task(cache_policy=NO_CACHE, timeout_seconds=60 * 10)
+def register_location_crosswalks(ev: Evaluation, args: MeanArealValuesInput, location_ids: np.ndarray):
+    """Crosswalk each location to itself, so API queries by location find its secondary timeseries."""
+    table = ev.table("location_crosswalks", namespace_name=args.namespace_name, catalog_name=args.catalog_name)
+    table.load_dataframe(
+        pd.DataFrame({"primary_location_id": location_ids, "secondary_location_id": location_ids}),
+        namespace_name=args.namespace_name,
+        catalog_name=args.catalog_name,
+        write_mode="append",
+    )
+
+
 @flow(
     name="calculate-mean-areal-values",
     description="Calculate mean areal values for a given grid and polygon layer."
@@ -208,6 +220,7 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
 
     weights_df["weight"] = _area_weights(weights_df, grid_da, args.y_dim)
     matrix, rows, cols, location_ids = build_weights_matrix(weights_df)
+    register_location_crosswalks(ev=ev, args=args, location_ids=location_ids)
     window = (int(rows.min()), int(rows.max()) + 1, int(cols.min()), int(cols.max()) + 1)
 
     # Shard-aligned batches, so each batch reads whole shards once
