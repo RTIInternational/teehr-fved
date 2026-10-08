@@ -174,9 +174,10 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
         )
     # teehr requires x/y dims; positions are unchanged, so row/col still index the stored grid.
     # Zero-filled so weights depend only on geometry: exactextract skips NaN cells.
+    # Loaded so exactextract's window reads don't re-read lazy coords from the store.
     grid_template_da = grid_template_da.rename({args.x_dim: "x", args.y_dim: "y"}).copy(
         data=np.zeros(grid_template_da.shape, dtype="float32")
-    )
+    ).load()
     logger.info(f"Using the '{variable_name}' grid as the template.")
 
     polygons_gdf = polygons_gdf.to_crs(grid_template_da.rio.crs)
