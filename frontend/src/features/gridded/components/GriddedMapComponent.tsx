@@ -6,10 +6,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { ensureFreshToken } from '@/features/auth/keycloak';
 import { griddedApiService, GRIDDED_API_BASE_URL } from '@/services/griddedApi';
 import { usePolygonLayers, useTilesLegend } from '@/shared/queries/gridded/tiles';
-import { useTimesteps } from '@/shared/queries/gridded/timesteps';
 import type { PolygonFeatureProps, PolygonFeatures } from '@/shared/types/gridded/tiles';
 
 import { useDashboard, ActionTypes } from '../DashboardContext';
+import { useCurrentTimestep } from '../hooks/useCurrentTimestep';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 import GriddedColorBar from './GriddedColorBar';
 
@@ -70,10 +70,10 @@ const dedupePolygonFeatures = (features?: maplibregl.MapGeoJSONFeature[]) => {
 const GriddedMapComponent = () => {
   const { state, dispatch } = useDashboard();
   const { mapFilters, mapLoaded, activeOverlays, activePolygonLayer, selectedLocation } = state;
-  const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
+  const { dataset, variable, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
   const polygonLayers = usePolygonLayers();
-  const timesteps = useTimesteps(dataset);
+  const currentTimestep = useCurrentTimestep();
 
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -89,8 +89,6 @@ const GriddedMapComponent = () => {
   const clickHandlerRef = useRef<((e: maplibregl.MapMouseEvent) => void | Promise<void>) | null>(
     null
   );
-
-  const currentTimestep = (timesteps.data[timestepIndex] as string | undefined) ?? null;
 
   // Prime the token so a polygon layer selected before the first tile load
   // still builds its FetchSource with an Authorization header.

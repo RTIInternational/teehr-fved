@@ -221,3 +221,8 @@ export const getQuarterDateRange = (quarter: string) => {
 
   return { start_date, end_date };
 };
+
+// Milliseconds of a naive UTC time, as the gridded and warehouse APIs return them
+// ("YYYY-MM-DDTHH:MM:SS" or "YYYY-MM-DD HH:MM:SS"); times with a zone keep it
+export const parseUtcTime = (time: string) =>
+  Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(time) ? time : `${time.replace(' ', 'T')}Z`);

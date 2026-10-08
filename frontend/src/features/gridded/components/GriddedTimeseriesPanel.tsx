@@ -5,7 +5,9 @@ import { Button, ButtonGroup, Spinner } from 'react-bootstrap';
 
 import DashboardPanel from '@/shared/components/DashboardPanel';
 import { useEdrTimeseries } from '@/shared/queries/gridded/edr';
+import { usePolygonTimeseries } from '@/shared/queries/gridded/polygonTimeseries';
 import { variableAttrsQueryOptions } from '@/shared/queries/gridded/variableAttrs';
+import { parseUtcTime } from '@/shared/utils/dates';
 import { formatUnitName, formatVariableName } from '@/shared/utils/formatters';
 import { seriesColor } from '@/shared/utils/plotColors';
 
@@ -15,17 +17,45 @@ import GriddedTimeseriesControls from './GriddedTimeseriesControls';
 const formatPoint = (lat: number, lon: number) =>
   `(${Math.abs(lat).toFixed(4)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(4)}°${lon >= 0 ? 'E' : 'W'})`;
 
+type PlotSeries = {
+  name: string;
+  variable: string;
+  unit: string;
+  times: string[];
+  values: (number | null)[];
+};
+
+type PlotData = { plotted: PlotSeries[]; notes: string[]; isLoading: boolean };
+
+// Break the line across missing steps: a gap longer than the series' shortest step gets a null
+const withGaps = ({ times, values }: PlotSeries) => {
+  const ms = times.map(parseUtcTime);
+  const step = ms.reduce((min, t, i) => (i > 0 ? Math.min(min, t - ms[i - 1]) : min), Infinity);
+  const x: string[] = [];
+  const y: (number | null)[] = [];
+  times.forEach((time, i) => {
+    if (i > 0 && ms[i] - ms[i - 1] > step) {
+      x.push(new Date(ms[i - 1] + step).toISOString().slice(0, 19));
+      y.push(null);
+    }
+    x.push(time);
+    y.push(values[i]);
+  });
+  return { x, y };
+};
+
 const GriddedTimeseriesPanel = () => {
   const { state, dispatch } = useDashboard();
-  const { mapFilters, clickedPoint, timeseriesFilters } = state;
+  const { mapFilters, clickedPoint, polygonQuery, timeseriesFilters } = state;
   const plotRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState('plot');
 
-  // A new map click shows its plot
-  const [lastClickedPoint, setLastClickedPoint] = useState(clickedPoint);
-  if (clickedPoint !== lastClickedPoint) {
-    setLastClickedPoint(clickedPoint);
-    if (clickedPoint) setViewMode('plot');
+  // A new map click or polygon load shows its plot
+  const request = clickedPoint ?? polygonQuery;
+  const [lastRequest, setLastRequest] = useState(request);
+  if (request !== lastRequest) {
+    setLastRequest(request);
+    if (request) setViewMode('plot');
   }
 
   const datasets = timeseriesDatasets(timeseriesFilters, mapFilters.dataset);
@@ -40,45 +70,74 @@ const GriddedTimeseriesPanel = () => {
   const variableAttrs = useQueries({
     queries: datasets.map((ds) => variableAttrsQueryOptions(ds)),
   });
+  const polygonSeries = usePolygonTimeseries({
+    ...timeseriesFilters,
+    datasets,
+    locationId: polygonQuery?.location_id,
+    variable: mapFilters.variable,
+    anchor: polygonQuery?.time,
+  });
 
-  const units = series.map((s, i) =>
-    formatUnitName(s.variable ? (variableAttrs[i]?.data?.[s.variable]?.units ?? null) : null)
-  );
-  const plotted = series
-    .map((s, i) => ({ ...s, unit: units[i] }))
-    .filter((s) => s.data?.values.some((v) => v !== null));
-  const notes = series.flatMap((s) =>
-    s.skipped ? [s.skipped] : s.error ? [`${s.datasetId}: ${s.error}`] : []
-  );
-  const isLoading = series.some((s) => s.isLoading);
+  // Point and polygon queries plot through the same series shape
+  const { plotted, notes, isLoading }: PlotData = polygonQuery
+    ? {
+        plotted: (polygonSeries.data ?? []).map((ts) => ({
+          name: ts.configuration_name,
+          variable: formatVariableName(ts.variable_name),
+          unit: formatUnitName(ts.unit_name),
+          times: ts.timeseries.map((p) => p.value_time),
+          values: ts.timeseries.map((p) => p.value),
+        })),
+        notes: polygonSeries.error ? [polygonSeries.error.message] : [],
+        isLoading: polygonSeries.isLoading,
+      }
+    : {
+        plotted: series.flatMap((s, i) =>
+          s.data?.values.some((v) => v !== null)
+            ? [
+                {
+                  name: s.datasetId,
+                  variable: formatVariableName(s.variable ?? undefined),
+                  unit: formatUnitName(
+                    s.variable ? (variableAttrs[i]?.data?.[s.variable]?.units ?? null) : null
+                  ),
+                  ...s.data,
+                },
+              ]
+            : []
+        ),
+        notes: series.flatMap((s) =>
+          s.skipped ? [s.skipped] : s.error ? [`${s.datasetId}: ${s.error}`] : []
+        ),
+        isLoading: series.some((s) => s.isLoading),
+      };
+  const title = polygonQuery
+    ? polygonQuery.name || polygonQuery.location_id
+    : clickedPoint && formatPoint(clickedPoint.lat, clickedPoint.lon);
 
   useEffect(() => {
-    if (!plotRef.current || !clickedPoint || plotted.length === 0) return;
-    const traces = plotted.map((s, i) => {
-      const varName = formatVariableName(s.variable ?? undefined);
-      return {
-        x: s.data!.times,
-        y: s.data!.values,
-        name: `${s.datasetId} · ${varName}${s.unit ? ` (${s.unit})` : ''}`,
-        type: 'scatter',
-        mode: 'lines+markers',
-        connectgaps: false,
-        marker: { size: 4 },
-        line: { color: seriesColor(i) },
-        hovertemplate:
-          '<b>%{fullData.name}</b><br>' +
-          'Date: %{x}<br>' +
-          `${varName}: %{y}${s.unit ? ' ' + s.unit : ''}<br>` +
-          '<extra></extra>',
-      };
-    });
+    if (!plotRef.current || !request || plotted.length === 0) return;
+    const traces = plotted.map((s, i) => ({
+      ...withGaps(s),
+      name: `${s.name} · ${s.variable}${s.unit ? ` (${s.unit})` : ''}`,
+      type: 'scatter',
+      mode: 'lines+markers',
+      connectgaps: false,
+      marker: { size: 4 },
+      line: { color: seriesColor(i) },
+      hovertemplate:
+        '<b>%{fullData.name}</b><br>' +
+        'Date: %{x}<br>' +
+        `${s.variable}: %{y}${s.unit ? ' ' + s.unit : ''}<br>` +
+        '<extra></extra>',
+    }));
     const sharedUnit = plotted.every((s) => s.unit === plotted[0].unit) ? plotted[0].unit : '';
 
     void Plotly.react(
       plotRef.current,
       traces as Partial<Plotly.ScatterData>[],
       {
-        title: { text: formatPoint(clickedPoint.lat, clickedPoint.lon), font: { size: 13 } },
+        title: { text: title, font: { size: 13 } },
         xaxis: { title: 'Time', type: 'date' },
         yaxis: { title: sharedUnit || 'Value' },
         showlegend: true,
@@ -133,7 +192,7 @@ const GriddedTimeseriesPanel = () => {
         />
       </div>
     );
-  } else if (!clickedPoint) {
+  } else if (!request) {
     body = (
       <div className="d-flex align-items-center justify-content-center h-100 text-muted small">
         Click a point on the map, or load a timeseries for a selected polygon
