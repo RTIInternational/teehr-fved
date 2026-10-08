@@ -18,11 +18,12 @@ from teehr import Evaluation
 from teehr.utilities.generate_weights import generate_weights_file
 
 from utils import grid_utils as gu
-from workflows.utils.common_utils import initialize_evaluation
+from workflows.utils.common_utils import initialize_evaluation, table_exists
 from workflows.models.mean_areal_inputs import PixelCoverageWeightsInput
 
 WEIGHTS_TABLE_NAME = "grid_pixel_coverage_weights"
 WEIGHTS_UNIQUENESS_FIELDS = ["location_id", "row", "col", "grid_name"]
+WEIGHTS_PARTITION_BY = ["grid_name"]
 # Equal-area CRS for comparing polygon areas
 EQUAL_AREA_CRS = "EPSG:6933"
 
@@ -60,6 +61,7 @@ def write_dataframe_to_warehouse(
     uniqueness_fields: list[str] = None,
     catalog_name: str = None,
     namespace_name: str = None,
+    partition_by: list[str] = None,
 ):
     """Write a dataframe to an iceberg warehouse table."""
     logger = get_run_logger()
@@ -71,6 +73,7 @@ def write_dataframe_to_warehouse(
         uniqueness_fields=uniqueness_fields,
         catalog_name=catalog_name,
         namespace_name=namespace_name,
+        partition_by=partition_by,
     )
     logger.info(f"Rows written to the '{table_name}' warehouse table.")
 
@@ -204,5 +207,6 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
         dataframe=weights_df,
         table_name=WEIGHTS_TABLE_NAME,
         uniqueness_fields=WEIGHTS_UNIQUENESS_FIELDS,
-        write_mode=args.write_mode
+        write_mode=args.write_mode if table_exists(ev=ev, table_name=WEIGHTS_TABLE_NAME) else "create_or_replace",
+        partition_by=WEIGHTS_PARTITION_BY,
     )

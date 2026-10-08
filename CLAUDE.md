@@ -65,7 +65,7 @@ pytest workflows/tests/mean_areal_values_test.py::test_window  # single test
 
 ## Warehouse migrations
 
-`warehouse_migrations/NNNN/*.sql` are applied in order by teehr's `evolve_catalog_schema`, run from `warehouse/remote/01_initialization/01_apply_migrations.ipynb`. They are not applied by a deploy. Add a new numbered folder; never edit an applied migration. teehr-hub keeps its own separate migrations, so a table created there, such as `grid_pixel_coverage_weights`, does not automatically exist here.
+`warehouse_migrations/NNNN/*.sql` are applied in order by teehr's `evolve_catalog_schema`, run from `warehouse/remote/01_initialization/01_apply_migrations.ipynb`. They are not applied by a deploy. Add a new numbered folder; never edit an applied migration. Migrations cover the core teehr tables (`0001`–`0008` mirror teehr's own `src/teehr/migrations`). Non-core tables, such as metrics, dashboard summaries and `grid_pixel_coverage_weights`, are created by the flow that owns them, using `create_or_replace` when `table_exists` is false.
 
 ## Frontend
 
