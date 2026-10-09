@@ -318,16 +318,33 @@ deployments:
     parameters: {"script_path": 'C:\FVED\Scripts\ssm_test.py'}
     work_pool: *work_pool
 
+  - name: check-crmms-model-update
+    version:
+    tags: []
+    concurrency_limit:
+      limit: 1
+      collision_strategy: "CANCEL_NEW"
+    description: Check USBR for new CRMMS model, stage to S3 if found, trigger RiverWare run
+    entrypoint: workflows/riverware/check_crmms_model_update.py:check_crmms_model_update
+    parameters:
+      configuration_name: crmms_esp
+      script_path: 'C:\FVED\teehr-fved\riverware\run_pipeline.py'
+    work_pool: *work_pool
+    schedule:
+      cron: "0 12 13-20 * *"
+      active: false
+
   - name: run-riverware-s3-workflow
     version:
     tags: []
     concurrency_limit:
       limit: 1
       collision_strategy: "CANCEL_NEW"
-    description: Prototype S3 data exchange - upload input to S3, run EC2 script via SSM, validate outputs
+    description: Run RiverWare model with staged S3 artifact and load output to warehouse
     entrypoint: workflows/riverware/riverware_s3_workflow.py:run_riverware_s3_workflow
     parameters:
-      script_path: 'C:\FVED\teehr-fved\riverware\run_pipeline.py'
-      model_dir: 'C:\FVED\Models\CRMMS-ESP\CRMMS_July2026'
       configuration_name: crmms_esp
+      script_path: 'C:\FVED\teehr-fved\riverware\run_pipeline.py'
+      model_year: 2026
+      model_month: 10
     work_pool: *work_pool
