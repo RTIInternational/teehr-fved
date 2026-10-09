@@ -198,7 +198,7 @@ const GriddedTimeseriesPanel = () => {
         Click a point on the map, or load a timeseries for a selected polygon
       </div>
     );
-  } else if (isLoading && plotted.length === 0) {
+  } else if (isLoading) {
     body = (
       <div className="d-flex justify-content-center align-items-center h-100">
         <div className="text-center">
@@ -219,8 +219,9 @@ const GriddedTimeseriesPanel = () => {
       </div>
     );
   } else {
+    // Keyed so React never reuses this div for another state with Plotly's nodes still in it
     body = (
-      <div className="d-flex flex-column h-100">
+      <div key="plot" className="d-flex flex-column h-100">
         <div ref={plotRef} style={{ flex: '1 1 auto', minHeight: 0, width: '100%' }} />
         {notesList}
       </div>
