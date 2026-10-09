@@ -154,9 +154,10 @@ def validate_mean_areal_values(args: ValidateMeanArealValuesInput):
     for loc in sample:
         poly = gpd.GeoDataFrame(geometry=[polys.loc[loc, "geometry"]], crs=crs.to_wkt())
         lw = w[w["location_id"] == loc]
+        # Padded by a cell so a basin in one row or column still has a resolution
         window = grid.isel({
-            args.y_dim: slice(int(lw["row"].min()), int(lw["row"].max()) + 1),
-            args.x_dim: slice(int(lw["col"].min()), int(lw["col"].max()) + 1),
+            args.y_dim: slice(max(int(lw["row"].min()) - 1, 0), int(lw["row"].max()) + 2),
+            args.x_dim: slice(max(int(lw["col"].min()) - 1, 0), int(lw["col"].max()) + 2),
         })
         first = window.isel({args.append_dim: 0}).rename({args.x_dim: "x", args.y_dim: "y"})
         ones = first.copy(data=np.ones(first.shape, "float32")).load().rio.write_crs(crs.to_wkt())
