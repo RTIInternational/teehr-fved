@@ -236,22 +236,6 @@ deployments:
     }
     work_pool: *work_pool
 
-  # Temporary: remove after validating mean areal values
-  - name: validate-mean-areal-values
-    version:
-    tags: []
-    description: "Temporary: validate pixel coverage weights and mean areal values against independent calculations"
-    entrypoint: workflows/ingests/validate_mean_areal_values.py:validate_mean_areal_values
-    parameters: {
-      "args": {
-        "temp_dir_path": *temp_dir_path,
-        "configuration_name": "ua_swann_4km",
-        "location_id_prefix": "usgsbasin",
-        "grid_variable_name": "swe_daily_inst"
-      }
-    }
-    work_pool: *work_pool
-
   # Create Vector Tiles
   - name: create-vector-tiles
     version:
