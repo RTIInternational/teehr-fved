@@ -7,7 +7,7 @@ import DashboardPanel from '@/shared/components/DashboardPanel';
 import { useEdrTimeseries } from '@/shared/queries/gridded/edr';
 import { usePolygonTimeseries } from '@/shared/queries/gridded/polygonTimeseries';
 import { variableAttrsQueryOptions } from '@/shared/queries/gridded/variableAttrs';
-import { parseUtcTime } from '@/shared/utils/dates';
+import { parseUtcTime, shortestStep } from '@/shared/utils/dates';
 import { formatUnitName, formatVariableName } from '@/shared/utils/formatters';
 import { seriesColor } from '@/shared/utils/plotColors';
 
@@ -30,7 +30,7 @@ type PlotData = { plotted: PlotSeries[]; notes: string[]; isLoading: boolean };
 // Break the line across missing steps: a gap longer than the series' shortest step gets a null
 const withGaps = ({ times, values }: PlotSeries) => {
   const ms = times.map(parseUtcTime);
-  const step = ms.reduce((min, t, i) => (i > 0 ? Math.min(min, t - ms[i - 1]) : min), Infinity);
+  const step = shortestStep(ms);
   const x: string[] = [];
   const y: (number | null)[] = [];
   times.forEach((time, i) => {
