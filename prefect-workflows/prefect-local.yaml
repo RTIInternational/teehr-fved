@@ -565,6 +565,36 @@ deployments:
     }
     work_pool: *work_pool
 
+  # Mean Areal Values
+  - name: calculate-pixel-coverage-weights
+    version:
+    tags: []
+    description: Calculate pixel coverage weights of location polygons on a gridded IceChunk repository
+    entrypoint: workflows/ingests/pixel_coverage_weights.py:calculate_pixel_coverage_weights
+    parameters: {
+      "args": {
+        "temp_dir_path": *temp_dir_path,
+        "configuration_name": "ua_swann_4km",
+        "location_id_prefix": "usgsbasin"
+      }
+    }
+    work_pool: *work_pool
+
+  - name: calculate-mean-areal-values
+    version:
+    tags: []
+    description: Calculate mean areal values of location polygons from a gridded IceChunk repository
+    entrypoint: workflows/ingests/mean_areal_values.py:calculate_mean_areal_values
+    parameters: {
+      "args": {
+        "temp_dir_path": *temp_dir_path,
+        "configuration_name": "ua_swann_4km",
+        "location_id_prefix": "usgsbasin",
+        "grid_variable_name": "swe_daily_inst"
+      }
+    }
+    work_pool: *work_pool
+
   # Create Vector Tiles
   - name: create-vector-tiles
     version:

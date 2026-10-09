@@ -1,8 +1,8 @@
 """Define arguments and defaults for the mean_areal Prefect flow."""
 from datetime import datetime
-from typing import Union
+from typing import Literal, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from workflows.models.ingest_gridded_data_input import BaseGriddedDataInput
 
@@ -18,38 +18,69 @@ class PixelCoverageWeightsInput(BaseGriddedDataInput):
         ...,
         description="Prefix for location IDs to filter polygons"
     )
-    grid_variable_name: str = Field(
-        ...,
-        description="Name of variable in the gridded dataset, already the teehr variable name (e.g. 'swe_daily_inst')"
+    grid_variable_name: Optional[str] = Field(
+        default=None,
+        description=(
+            "Variable used as the template grid; defaults to the repo's first. Weights apply to every "
+            "variable on the grid"
+        )
     )
-    domain_name: str = Field(
-        ...,
-        description="Name of the domain for which pixel coverage weights are being calculated"
+    grid_name: Optional[str] = Field(
+        default=None,
+        description=(
+            "Name of the grid the weights index (CRS, pixel size, extent), shared by every configuration "
+            "on it. Defaults to configuration_name"
+        )
+    )
+    min_valid_coverage: float = Field(
+        0.9,
+        ge=0,
+        le=1,
+        description=(
+            "Weights: minimum fraction of a polygon's area inside the grid, or the polygon is dropped. "
+            "Mean areal values: minimum fraction of a polygon's in-grid area with data, or the value is "
+            "dropped. Both apply, so 0.9 keeps values covering at least 81% of a polygon"
+        )
     )
     start_spark_cluster: bool = Field(
         False,
         description="Whether to start a Spark cluster for processing"
     )
-    write_mode: str = Field(
+    write_mode: Literal["append", "upsert"] = Field(
         "append",
-        description=(
-            "Write mode for saving the pixel coverage weights to the warehouse table. "
-            "Default is 'append'. The value is passed to ev._write.to_warehouse()."
-        )
+        description="Write mode for the pixel coverage weights table, passed to ev._write.to_warehouse()"
     )
+
+    @model_validator(mode="after")
+    def _default_grid_name(self) -> "PixelCoverageWeightsInput":
+        if self.grid_name is None:
+            self.grid_name = self.configuration_name
+        return self
 
 
 class MeanArealValuesInput(PixelCoverageWeightsInput):
     """Model for mean areal values inputs."""
 
+    grid_variable_name: str = Field(
+        ...,
+        description="Name of variable in the gridded dataset, already the teehr variable name (e.g. 'swe_daily_inst')"
+    )
     timeseries_table_name: str = Field(
-        "primary_timeseries",
+        "secondary_timeseries",
         description=(
-            "Name of the timeseries table in the teehr warehouse to write the mean areal values to. "
-            "Default is 'primary_timeseries'."
+            "Timeseries table to write the mean areal values to; 'primary_timeseries' registers the "
+            "configuration as primary, any other table as secondary"
         )
     )
-    write_mode: str = Field(
+    catalog_name: Optional[str] = Field(
+        default=None,
+        description="Catalog of the timeseries table. Defaults to the evaluation's catalog"
+    )
+    namespace_name: Optional[str] = Field(
+        default=None,
+        description="Namespace of the timeseries table. Defaults to the evaluation's namespace"
+    )
+    write_mode: Literal["append", "upsert"] = Field(
         "upsert",
         description=(
             "Write mode for the timeseries table, passed to ev._write.to_warehouse(). 'upsert' replaces "
@@ -63,4 +94,27 @@ class MeanArealValuesInput(PixelCoverageWeightsInput):
     end_dt: Union[str, datetime, None] = Field(
         default=None,
         description="Last grid step to compute. Defaults to the last written step."
+    )
+    max_read_memory_gb: Optional[float] = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Memory for grid batches read at once; caps the number of concurrent batches. Defaults to "
+            "the memory teehr finds available"
+        )
+    )
+    batch_workers: Optional[int] = Field(
+        default=None,
+        gt=0,
+        description="Concurrent grid batches before the memory cap. Defaults to the available CPUs"
+    )
+    zarr_concurrency: Optional[int] = Field(
+        default=None,
+        gt=0,
+        description="Concurrent chunk reads per batch (zarr async.concurrency). Defaults to the environment's"
+    )
+    max_rows_per_write: int = Field(
+        5_000_000,
+        gt=0,
+        description="Rows accumulated before each warehouse write"
     )

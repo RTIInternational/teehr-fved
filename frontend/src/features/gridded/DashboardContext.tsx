@@ -4,6 +4,7 @@ import type {
   ClickedPoint,
   MapFilters,
   PointQuery,
+  PolygonQuery,
   SelectedLocation,
 } from '@/shared/types/gridded/maps';
 import type { PolygonFeatures } from '@/shared/types/gridded/tiles';
@@ -22,6 +23,7 @@ export type DashboardState = {
   polygonClickLngLat: ClickedPoint | null;
   selectedLocation: SelectedLocation | null;
   clickedPoint: PointQuery | null;
+  polygonQuery: PolygonQuery | null;
   timeseriesFilters: GriddedTimeseriesFilters;
   mapLoaded: boolean;
   loading: boolean;
@@ -67,8 +69,9 @@ const initialState: DashboardState = {
   selectedLocation: null, // { primary_location_id, name } | null — feature chosen for a warehouse query
 
   clickedPoint: null, // { lon, lat, time } | null — last point clicked on the map, with the map's date
+  polygonQuery: null, // { location_id, name, time } | null — polygon loaded for a timeseries, with the map's date
 
-  // Datasets and time span for the point query on map click
+  // Datasets and time span for the point or polygon timeseries
   timeseriesFilters: DEFAULT_TIMESERIES_FILTERS,
 
   mapLoaded: false,
@@ -86,6 +89,7 @@ export const ActionTypes = {
   CLEAR_POLYGON_FEATURES: 'CLEAR_POLYGON_FEATURES',
   SELECT_LOCATION: 'SELECT_LOCATION',
   SET_CLICKED_POINT: 'SET_CLICKED_POINT',
+  LOAD_POLYGON_TIMESERIES: 'LOAD_POLYGON_TIMESERIES',
   SET_MAP_LOADED: 'SET_MAP_LOADED',
   SET_LOADING: 'SET_LOADING',
   SET_ERROR: 'SET_ERROR',
@@ -105,6 +109,7 @@ export type DashboardAction =
   | { type: typeof ActionTypes.CLEAR_POLYGON_FEATURES }
   | { type: typeof ActionTypes.SELECT_LOCATION; payload: SelectedLocation }
   | { type: typeof ActionTypes.SET_CLICKED_POINT; payload: PointQuery | null }
+  | { type: typeof ActionTypes.LOAD_POLYGON_TIMESERIES; payload: PolygonQuery }
   | { type: typeof ActionTypes.SET_MAP_LOADED; payload: boolean }
   | { type: typeof ActionTypes.SET_LOADING; payload: boolean }
   | { type: typeof ActionTypes.SET_ERROR; payload: string | null }
@@ -175,10 +180,19 @@ const reducer = (state: DashboardState, action: DashboardAction): DashboardState
         selectedLocation: action.payload,
       };
 
+    // The timeseries panel plots whichever was requested last
     case ActionTypes.SET_CLICKED_POINT:
       return {
         ...state,
         clickedPoint: action.payload,
+        polygonQuery: null,
+      };
+
+    case ActionTypes.LOAD_POLYGON_TIMESERIES:
+      return {
+        ...state,
+        polygonQuery: action.payload,
+        clickedPoint: null,
       };
 
     case ActionTypes.SET_MAP_LOADED:
