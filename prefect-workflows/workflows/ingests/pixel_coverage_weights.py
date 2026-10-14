@@ -177,6 +177,8 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
     logger.info(f"Using the '{variable_name}' grid as the template.")
 
     polygons_gdf = polygons_gdf.to_crs(grid_template_da.rio.crs)
+    # Some source polygons are invalid (degenerate or self-intersecting segments); repair as teehr does.
+    polygons_gdf.geometry = polygons_gdf.geometry.make_valid(method="structure", keep_collapsed=False)
     polygons_gdf = filter_polygons_by_coverage(
         polygons_gdf=polygons_gdf,
         grid_da=grid_template_da,
