@@ -16,7 +16,7 @@ from teehr.fetching.nwm.grid_utils import build_weights_matrix  # noqa: E402
 from teehr.utils.concurrency import run_concurrent_map  # noqa: E402
 
 from mean_areal_values import _area_weights, _mean_areal_batch, _written_steps  # noqa: E402
-from pixel_coverage_weights import filter_polygons_by_coverage  # noqa: E402
+from pixel_coverage_weights import filter_polygons_by_coverage, resolve_grid_name  # noqa: E402
 from utils import grid_utils as gu  # noqa: E402
 from utils import time_grid as tg  # noqa: E402
 from workflows.models.mean_areal_inputs import MeanArealValuesInput  # noqa: E402
@@ -52,11 +52,6 @@ def test_repo_without_status_keeps_all_steps():
 
 def test_defaults_to_upsert():
     assert _args().write_mode == "upsert"
-
-
-def test_grid_name_defaults_to_configuration_name():
-    assert _args().grid_name == "c"
-    assert _args(grid_name="g").grid_name == "g"
 
 
 def _lat_lon_grid(values, crs="EPSG:4326"):
@@ -150,6 +145,24 @@ def test_coverage_filter_drops_polygon_mostly_outside_grid(harness):
         return filter_polygons_by_coverage(polygons, grid, min_coverage=0.9)
 
     assert run().id.tolist() == ["p-inside"]
+
+
+def test_grid_name_from_args_then_repo_then_configuration_name(harness):
+    import icechunk as ic
+
+    @flow
+    def run(stored, grid_name):
+        store = ic.Repository.create(ic.in_memory_storage()).writable_session("main").store
+        if stored is not None:
+            tg.write_grid_attrs(store, {tg.GRID_NAME_ATTR: stored})
+        return resolve_grid_name(store, grid_name, "c")
+
+    assert run(None, None) == "c"
+    assert run("g", None) == "g"
+    assert run(None, "x") == "x"
+    assert run("g", "g") == "g"
+    with pytest.raises(ValueError):
+        run("g", "x")
 
 
 def test_generated_weights_index_a_lat_lon_grid():

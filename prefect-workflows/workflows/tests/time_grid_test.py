@@ -175,6 +175,18 @@ def test_stored_encoding(repo, source):
     assert _refs(repo).created_at.isnull().values[0]
 
 
+def test_grid_name_is_added_once_and_never_changed(repo):
+    session = repo.writable_session("main")
+    tg.write_grid_attrs(session.store, {"append_dim": DIM, "time_origin": ORIGIN.isoformat(), "time_step": STEP.isoformat()})
+    assert tg.read_grid_name(session.store) is None
+    assert tg.ensure_grid_name(session.store, "g")
+    assert not tg.ensure_grid_name(session.store, "g")
+    assert tg.read_grid_name(session.store) == "g"
+    assert tg.read_grid(session.store) == (DIM, ORIGIN, STEP)
+    with pytest.raises(ValueError):
+        tg.ensure_grid_name(session.store, "other")
+
+
 def test_grid_attrs_and_off_grid_timestamps(repo):
     session = repo.writable_session("main")
     tg.write_grid_attrs(session.store, {"append_dim": DIM, "time_origin": ORIGIN.isoformat(), "time_step": STEP.isoformat()})

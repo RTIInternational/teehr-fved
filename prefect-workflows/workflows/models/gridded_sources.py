@@ -46,6 +46,10 @@ class GriddedSource(BaseModel, ABC):
     def ingest_variables(self) -> list[str]:
         """Source variables to materialize."""
 
+    def grid_name(self) -> str:
+        """Grid (CRS, pixel size, extent) the source's data is on; sources sharing a grid share a name."""
+        return self.repository_name()
+
     def credentials(self) -> dict:
         """Source access keys, for obstore and the virtual chunk container; empty means anonymous.
 

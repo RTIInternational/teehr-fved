@@ -24,7 +24,9 @@ from workflows.utils.time_utils import to_naive_utc
 from workflows.utils.common_utils import initialize_evaluation
 from workflows.models.ingest_gridded_data_input import VARIABLE_AND_UNIT_MAPPER
 from workflows.models.mean_areal_inputs import MeanArealValuesInput
-from pixel_coverage_weights import WEIGHTS_TABLE_NAME, get_readonly_repo_store, write_dataframe_to_warehouse
+from pixel_coverage_weights import (
+    WEIGHTS_TABLE_NAME, get_readonly_repo_store, resolve_grid_name, write_dataframe_to_warehouse
+)
 
 
 def _written_steps(da: xr.DataArray, args: MeanArealValuesInput) -> xr.DataArray:
@@ -187,17 +189,16 @@ def calculate_mean_areal_values(args: MeanArealValuesInput):
         }
     )
 
-    weights_df = read_weights_from_warehouse(
-        ev=ev,
-        location_id_prefix=args.location_id_prefix,
-        grid_name=args.grid_name
-    )
-
     store = get_readonly_repo_store(
         dest_bucket=args.dest_bucket,
         base_prefix=args.base_prefix,
         configuration_name=args.configuration_name,
         s3_storage_kwargs=args.s3_storage_kwargs
+    )
+    weights_df = read_weights_from_warehouse(
+        ev=ev,
+        location_id_prefix=args.location_id_prefix,
+        grid_name=resolve_grid_name(store, args.grid_name, args.configuration_name)
     )
     grid_da = xr.open_zarr(
         store, group=gu.read_data_group(store), decode_coords="all", chunks=None
