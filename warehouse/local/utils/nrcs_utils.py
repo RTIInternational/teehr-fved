@@ -11,6 +11,9 @@ import pandas as pd
 from . import nrcs_api_accessor as _api_accessor
 from .nrcs_api_accessor import _water_year
 
+from teehr.models.pandera_dataframe_schemas import primary_timeseries_schema
+from teehr.models.pandera_dataframe_schemas import secondary_timeseries_schema
+
 AC_FT_TO_M3 = 1_233.48183754752
 KAC_FT_TO_M3 = 1_233_481.83754752
 
@@ -35,16 +38,12 @@ ELEMENT_TO_VARIABLE_MAPPING: dict[str, dict[str, Any]] = {
     },
 }
 
-_OBSERVED_COLUMNS = [
-    "reference_time",
-    "value_time",
-    "value",
-    "variable_name",
-    "configuration_name",
-    "unit_name",
-    "location_id",
-]
-_FORECAST_COLUMNS = _OBSERVED_COLUMNS + ["member"]
+sim_cols_raw = list(secondary_timeseries_schema(type="pandas").columns.keys())
+obs_cols_raw = list(primary_timeseries_schema(type="pandas").columns.keys())
+cols_to_remove = ['created_at', 'updated_at']
+
+_OBSERVED_COLUMNS = [x for x in obs_cols_raw if x not in cols_to_remove]
+_FORECAST_COLUMNS = [x for x in sim_cols_raw if x not in cols_to_remove]
 
 
 def _configuration_for_element_code(
