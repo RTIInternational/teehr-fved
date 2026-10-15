@@ -400,7 +400,7 @@ def _observed_to_dataframe(
                         "reference_time": pd.NaT,
                         "value_time": value_time,
                         "value": observation.get("value"),
-                        "variable_name": "volume_monthly_inst",
+                        "variable_name": "volume_monthly_sum",
                         "configuration_name": configuration_name,
                         "unit_name": station_element.get("storedUnitCode"),
                         "location_id": location_id,

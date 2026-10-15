@@ -4,6 +4,9 @@ DEV_LOCATION_ID_LIST = [
     'usgs-09149500',
     'usgs-09361500',
     'usgs-09260050',
+    # initial nrcs locations w/ usgs record
+    'usgs-09361500',
+    'usgs-10128500',
     # sample usgs basin polygon ids
     'usgsbasin-06114700',
     'usgsbasin-06123030',
