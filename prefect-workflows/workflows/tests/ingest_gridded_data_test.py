@@ -82,6 +82,21 @@ def _groups(open_repo):
     return {g: xr.open_zarr(store, group=g, consolidated=False) for g in GROUPS}
 
 
+def test_grid_name_on_new_and_existing_repos(harness, ua):
+    publish, open_repo = ua
+    for d in DAYS[:10]:
+        publish(d, "stable", d.dayofyear, "2026-01-01")
+    _run("1981-10-01", "1981-10-05")
+    assert ing.tg.read_grid_name(open_repo().readonly_session("main").store) == "ua_swann_4km"
+
+    # A repo created before grid_name existed gains it on its next ingest
+    session = open_repo().writable_session("main")
+    del zarr.open_group(session.store, mode="a", zarr_format=3).attrs["grid_name"]
+    session.commit("Drop grid_name")
+    _run("1981-10-06", "1981-10-10")
+    assert ing.tg.read_grid_name(open_repo().readonly_session("main").store) == "ua_swann_4km"
+
+
 def test_backfill_in_any_order_then_upsert(harness, ua):
     publish, open_repo = ua
     for d in DAYS:

@@ -20,6 +20,8 @@ UNWRITTEN = -1
 AUDIT_COORDS = ("created_at", "updated_at", "source_last_modified")
 STEP_COORDS = (STATUS_COORD, *AUDIT_COORDS)
 GRID_ATTRS = ("append_dim", "time_origin", "time_step")
+# Repos with the same grid_name are pixel-aligned; it keys the pixel coverage weights
+GRID_NAME_ATTR = "grid_name"
 # 1-D step coordinates are small; one chunk covers decades of daily or hourly steps
 _STEP_COORD_CHUNK = 100_000
 _NAT_INT = np.iinfo("int64").min
@@ -68,15 +70,35 @@ def write_grid_attrs(store: ic.IcechunkStore, attrs: dict) -> None:
     zarr.open_group(store, mode="a", zarr_format=3).attrs.update(attrs)
 
 
+def _root_attrs(store: ic.IcechunkStore) -> dict:
+    try:
+        return dict(zarr.open_group(store, mode="r", zarr_format=3).attrs)
+    except (zarr.errors.GroupNotFoundError, FileNotFoundError):
+        return {}
+
+
 def read_grid(store: ic.IcechunkStore) -> tuple[str, pd.Timestamp, pd.Timedelta] | None:
     """(append_dim, time_origin, time_step) from the root group, or None for a repo without a grid."""
-    try:
-        attrs = zarr.open_group(store, mode="r", zarr_format=3).attrs
-    except (zarr.errors.GroupNotFoundError, FileNotFoundError):
-        return None
+    attrs = _root_attrs(store)
     if not all(name in attrs for name in GRID_ATTRS):
         return None
     return attrs["append_dim"], pd.Timestamp(attrs["time_origin"]), pd.Timedelta(attrs["time_step"])
+
+
+def read_grid_name(store: ic.IcechunkStore) -> str | None:
+    """The grid (CRS, pixel size, extent) the repo's data is on, or None for a repo without one."""
+    return _root_attrs(store).get(GRID_NAME_ATTR)
+
+
+def ensure_grid_name(store: ic.IcechunkStore, grid_name: str) -> bool:
+    """Record ``grid_name`` on a repo that lacks it, so existing repos gain it; True if recorded."""
+    stored = read_grid_name(store)
+    if stored == grid_name:
+        return False
+    if stored is not None:
+        raise ValueError(f"The repo is on grid '{stored}', not '{grid_name}'.")
+    write_grid_attrs(store, {GRID_NAME_ATTR: grid_name})
+    return True
 
 
 def check_on_grid(times: pd.DatetimeIndex, time_origin: pd.Timestamp, time_step: pd.Timedelta) -> None:

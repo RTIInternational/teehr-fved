@@ -206,6 +206,36 @@ deployments:
     }
     work_pool: *work_pool
 
+  # Mean Areal Values
+  - name: calculate-pixel-coverage-weights
+    version:
+    tags: []
+    description: Calculate pixel coverage weights of location polygons on a gridded IceChunk repository
+    entrypoint: workflows/ingests/pixel_coverage_weights.py:calculate_pixel_coverage_weights
+    parameters: {
+      "args": {
+        "temp_dir_path": *temp_dir_path,
+        "configuration_name": "ua_swann_4km",
+        "location_id_prefix": "usgsbasin"
+      }
+    }
+    work_pool: *work_pool
+
+  - name: calculate-mean-areal-values
+    version:
+    tags: []
+    description: Calculate mean areal values of location polygons from a gridded IceChunk repository
+    entrypoint: workflows/ingests/mean_areal_values.py:calculate_mean_areal_values
+    parameters: {
+      "args": {
+        "temp_dir_path": *temp_dir_path,
+        "configuration_name": "ua_swann_4km",
+        "location_id_prefix": "usgsbasin",
+        "grid_variable_name": "swe_daily_inst"
+      }
+    }
+    work_pool: *work_pool
+
   # Create Vector Tiles
   - name: create-vector-tiles
     version:
@@ -318,16 +348,33 @@ deployments:
     parameters: {"script_path": 'C:\FVED\Scripts\ssm_test.py'}
     work_pool: *work_pool
 
+  - name: check-crmms-model-update
+    version:
+    tags: []
+    concurrency_limit:
+      limit: 1
+      collision_strategy: "CANCEL_NEW"
+    description: Check USBR for new CRMMS model, stage to S3 if found, trigger RiverWare run
+    entrypoint: workflows/riverware/check_crmms_model_update.py:check_crmms_model_update
+    parameters:
+      configuration_name: crmms_esp
+      script_path: 'C:\FVED\teehr-fved\riverware\run_pipeline.py'
+    work_pool: *work_pool
+    schedule:
+      cron: "0 12 13-20 * *"
+      active: false
+
   - name: run-riverware-s3-workflow
     version:
     tags: []
     concurrency_limit:
       limit: 1
       collision_strategy: "CANCEL_NEW"
-    description: Prototype S3 data exchange - upload input to S3, run EC2 script via SSM, validate outputs
+    description: Run RiverWare model with staged S3 artifact and load output to warehouse
     entrypoint: workflows/riverware/riverware_s3_workflow.py:run_riverware_s3_workflow
     parameters:
-      script_path: 'C:\FVED\teehr-fved\riverware\run_pipeline.py'
-      model_dir: 'C:\FVED\Models\CRMMS-ESP\CRMMS_July2026'
       configuration_name: crmms_esp
+      script_path: 'C:\FVED\teehr-fved\riverware\run_pipeline.py'
+      model_year: 2026
+      model_month: 10
     work_pool: *work_pool
