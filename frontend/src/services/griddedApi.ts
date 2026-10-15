@@ -10,7 +10,8 @@ import type { VariablesResponse } from '@/shared/types/gridded/variables';
 export const GRIDDED_API_BASE_URL =
   import.meta.env.VITE_XPUBLISH_API_BASE_URL || 'http://127.0.0.1:8001';
 
-export const MAX_TIMESERIES_POINTS = 365;
+// Per-dataset cap on time steps in one point query: about 20 years of daily steps
+export const MAX_TIMESERIES_POINTS = 20 * 365;
 
 type GriddedApiCall = {
   (path: string, options?: { raw: true }): Promise<string>;
@@ -44,15 +45,14 @@ function parseTimeseriesCsv(csvText: string, variable: string) {
   }
   const varColIdx = headers.findIndex((h) => h === variable);
   if (varColIdx === -1) throw new Error(`Variable '${variable}' not found in timeseries response`);
-  const times = [];
-  const values = [];
+  const times: string[] = [];
+  const values: (number | null)[] = [];
   for (const line of lines.slice(1)) {
     const cols = line.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
     const val = parseFloat(cols[varColIdx]);
-    if (Number.isFinite(val)) {
-      times.push(timeColIdx !== -1 ? cols[timeColIdx] : '');
-      values.push(val);
-    }
+    times.push(timeColIdx !== -1 ? cols[timeColIdx] : '');
+    // Steps without data stay as null, so the plot shows a gap rather than joining across it
+    values.push(Number.isFinite(val) ? val : null);
   }
   return { times, values };
 }
@@ -150,12 +150,10 @@ export const griddedApiService = {
     variable: string,
     lon: number,
     lat: number,
-    timesteps: string[],
-    maxPoints = MAX_TIMESERIES_POINTS
+    start: string,
+    end: string
   ) => {
-    const slice = maxPoints > 0 ? timesteps.slice(0, maxPoints) : timesteps;
-    if (slice.length === 0) throw new Error('No timesteps available for timeseries query');
-    const datetimeRange = slice.length === 1 ? slice[0] : `${slice[0]}/${slice[slice.length - 1]}`;
+    const datetimeRange = start === end ? start : `${start}/${end}`;
     const params = new URLSearchParams({
       coords: `POINT(${lon} ${lat})`,
       'parameter-name': variable,
