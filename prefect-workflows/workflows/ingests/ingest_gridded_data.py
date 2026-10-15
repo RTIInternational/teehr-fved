@@ -88,7 +88,7 @@ def ingest_gridded_data(args: IngestGriddedDataInput) -> None:
             **args.xconcat_kwargs
         )
         virtual_ds = _standardize_references(gu.align_virtual_fill_values(virtual_ds), args)
-        write_references(repo, virtual_ds, todo, origin, source.time_step, args)
+        write_references(repo, virtual_ds, todo, origin, source.time_step, source.grid_name(), args)
     if args.write_materialized:
         materialize_references(repo, args)
     if args.build_pyramids_on_ingest:
@@ -131,6 +131,7 @@ def write_references(
     todo: pd.DataFrame,
     origin: pd.Timestamp,
     time_step: pd.Timedelta,
+    grid_name: str,
     args: IngestGriddedDataInput,
 ) -> None:
     """Write virtual references into their slots, with their status and source file's last modified time."""
@@ -153,6 +154,8 @@ def write_references(
         added = tg.ensure_axis(session, REFERENCES_GROUP_PATH, end, time_step, dim)
         if added:
             logger.info(f"Extended {REFERENCES_GROUP_PATH} by {added} slot(s) to {end}.")
+    if tg.ensure_grid_name(session.store, grid_name):
+        logger.info(f"Recorded grid_name '{grid_name}' on the repo.")
     ds = tg.with_step_metadata(
         virtual_ds,
         dim,

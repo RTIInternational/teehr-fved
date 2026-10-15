@@ -17,6 +17,7 @@ from teehr import Evaluation
 from teehr.utilities.generate_weights import generate_weights_file
 
 from utils import grid_utils as gu
+from utils import time_grid as tg
 from workflows.utils.common_utils import initialize_evaluation, table_exists
 from workflows.models.mean_areal_inputs import PixelCoverageWeightsInput
 
@@ -49,6 +50,24 @@ def get_readonly_repo_store(
         f"IceChunk S3 session store configured at: {dest_bucket}/{base_prefix}/{configuration_name}."
     )
     return store
+
+
+@task(cache_policy=NO_CACHE)
+def resolve_grid_name(store: ic.IcechunkStore, grid_name: str | None, configuration_name: str) -> str:
+    """The grid_name arg, else the repo's grid_name attribute, else the configuration name."""
+    logger = get_run_logger()
+    stored = tg.read_grid_name(store)
+    if grid_name is not None and stored is not None and grid_name != stored:
+        # Weights of another grid would index the wrong pixels
+        raise ValueError(f"grid_name '{grid_name}' differs from the repo's grid_name attribute '{stored}'.")
+    if grid_name is not None:
+        logger.info(f"Using grid_name '{grid_name}' from the flow args.")
+        return grid_name
+    if stored is not None:
+        logger.info(f"Using grid_name '{stored}' from the repo.")
+        return stored
+    logger.info(f"The repo has no grid_name; using the configuration name '{configuration_name}'.")
+    return configuration_name
 
 
 @task(cache_policy=NO_CACHE, timeout_seconds=60 * 60)
@@ -163,6 +182,7 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
         configuration_name=args.configuration_name,
         s3_storage_kwargs=args.s3_storage_kwargs
     )
+    grid_name = resolve_grid_name(store, args.grid_name, args.configuration_name)
     grid_ds = xr.open_zarr(store, group=gu.read_data_group(store), decode_coords="all", chunks=None)
     variable_name = args.grid_variable_name or next(iter(grid_ds.data_vars))
     grid_template_da = grid_ds[variable_name]
@@ -198,7 +218,7 @@ def calculate_pixel_coverage_weights(args: PixelCoverageWeightsInput):
     weights_df = format_weights_df(
         weights_df=weights_df,
         configuration_name=args.configuration_name,
-        grid_name=args.grid_name
+        grid_name=grid_name
     )
 
     write_dataframe_to_warehouse(
