@@ -56,8 +56,6 @@ definitions:
       ICECHUNK_PREFIX: "{{ $ICECHUNK_PREFIX }}"
       PMTILES_BUCKET: "{{ $PMTILES_BUCKET }}"
       PMTILES_PREFIX: "{{ $PMTILES_PREFIX }}"
-    node_selector:
-      teehr-hub/nodegroup-name: spark-r5-4xlarge
     tolerations:
       - key: teehr-hub/dedicated
         operator: Equal
@@ -67,20 +65,86 @@ definitions:
         operator: Equal
         value: worker
         effect: NoSchedule
+  # Driver resource tiers.
+  #
+  # Every deployment used to request the same 4 CPU / 32Gi. Measuring 166
+  # driver pods over 3 days (2026-09) showed the real requirement is strongly
+  # bimodal, and in the opposite direction to the obvious guess:
+  #
+  #   * Flows that START a Spark cluster have the SMALLEST drivers -- the work
+  #     is on the executors, so the driver only coordinates. update-forecast-
+  #     metrics-table peaked at 0.34 CPU / 4.8Gi while requesting 8 CPU / 64Gi.
+  #   * Flows with start_spark_cluster=false run Spark in LOCAL mode inside the
+  #     driver pod, so they are the heavy ones. ingest-nwm-medium-range-blend
+  #     peaked at 5.52 CPU / 38.9Gi -- over its 32Gi request.
+  #
+  # Tiers are set from observed peak with headroom, since the sample is short
+  # and some flows run only weekly. Flows with no measurement in the window
+  # keep the old 4 CPU / 32Gi "standard" tier rather than being guessed at.
+  #
+  # CPU is compressible, so these requests are floors, not caps; the pods have
+  # no CPU limit and still burst to whatever the node has spare.
+
+  # Coordinates a Spark cluster, or does trivial work. Peak seen: 0.41 CPU / 5.5Gi.
+  work_pool_resources_small: &work_pool_resources_small
+    cpu_request: "500m"
+    memory_request: 8Gi
+    node_selector:
+      teehr-hub/nodegroup-name: driver-r5-xlarge
+  # Light local-Spark work. Peak seen: 1.95 CPU / 14.3Gi.
+  work_pool_resources_medium: &work_pool_resources_medium
+    cpu_request: "2"
+    memory_request: 20Gi
+    node_selector:
+      teehr-hub/nodegroup-name: driver-r5-xlarge
+  # Heavy local-Spark work. Peak seen: 5.52 CPU / 38.9Gi.
+  work_pool_resources_large: &work_pool_resources_large
+    cpu_request: "6"
+    memory_request: 48Gi
+    node_selector:
+      teehr-hub/nodegroup-name: driver-r5-2xlarge
+  # Full-table rebuilds. Deliberately left at the historical 8 CPU / 64Gi
+  # rather than tiered down: this is an infrequent but genuinely large job,
+  # and it has no driver measurement because its schedule is disabled. Note
+  # 8 CPU / 64Gi does NOT fit an r5.2xlarge (~7.84 CPU / ~60Gi allocatable),
+  # so this tier keeps the 4xlarge node group.
+  work_pool_resources_xlarge: &work_pool_resources_xlarge
+    cpu_request: "8"
+    memory_request: 64Gi
+    node_selector:
+      teehr-hub/nodegroup-name: spark-r5-4xlarge
+  # Retained for flows with no measurement and no basis for inference. The
+  # nwm-forcing-* deployments previously sat here; they are disabled (too
+  # expensive to run) so they never appeared in the sample, but their driver
+  # shape can be inferred from the pattern every measured flow followed --
+  # cluster-starters coordinate and stay tiny, local-mode flows do the work
+  # in-process and are heavy. Re-measure them if they are ever re-enabled.
   work_pool_resources_standard: &work_pool_resources_standard
     cpu_request: "4"
     memory_request: 32Gi
-  work_pool_resources_large: &work_pool_resources_large
-    cpu_request: "8"
-    memory_request: 64Gi
-  work_pool: &work_pool
+    node_selector:
+      teehr-hub/nodegroup-name: driver-r5-2xlarge
+
+  work_pool_small: &work_pool_small
     name: kubernetes-pool
     job_variables:
-      <<: [*work_pool_job_variables_base, *work_pool_resources_standard]
+      <<: [*work_pool_job_variables_base, *work_pool_resources_small]
+  work_pool_medium: &work_pool_medium
+    name: kubernetes-pool
+    job_variables:
+      <<: [*work_pool_job_variables_base, *work_pool_resources_medium]
   work_pool_large: &work_pool_large
     name: kubernetes-pool
     job_variables:
       <<: [*work_pool_job_variables_base, *work_pool_resources_large]
+  work_pool_xlarge: &work_pool_xlarge
+    name: kubernetes-pool
+    job_variables:
+      <<: [*work_pool_job_variables_base, *work_pool_resources_xlarge]
+  work_pool: &work_pool
+    name: kubernetes-pool
+    job_variables:
+      <<: [*work_pool_job_variables_base, *work_pool_resources_standard]
 
 # the deployments section allows you to provide configuration for deploying flows
 deployments:
