@@ -158,7 +158,7 @@ deployments:
     description: Ingest USGS streamflow data from NWIS
     entrypoint: workflows/ingests/usgs_streamflow_obs.py:ingest_usgs_streamflow_obs
     parameters: {"temp_dir_path": *temp_dir_path}
-    work_pool: *work_pool
+    work_pool: *work_pool_medium
     schedule:
       cron: "0 8,20 * * *"
       active: false
@@ -176,7 +176,7 @@ deployments:
       "temp_dir_path": *temp_dir_path,
       "nwm_configuration": "short_range"
     }
-    work_pool: *work_pool
+    work_pool: *work_pool_large
     schedule:
       cron: "0 7,19 * * *"
       active: false
@@ -195,7 +195,7 @@ deployments:
       "output_type": "channel_rt",
       "start_spark_cluster": false
     }
-    work_pool: *work_pool
+    work_pool: *work_pool_large
     schedule:
       cron: "10 6,18 * * *"
       active: false
@@ -212,7 +212,7 @@ deployments:
     parameters: {
       "temp_dir_path": *temp_dir_path
     }
-    work_pool: *work_pool
+    work_pool: *work_pool_medium
     schedule:
       cron: "29 * * * *"
       active: false
@@ -283,7 +283,7 @@ deployments:
         "location_id_prefix": "usgsbasin"
       }
     }
-    work_pool: *work_pool
+    work_pool: *work_pool_large
 
   - name: calculate-mean-areal-values
     version:
@@ -298,7 +298,7 @@ deployments:
         "grid_variable_name": "swe_daily_inst"
       }
     }
-    work_pool: *work_pool
+    work_pool: *work_pool_large
 
   # Create Vector Tiles
   - name: create-vector-tiles
@@ -313,7 +313,7 @@ deployments:
         "output_layer_name": "usgs-basins"
       }
     }
-    work_pool: *work_pool
+    work_pool: *work_pool_medium
 
   # Maintenance and Metrics Workflows
   - name: update-joined-forecast-table
@@ -325,7 +325,7 @@ deployments:
     description: Create the joined forecast timeseries table
     entrypoint: workflows/metrics/update_joined_forecasts.py:update_joined_forecast_table
     parameters: {"temp_dir_path": *temp_dir_path}
-    work_pool: *work_pool_large
+    work_pool: *work_pool_xlarge
     # schedule:
     #   cron: "0 9,21 * * *"
     #   active: false
@@ -339,7 +339,7 @@ deployments:
     description: Create the joined forecast timeseries table
     entrypoint: workflows/metrics/update_joined_forecasts.py:update_joined_forecast_table_incremental
     parameters: {"temp_dir_path": *temp_dir_path}
-    work_pool: *work_pool
+    work_pool: *work_pool_small
     schedule:
       cron: "0 9,21 * * *"
       active: false
@@ -353,7 +353,7 @@ deployments:
     description: Create the forecast metrics table
     entrypoint: workflows/metrics/update_forecast_metrics.py:update_forecast_metrics_table
     parameters: {"temp_dir_path": *temp_dir_path}
-    work_pool: *work_pool_large
+    work_pool: *work_pool_small
     schedule:
       cron: "0 10,22 * * *"
       active: false
@@ -367,7 +367,7 @@ deployments:
     description: Run routine Iceberg table maintenance (expire snapshots, remove orphan files, compact data files, rewrite manifests)
     entrypoint: workflows/maintenance/routine_table_maintenance.py:routine_table_maintenance
     parameters: {"temp_dir_path": *temp_dir_path}
-    work_pool: *work_pool
+    work_pool: *work_pool_small
     schedule:
       cron: "0 4 * * 0"
       active: false
@@ -381,7 +381,7 @@ deployments:
     description: Delete old Prefect flow runs (status=COMPLETED, older than 7 days)
     entrypoint: workflows/maintenance/prefect_cleanup.py:rm_completed_flow_runs
     parameters: {"age_limit_days": 7}
-    work_pool: *work_pool
+    work_pool: *work_pool_small
     schedule:
       cron: "15 3 * * *"
       active: false
@@ -395,7 +395,7 @@ deployments:
     description: Precompute distinct group_by combinations that back the API queryable values endpoint
     entrypoint: workflows/data_management/update_queryable_combinations.py:update_queryable_combinations
     parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
-    work_pool: *work_pool
+    work_pool: *work_pool_medium
     schedule:
       cron: "0 5 * * *"
       active: true
@@ -410,7 +410,7 @@ deployments:
     description: Run ssm_test.py on the RiverWare Windows EC2 instance via AWS SSM
     entrypoint: workflows/riverware/riverware_ssm_run.py:run_riverware_python_script
     parameters: {"script_path": 'C:\FVED\Scripts\ssm_test.py'}
-    work_pool: *work_pool
+    work_pool: *work_pool_small
 
   - name: check-crmms-model-update
     version:
@@ -423,7 +423,7 @@ deployments:
     parameters:
       configuration_name: crmms_esp
       script_path: 'C:\FVED\teehr-fved\riverware\run_pipeline.py'
-    work_pool: *work_pool
+    work_pool: *work_pool_small
     schedule:
       cron: "0 12 13-20 * *"
       active: false
