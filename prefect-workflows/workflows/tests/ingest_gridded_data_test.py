@@ -90,13 +90,13 @@ TIFF_NODATA = np.float32(3.4e38)
 
 @pytest.fixture
 def cu(tmp_path, monkeypatch):
-    """CU-SWE source and repo on local storage; returns publish(day) -> the file's values (nodata as NaN) and an opener."""
+    """CU-SWE source and repo on local storage; returns publish(day) -> the file's values in m (nodata as NaN) and an opener."""
     src = tmp_path / "src"
     (src / "NRT").mkdir(parents=True)
     rng = np.random.default_rng(0)
 
     def publish(day):
-        values = rng.uniform(0, 3000, TIFF_SHAPE).astype("float32")
+        values = rng.uniform(0, 3, TIFF_SHAPE).astype("float32")
         values[:5, :7] = TIFF_NODATA
         with rasterio.open(
             src / "NRT" / f"WW_phvrcn_{day:%Y%m%d}_fscamsk_clp.tif", "w", driver="GTiff",
@@ -216,7 +216,35 @@ def test_geotiff_values_match_source(harness, cu):
     np.testing.assert_allclose(raw.x.values, x0 + (np.arange(TIFF_SHAPE[1]) + 0.5) * TIFF_RES)
     np.testing.assert_allclose(raw.y.values, y0 - (np.arange(TIFF_SHAPE[0]) + 0.5) * TIFF_RES)
     assert CRS.from_wkt(raw.spatial_ref.attrs["crs_wkt"]).to_epsg() == 4269
-    assert raw.swe_daily_inst.attrs["units"] == "mm"
-    # Values are copied exactly, with nodata as NaN
+    # /raw_data holds plain mm; /references keeps the source m and decodes to mm
+    assert {k: raw.swe_daily_inst.attrs[k] for k in ("units", "source_units")} == {"units": "mm", "source_units": "m"}
+    assert "scale_factor" not in raw.swe_daily_inst.encoding and raw.swe_daily_inst.dtype == "float32"
+    refs = xr.open_zarr(store, group="references", consolidated=False)
+    packed = xr.open_zarr(store, group="references", consolidated=False, mask_and_scale=False).swe_daily_inst
+    assert packed.dtype == "float32" and packed.attrs["scale_factor"] == 1000
     for d in days:
-        np.testing.assert_array_equal(raw.swe_daily_inst.sel(time=d).transpose("y", "x").values, expected[d])
+        source_m = expected[d]
+        source_mm = source_m * np.float32(1000)
+        np.testing.assert_array_equal(raw.swe_daily_inst.sel(time=d).transpose("y", "x").values, source_mm)
+        # Decoded with the JSON (float64) scale factor
+        np.testing.assert_array_equal(refs.swe_daily_inst.sel(time=d).transpose("y", "x").values.astype("float32"), source_mm)
+        stored_m = packed.sel(time=d).transpose("y", "x").values
+        np.testing.assert_array_equal(np.where(stored_m == TIFF_NODATA, np.nan, stored_m), source_m)
+    # Pyramids are packed from the mm values
+    pyramid = xr.open_zarr(store, group="pyramids/0", consolidated=False).swe_daily_inst
+    np.testing.assert_allclose(float(pyramid.isel(time=0).mean()), float(raw.swe_daily_inst.isel(time=0).mean()), rtol=0.05)
+
+
+def test_unit_conversion_composes_with_source_packing():
+    ds = xr.Dataset({
+        "swe_daily_inst": ("x", np.arange(3, dtype="int16"), {"units": "m", "scale_factor": np.float32(0.01), "add_offset": np.float32(1)}),
+        "other": ("x", np.zeros(3, "float32"), {"units": "m"}),
+    })
+    out = ing.gu.apply_unit_conversions(ds, ing.VARIABLE_UNITS, ing.UNIT_CONVERSIONS)
+    swe = out.swe_daily_inst.attrs
+    assert (swe["units"], swe["source_units"]) == ("mm", "m")
+    assert swe["scale_factor"] == np.float32(10) and swe["add_offset"] == np.float32(1000)
+    assert swe["scale_factor"].dtype == np.float32
+    assert out.other.attrs == {"units": "m"}  # not in VARIABLE_UNITS
+    with pytest.raises(ValueError, match="No conversion"):
+        ing.gu.apply_unit_conversions(xr.Dataset({"swe_daily_inst": ("x", [1.0], {"units": "ft"})}), ing.VARIABLE_UNITS, ing.UNIT_CONVERSIONS)
