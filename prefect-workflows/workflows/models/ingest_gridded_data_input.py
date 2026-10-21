@@ -12,7 +12,7 @@ from workflows.models.gridded_sources import GriddedSourceType
 
 
 # Renames source variables and units to teehr's on ingest: teehr's NWM mapper plus the
-# UA SWANN and iSnobal snow variables it doesn't cover
+# UA SWANN, iSnobal and CU-SWE snow variables it doesn't cover
 VARIABLE_AND_UNIT_MAPPER = {
     VARIABLE_NAME: {
         **NWM_VARIABLE_MAPPER[VARIABLE_NAME],
@@ -28,6 +28,10 @@ VARIABLE_AND_UNIT_MAPPER = {
         "kg m-2": {"name": "mm", "long_name": "Millimeters"},
     }
 }
+# Units each teehr variable is stored in; variables not listed keep their (mapped) source units
+VARIABLE_UNITS = {"swe_daily_inst": "mm", "depth_daily_inst": "mm"}
+# Linear conversions into those units: value * scale_factor + add_offset
+UNIT_CONVERSIONS = {("m", "mm"): {"scale_factor": 1000.0}}
 
 PYRAMID_GROUP_PATH = "/pyramids"
 # Spatial chunk size of pyramid levels, about one 256 px map tile
@@ -199,7 +203,7 @@ class BuildPyramidsDataInput(BaseGriddedDataInput):
     )
     pyramid_encoding: dict[str, PackedEncoding] = Field(
         default={
-            # UA SWANN and iSnobal; iSnobal peaks near 7,700 mm (willamette_extended)
+            # UA SWANN, iSnobal and CU-SWE; iSnobal peaks near 7,700 mm (willamette_extended)
             "swe_daily_inst": PackedEncoding(dtype="uint16", max_value=10000, units="mm"),
             "depth_daily_inst": PackedEncoding(dtype="uint16", max_value=8000, units="mm"),
         },
