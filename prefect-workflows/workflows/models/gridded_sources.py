@@ -223,8 +223,8 @@ class CUSwe(GriddedSource):
     store_kwargs: ClassVar[dict] = {"region": "us-east-2", "retry_config": REMOTE_RETRY_CONFIG}
     virtual_store_kwargs: ClassVar[dict] = {"region": "us-east-2"}
     time_step: ClassVar[pd.Timedelta] = pd.Timedelta("1D")
-    # The files carry no units tag; mm is unconfirmed
-    units: ClassVar[str] = "mm"
+    # The files carry no units tag; m is unconfirmed. Ingest converts to mm.
+    units: ClassVar[str] = "m"
     file_pattern: ClassVar[re.Pattern] = re.compile(r"/WW_phvrcn_(\d{8})_fscamsk_clp\.tif$")
 
     def _files(self) -> list[tuple[pd.Timestamp, dict]]:
