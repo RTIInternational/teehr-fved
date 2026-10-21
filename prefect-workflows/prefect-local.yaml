@@ -36,6 +36,8 @@ definitions:
         TEEHR_SPARK_IMAGE: "{{ $TEEHR_SPARK_IMAGE }}"
         TEEHR_NAMESPACE: "{{ $TEEHR_NAMESPACE }}"
         PREFECT_LOGGING_EXTRA_LOGGERS: teehr
+        # Concurrent chunk reads/writes per zarr call (default 10)
+        ZARR_ASYNC__CONCURRENCY: "128"
         # Start Local Only
         AWS_ACCESS_KEY_ID: "{{ $AWS_ACCESS_KEY_ID }}"
         AWS_SECRET_ACCESS_KEY: "{{ $AWS_SECRET_ACCESS_KEY }}"
@@ -141,10 +143,30 @@ deployments:
     parameters: {
       "args": {
         "source": {"type": "isnobal", "domain": "boise"},
+        "write_mode": "upsert",
         "parser_type": "tiff",
         "x_dim": "x",
         "y_dim": "y",
         "factors": [1, 2],
+        "time_batch_size": 30,
+        "ignore_unreadable_file": false
+      }
+    }
+    work_pool: *work_pool
+
+  - name: ingest-cu-swe
+    version:
+    tags: []
+    description: Ingest CU-SWE daily SWE GeoTIFFs into an IceChunk S3 repository using VirtualiZarr
+    entrypoint: workflows/ingests/ingest_gridded_data.py:ingest_gridded_data
+    parameters: {
+      "args": {
+        "source": {"type": "cu-swe"},
+        "write_mode": "upsert",
+        "parser_type": "tiff",
+        "x_dim": "x",
+        "y_dim": "y",
+        "factors": [1, 2, 4],
         "time_batch_size": 30,
         "ignore_unreadable_file": false
       }

@@ -11,7 +11,7 @@ import requests
 import xarray as xr
 from obstore.store import from_url
 from prefect.blocks.system import Secret
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AfterValidator, BaseModel, Field
 from teehr.fetching.utils import REMOTE_RETRY_CONFIG
 
 from workflows.utils.data_status import STATUS_COORD, STATUS_MEANINGS, with_status
@@ -74,6 +74,32 @@ def _listing(rows: list[dict]) -> pd.DataFrame:
     return df.set_index(pd.DatetimeIndex(df.pop("time"), name="time")).sort_index()
 
 
+def _known_status(v: str) -> str:
+    if v not in STATUS_MEANINGS:
+        raise ValueError(f"status must be one of {STATUS_MEANINGS}, got '{v}'")
+    return v
+
+
+# Data status recorded for every step of a source that publishes one status
+Status = Annotated[str, AfterValidator(_known_status), Field(description=f"Data status recorded for every step: one of {STATUS_MEANINGS}")]
+
+
+def _secret_credentials(name: str) -> dict:
+    """S3 keys from the ``<name>-aws-*`` Prefect Secret blocks; env vars (e.g. set in a notebook) take precedence."""
+    blocks = {"access_key_id": f"{name}-aws-access-key-id", "secret_access_key": f"{name}-aws-secret-access-key"}
+    return {
+        key: os.environ.get(block.upper().replace("-", "_")) or Secret.load(block).get()
+        for key, block in blocks.items()
+    }
+
+
+def _keyed_store(source: GriddedSource):
+    """An obstore store for the source's bucket, signed with its credentials."""
+    # A provider rather than keys: with keys, obstore adds any ambient AWS_SESSION_TOKEN to the request
+    creds = {**source.credentials(), "token": None, "expires_at": None}
+    return from_url(f"{source.source_bucket}/", **source.store_kwargs, credential_provider=lambda: creds)
+
+
 class UASwan4km(GriddedSource):
     type: Literal["ua-swann-4km"] = "ua-swann-4km"
     # Variants that may be used; each day takes the most final one published
@@ -131,7 +157,7 @@ class ISnobal(GriddedSource):
     domain: str = Field(..., description="Model domain, e.g. 'boise'. Each domain has its own repository.")
     variable: str = Field(default="specific_mass", description="File name prefix of the variable to ingest")
     prefix: str = Field(default="nrcs/shared", description="Key prefix above the domain directories")
-    status: str = Field(default="stable", description=f"Data status recorded for every step: one of {STATUS_MEANINGS}")
+    status: Status = "stable"
 
     source_bucket: ClassVar[str] = "s3://m3w-transfer"
     store_kwargs: ClassVar[dict] = {"region": "us-west-2", "retry_config": REMOTE_RETRY_CONFIG}
@@ -140,23 +166,11 @@ class ISnobal(GriddedSource):
     # Units per variable; only some files carry a units tag
     units: ClassVar[dict] = {"specific_mass": "kg m-2"}
 
-    @field_validator("status")
-    @classmethod
-    def _known_status(cls, v: str) -> str:
-        if v not in STATUS_MEANINGS:
-            raise ValueError(f"status must be one of {STATUS_MEANINGS}, got '{v}'")
-        return v
-
-    def _store(self):
-        # A provider rather than keys: with keys, obstore adds any ambient AWS_SESSION_TOKEN to the request
-        creds = {**self.credentials(), "token": None, "expires_at": None}
-        return from_url(f"{self.source_bucket}/", **self.store_kwargs, credential_provider=lambda: creds)
-
     def list_files(self, start_dt: datetime, end_dt: datetime) -> pd.DataFrame:
         """Files laid out as <domain>/wy<YYYY>/run<YYYYMMDD>/<variable>_<time>.tif, listed per water year."""
         start, end = start_dt.date(), end_dt.date()
         pattern = re.compile(rf"/run\d{{8}}/{re.escape(self.variable)}_(\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}})\.tif$")
-        store, rows = self._store(), []
+        store, rows = _keyed_store(self), []
         for wy in range(_water_year(start), _water_year(end) + 1):
             for batch in obstore.list(store, prefix=f"{self.prefix}/{self.domain}/wy{wy}/"):
                 for obj in batch:
@@ -172,7 +186,7 @@ class ISnobal(GriddedSource):
 
     def time_origin(self) -> pd.Timestamp:
         """Start of the domain's first water year in the bucket; domains start in different years."""
-        listed = obstore.list_with_delimiter(self._store(), prefix=f"{self.prefix}/{self.domain}/")
+        listed = obstore.list_with_delimiter(_keyed_store(self), prefix=f"{self.prefix}/{self.domain}/")
         matches = (re.search(r"/wy(\d{4})/?$", p) for p in listed["common_prefixes"])
         years = sorted(int(m.group(1)) for m in matches if m)
         if not years:
@@ -186,12 +200,7 @@ class ISnobal(GriddedSource):
         return [self.variable]
 
     def credentials(self) -> dict:
-        # Env vars (e.g. set in a notebook) take precedence over the Prefect Secret blocks
-        blocks = {"access_key_id": "m3works-aws-access-key-id", "secret_access_key": "m3works-aws-secret-access-key"}
-        return {
-            key: os.environ.get(block.upper().replace("-", "_")) or Secret.load(block).get()
-            for key, block in blocks.items()
-        }
+        return _secret_credentials("m3works")
 
     def preprocess(self, ds: xr.Dataset, url: str) -> xr.Dataset:
         # Parsed with IFD 0 (full resolution), the only variable is "0"
@@ -202,4 +211,66 @@ class ISnobal(GriddedSource):
         return with_status(ds, self.status)
 
 
-GriddedSourceType = Annotated[Union[UASwan4km, ISnobal], Field(discriminator="type")]
+class CUSwe(GriddedSource):
+    """CU Boulder SWE fusion, one daily western U.S. GeoTIFF."""
+
+    type: Literal["cu-swe"] = "cu-swe"
+    prefix: str = Field(default="NRT", description="Key prefix of the daily files")
+    variable: str = Field(default="SWE", description="Name given to the files' only band")
+    status: Status = "stable"
+
+    source_bucket: ClassVar[str] = "s3://swe-fusion"
+    store_kwargs: ClassVar[dict] = {"region": "us-east-2", "retry_config": REMOTE_RETRY_CONFIG}
+    virtual_store_kwargs: ClassVar[dict] = {"region": "us-east-2"}
+    time_step: ClassVar[pd.Timedelta] = pd.Timedelta("1D")
+    # The files carry no units tag; mm is unconfirmed
+    units: ClassVar[str] = "mm"
+    file_pattern: ClassVar[re.Pattern] = re.compile(r"/WW_phvrcn_(\d{8})_fscamsk_clp\.tif$")
+
+    def _files(self) -> list[tuple[pd.Timestamp, dict]]:
+        """(day, object meta) of every file under the prefix; the keys can't list the bucket root."""
+        files = []
+        for batch in obstore.list(_keyed_store(self), prefix=f"{self.prefix}/"):
+            for obj in batch:
+                match = self.file_pattern.search(obj["path"])
+                if match:
+                    files.append((pd.Timestamp(match.group(1)), obj))
+        return files
+
+    def list_files(self, start_dt: datetime, end_dt: datetime) -> pd.DataFrame:
+        start, end = start_dt.date(), end_dt.date()
+        return _listing([
+            {
+                "time": day,
+                "url": f"{self.source_bucket}/{obj['path']}",
+                STATUS_COORD: self.status,
+                "last_modified": pd.Timestamp(obj["last_modified"]).tz_convert(None),
+            }
+            for day, obj in self._files() if start <= day.date() <= end
+        ])
+
+    def time_origin(self) -> pd.Timestamp:
+        """First day published under the prefix."""
+        days = [day for day, _ in self._files()]
+        if not days:
+            raise ValueError(f"No CU-SWE files found under '{self.source_bucket}/{self.prefix}/'.")
+        return min(days)
+
+    def repository_name(self) -> str:
+        return "cu_swe"
+
+    def ingest_variables(self) -> list[str]:
+        return [self.variable]
+
+    def credentials(self) -> dict:
+        return _secret_credentials("cu-swe")
+
+    def preprocess(self, ds: xr.Dataset, url: str) -> xr.Dataset:
+        # Parsed with IFD 0 (full resolution), the only variable is "0"
+        time = pd.Timestamp(self.file_pattern.search(url).group(1))
+        ds = ds.rename({"0": self.variable}).expand_dims(time=[time])
+        ds[self.variable].attrs.setdefault("units", self.units)
+        return with_status(ds, self.status)
+
+
+GriddedSourceType = Annotated[Union[UASwan4km, ISnobal, CUSwe], Field(discriminator="type")]
