@@ -11,16 +11,17 @@ variables:
     replyToDisplayName: FVED Support
     starttls: "true"
     ssl: "false"
-  aws:
-    region: us-east-1
+  # Set per cluster by the remote deploy target (deploy-targets/).
   remoteCluster:
-    contextArn: arn:aws:eks:us-east-1:794457362858:cluster/fved-cluster
-    ecrRegistry: 794457362858.dkr.ecr.us-east-1.amazonaws.com
+    contextArn: ""
+    ecrRegistry: ""
 
 environments:
   - name: local
     defaultNamespace: ${project.name}
     variables:
+      aws:
+        region: us-east-1
       hostname: teehr.local.app.garden
       certificateIssuerName: letsencrypt-prod
       devTeehrVersion: 0333f73d0e41960abbbae7d5252aff0859dcf3d7
@@ -65,16 +66,16 @@ environments:
             authz_test_restricted: ["admin"] # for the xpublish-access-enforcement test
   - name: remote
     defaultNamespace: ${project.name}
+    # Cluster-specific values (region, cluster, ECR, EFS, IRSA roles, buckets,
+    # hostname) come from deploy-targets/<target>.yml, chosen with DEPLOY_TARGET.
+    # It overrides anything below. See teehr-cloud-core
+    # docs/platform-app-deployment-contract.md.
+    varfile: deploy-targets/${local.env.DEPLOY_TARGET || "use1"}.yml
     variables:
-      hostname: dev.low.amzifved.aws.rti.org
       certificateIssuerName: letsencrypt-prod
       devTeehrVersion: 0333f73d0e41960abbbae7d5252aff0859dcf3d7
       stableTeehrVersion: v0.7.0
       previousTeehrVersion: v0.6.6
-      irsa:
-        prefectJobRoleArn: arn:aws:iam::794457362858:role/fved-prefect-jobs-irsa
-        xpublishRoleArn: arn:aws:iam::794457362858:role/fved-xpublish-api-irsa
-        polarisRoleArn: arn:aws:iam::794457362858:role/fved-polaris-irsa
       polaris:
         inCluster: "true"
         catalogS3PathStyleAccess: "false"
@@ -82,15 +83,12 @@ environments:
         catalogS3Region: ${var.aws.region}
         catalogType: rest
         catalogUri: http://polaris:8181/api/catalog
-        catalogWarehouse: s3://dev-fved-iceberg-warehouse-rti-use1/
-        catalogRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-access
         skipCredentialSubscopingIndirection: "false"
         storageStsUnavailable: "false"
         defaultRealm: teehr
         realmsCsv: teehr
         oauthServerUri: http://keycloak-service:8080/realms/teehr/protocol/openid-connect/token
         oidcIssuerUri: http://keycloak-service:8080/realms/teehr
-      nfsServerDns: "fs-0d53828f401595456.efs.us-east-1.amazonaws.com"
       trino:
         host: trino
         port: "8080"
@@ -99,12 +97,9 @@ environments:
         schema: teehr
       allowedOrigins: "https://dashboards.${var.hostname},https://api.${var.hostname}"
       icechunk:
-        bucket: "dev-fved-icechunk-warehouse-rti-use1"
         prefix: "icechunk-ingests"
-        accessRoleArn: arn:aws:iam::794457362858:role/fved-icechunk-s3-warehouse-access
         storageStsUnavailable: "false"
       pmtiles:
-        bucket: "dev-fved-icechunk-warehouse-rti-use1"
         prefix: "vector-tiles"
       xpublish:
         # default: roles that can read anything not listed below.
@@ -132,4 +127,4 @@ providers:
       namespace: ${project.name}
     context: ${var.remoteCluster.contextArn}
     buildMode: cluster-buildkit
-    defaultHostname: dev.low.amzifved.aws.rti.org
+    defaultHostname: ${var.hostname}
