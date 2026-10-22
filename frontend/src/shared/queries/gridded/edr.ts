@@ -1,7 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
 
-import { fetchGriddedEdrTimeseries } from '@/services/griddedApi';
-import { MAX_TIMESERIES_POINTS } from '@/services/griddedApi';
+import { MAX_TIMESERIES_POINTS } from '@/shared/api/gridded/client';
+import { fetchGriddedEdrTimeseries } from '@/shared/api/gridded/edr';
 import type { DatasetTimeseries } from '@/shared/types/gridded/edr';
 import type { GriddedTimeseriesFilters } from '@/shared/types/gridded/timeseries';
 
