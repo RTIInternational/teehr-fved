@@ -1,6 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
 
-import { griddedApiService, MAX_TIMESERIES_POINTS } from '@/services/griddedApi';
+import { fetchGriddedEdrTimeseries } from '@/services/griddedApi';
+import { MAX_TIMESERIES_POINTS } from '@/services/griddedApi';
 import type { DatasetTimeseries } from '@/shared/types/gridded/edr';
 import type { GriddedTimeseriesFilters } from '@/shared/types/gridded/timeseries';
 
@@ -92,8 +93,7 @@ export const useEdrTimeseries = ({
       const { variable, start, end } = plans[i];
       return {
         queryKey: ['gridded', 'edrTimeseries', ds, variable, lon, lat, start, end],
-        queryFn: () =>
-          griddedApiService.fetchGriddedEdrTimeseries(ds, variable!, lon!, lat!, start!, end!),
+        queryFn: () => fetchGriddedEdrTimeseries(ds, variable!, lon!, lat!, start!, end!),
         enabled: variable != null && start != null && end != null && lon != null && lat != null,
       };
     }),

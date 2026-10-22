@@ -1,13 +1,13 @@
 import { queryOptions, useQuery } from '@tanstack/react-query';
 
-import { griddedApiService } from '../../../services/griddedApi';
+import { getGriddedVariables } from '../../../services/griddedApi';
 
 const fetchVariables = async (datasetId?: string | null) => {
   if (!datasetId) {
     throw new Error('Dataset required to retrieve variables');
   }
 
-  return griddedApiService.getGriddedVariables(datasetId);
+  return getGriddedVariables(datasetId);
 };
 
 export const variablesQueryOptions = (datasetId?: string | null) =>
