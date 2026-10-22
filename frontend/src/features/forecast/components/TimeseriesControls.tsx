@@ -3,8 +3,7 @@ import { Form, Row, Col, Button, Tabs, Tab } from 'react-bootstrap';
 
 import type { TimeseriesRequestFilters } from '@/shared/api/timeseries';
 import MultiSelectDropdown from '@/shared/components/MultiSelectDropdown';
-import { useConfigurations } from '@/shared/queries/configurations';
-import { useVariables } from '@/shared/queries/variables';
+import { useDistinctValues } from '@/shared/queries/distinctValues';
 import type { MapLocation } from '@/shared/types/locations';
 import type { MapFilters } from '@/shared/types/maps';
 import type { TimeseriesFilters } from '@/shared/types/timeseries';
@@ -35,9 +34,9 @@ const TimeseriesControls = ({
 }: TimeseriesControlsProps) => {
   const [activeTab, setActiveTab] = useState('observations');
 
-  const configurations = useConfigurations(table);
-  const variables = useVariables(table);
-  const primaryVariables = useVariables('primary_timeseries');
+  const configurations = useDistinctValues(table, 'configuration_name');
+  const variables = useDistinctValues(table, 'variable_name');
+  const primaryVariables = useDistinctValues('primary_timeseries', 'variable_name');
 
   const primaryFilters = timeseriesFilters.primary;
   const secondaryFilters = timeseriesFilters.secondary;
