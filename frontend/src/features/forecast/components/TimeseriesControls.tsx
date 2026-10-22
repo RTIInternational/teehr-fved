@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Form, Row, Col, Button, Tabs, Tab } from 'react-bootstrap';
 
+import type { TimeseriesRequestFilters } from '@/shared/api/timeseries';
 import MultiSelectDropdown from '@/shared/components/MultiSelectDropdown';
 import { useConfigurations } from '@/shared/queries/configurations';
 import { useVariables } from '@/shared/queries/variables';
 import type { MapLocation } from '@/shared/types/locations';
 import type { MapFilters } from '@/shared/types/maps';
-import type { TimeseriesFilters, TimeseriesRequestFilters } from '@/shared/types/timeseries';
+import type { TimeseriesFilters } from '@/shared/types/timeseries';
 import {
   toDisplayVariableName,
   fromDisplayVariableName,
