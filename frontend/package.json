@@ -23,6 +23,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:remote": "vite --mode remote-dev",
     "start": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
