@@ -48,6 +48,7 @@ environments:
         user: teehr
         catalog: iceberg
         schema: teehr
+      enableLocalDevFrontendClient: false
       allowedOrigins: "https://dashboards.${var.hostname},https://api.${var.hostname}"
       icechunk:
         bucket: "warehouse"
@@ -95,7 +96,8 @@ environments:
         user: teehr
         catalog: iceberg
         schema: teehr
-      allowedOrigins: "https://dashboards.${var.hostname},https://api.${var.hostname}"
+      enableLocalDevFrontendClient: true
+      allowedOrigins: "https://dashboards.${var.hostname},https://api.${var.hostname},http://localhost:8080,http://127.0.0.1:8080"
       icechunk:
         prefix: "icechunk-ingests"
         storageStsUnavailable: "false"
