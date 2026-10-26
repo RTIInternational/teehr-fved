@@ -1,6 +1,7 @@
 import { Dropdown } from 'react-bootstrap';
 import { Link, useLocation } from 'react-router-dom';
 
+import { getDashboardLabelByRoute } from '@/config/dashboardNavigation';
 import { useAuth } from '@/shared/auth';
 
 const JUPYTERHUB_URL =
@@ -14,9 +15,8 @@ const Navbar = () => {
   const canViewHubDeployment = authenticated && roles.includes('jupyter-user');
 
   const getBreadcrumbs = () => {
+    const dashboardLabel = getDashboardLabelByRoute(location.pathname);
     const pathMap: Record<string, string> = {
-      '/forecast': 'Forecast Analysis',
-      '/gridded': 'Snow Dashboard',
       '/admin': 'Admin Page',
       '/admin/api-keys': 'API Keys',
       '/admin/keycloak': 'Keycloak Admin',
@@ -41,7 +41,7 @@ const Navbar = () => {
           </li>
           {!isHubMainPage && (
             <li className="breadcrumb-item active text-white" aria-current="page">
-              {pathMap[location.pathname] || 'Dashboard'}
+              {dashboardLabel || pathMap[location.pathname] || 'Dashboard'}
             </li>
           )}
         </ol>
