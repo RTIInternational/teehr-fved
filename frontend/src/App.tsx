@@ -10,6 +10,7 @@ import KeycloakAdmin from '@/pages/admin/KeycloakAdmin';
 import DashboardsHome from '@/pages/DashboardsHome';
 import Home from '@/pages/Home';
 import { useAuth } from '@/shared/auth';
+import DashboardQuickSwitchBar from '@/shared/components/DashboardQuickSwitchBar';
 import Navbar from '@/shared/components/Navbar';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -84,6 +85,7 @@ const AppRoutes = () => {
   return (
     <div className="App">
       <Navbar />
+      <DashboardQuickSwitchBar />
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
