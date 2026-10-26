@@ -9,6 +9,7 @@ import type {
 } from '@/shared/types/gridded/maps';
 import type { PolygonFeatures } from '@/shared/types/gridded/tiles';
 import type { GriddedTimeseriesFilters } from '@/shared/types/gridded/timeseries';
+import type { MapViewport } from '@/shared/types/maps';
 
 import type { GriddedTabName } from './Dashboard';
 
@@ -16,6 +17,7 @@ type PolygonFeaturesPayload = { features: PolygonFeatures; lngLat: ClickedPoint 
 
 export type DashboardState = {
   mapFilters: MapFilters;
+  mapViewport: MapViewport | null;
   activeOverlays: string[];
   activePolygonLayer: string | null;
   rightPanelTab: GriddedTabName;
@@ -54,6 +56,8 @@ const initialState: DashboardState = {
     colorRampMax: 100,
   },
 
+  mapViewport: null,
+
   activeOverlays: [], // string[] of overlay IDs currently shown on the map
 
   // Polygon layers from S3/pmtiles
@@ -81,6 +85,7 @@ const initialState: DashboardState = {
 
 export const ActionTypes = {
   UPDATE_MAP_FILTERS: 'UPDATE_MAP_FILTERS',
+  SET_MAP_VIEWPORT: 'SET_MAP_VIEWPORT',
   UPDATE_TIMESERIES_FILTERS: 'UPDATE_TIMESERIES_FILTERS',
   TOGGLE_OVERLAY: 'TOGGLE_OVERLAY',
   SET_ACTIVE_POLYGON_LAYER: 'SET_ACTIVE_POLYGON_LAYER',
@@ -98,6 +103,7 @@ export const ActionTypes = {
 
 export type DashboardAction =
   | { type: typeof ActionTypes.UPDATE_MAP_FILTERS; payload: UpdateMapFiltersPayload }
+  | { type: typeof ActionTypes.SET_MAP_VIEWPORT; payload: MapViewport | null }
   | {
       type: typeof ActionTypes.UPDATE_TIMESERIES_FILTERS;
       payload: Partial<GriddedTimeseriesFilters>;
@@ -124,6 +130,12 @@ const reducer = (state: DashboardState, action: DashboardAction): DashboardState
           ...state.mapFilters,
           ...action.payload,
         },
+      };
+
+    case ActionTypes.SET_MAP_VIEWPORT:
+      return {
+        ...state,
+        mapViewport: action.payload,
       };
 
     case ActionTypes.UPDATE_TIMESERIES_FILTERS:
