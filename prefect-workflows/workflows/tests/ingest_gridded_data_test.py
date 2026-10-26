@@ -56,21 +56,24 @@ def _local_repo(tmp_path, src, monkeypatch):
 
 @pytest.fixture
 def ua(tmp_path, monkeypatch):
-    """UA source and repo on local storage; returns publish(day, status, value, modified) and an opener."""
+    """UA source and repo on local storage; returns publish(day, status, value, modified, ...) and an opener.
+
+    ``value`` is a scalar or a (40, 50) grid; ``encoding`` writes it packed, e.g. as int16.
+    """
     src = tmp_path / "src"
     src.mkdir()
     prefix = f"file://{src}/"
     published = {}
 
-    def publish(day, status, value, modified):
+    def publish(day, status, value, modified, units="millimeters h20", encoding=None):
         for old in src.glob(f"*_{day:%Y%m%d}_*.nc"):
             old.unlink()
         name = f"UA_SWE_Depth_4km_v1_{day:%Y%m%d}_{status}.nc"
+        data = np.broadcast_to(np.asarray(value, "float32"), (40, 50))[None]
         xr.Dataset(
-            {v: (("time", "lat", "lon"), np.full((1, 40, 50), value, "float32"), {"units": "millimeters h20"})
-             for v in ("SWE", "DEPTH")},
+            {v: (("time", "lat", "lon"), data, {"units": units}) for v in ("SWE", "DEPTH")},
             coords={"time": [day], "lat": np.linspace(40.0, 41.0, 40), "lon": np.linspace(-110.0, -108.0, 50)},
-        ).to_netcdf(src / name, engine="h5netcdf")
+        ).to_netcdf(src / name, engine="h5netcdf", encoding={v: encoding for v in ("SWE", "DEPTH")} if encoding else None)
         published[day] = {"time": day, "url": f"{prefix}{name}", "status": status, "last_modified": pd.Timestamp(modified)}
 
     def list_files(self, start_dt, end_dt):
@@ -115,10 +118,10 @@ def cu(tmp_path, monkeypatch):
     return publish, _local_repo(tmp_path, src, monkeypatch)
 
 
-def _run(start, end, mode="append"):
+def _run(start, end, mode="append", **kwargs):
     ing.ingest_gridded_data(IngestGriddedDataInput(
         source={"type": "ua-swann-4km"}, start_dt=start, end_dt=end, write_mode=mode, fallback_source_crs="EPSG:4269",
-        factors=[1, 2], dest_bucket="unused", base_prefix="unused", ignore_unreadable_file=False,
+        factors=[1, 2], dest_bucket="unused", base_prefix="unused", ignore_unreadable_file=False, **kwargs,
     ))
 
 
@@ -233,6 +236,71 @@ def test_geotiff_values_match_source(harness, cu):
     # Pyramids are packed from the mm values
     pyramid = xr.open_zarr(store, group="pyramids/0", consolidated=False).swe_daily_inst
     np.testing.assert_allclose(float(pyramid.isel(time=0).mean()), float(raw.swe_daily_inst.isel(time=0).mean()), rtol=0.05)
+
+
+@pytest.mark.parametrize("units, source_scale, stored_scale, mm_per_int", [
+    ("millimeters h20", None, None, 1),  # unpacked, already mm: stored as is
+    ("m", None, 1000, 1000),  # unpacked m: the conversion adds packing
+    ("m", 0.001, 1.0, 1),  # packed m: the conversion composes with the source packing
+])
+def test_integer_source_stored_losslessly(harness, ua, units, source_scale, stored_scale, mm_per_int):
+    publish, open_repo = ua
+    rng = np.random.default_rng(0)
+    ints = rng.integers(0, 3000, (40, 50)).astype("float32")
+    ints[:4, :6] = np.nan
+    encoding = {"dtype": "int16", "_FillValue": -9999}
+    if source_scale:
+        encoding["scale_factor"] = source_scale
+    for d in (DAYS[0], DAYS[2]):  # DAYS[1] stays unwritten
+        publish(d, "stable", ints * (source_scale or 1), "2026-01-01", units=units, encoding=encoding)
+    _run("1981-10-01", "1981-10-03")
+
+    store = open_repo().readonly_session("main").store
+    stored = xr.open_zarr(store, group="raw_data", consolidated=False, mask_and_scale=False).swe_daily_inst
+    assert stored.dtype == "int16" and stored.attrs["_FillValue"] == -9999
+    assert stored.attrs.get("scale_factor") == stored_scale and "add_offset" not in stored.attrs
+    raw = xr.open_zarr(store, group="raw_data", consolidated=False).swe_daily_inst
+    assert raw.attrs["units"] == "mm"
+    for i in (0, 2):
+        np.testing.assert_array_equal(stored.isel(time=i).values, np.where(np.isnan(ints), -9999, ints))
+        np.testing.assert_array_equal(raw.isel(time=i).values, ints * mm_per_int)
+    assert np.isnan(raw.isel(time=1).values).all()  # unwritten slots are missing, not 0
+
+
+def test_integer_source_without_fill_value_needs_one(harness, ua, monkeypatch):
+    publish, open_repo = ua
+    monkeypatch.setattr(ing, "materialize_references", ing.materialize_references.with_options(retries=0))
+    ints = np.arange(40 * 50).reshape(40, 50) % 255  # 0-254, leaving 255 unused
+    for d in (DAYS[0], DAYS[2]):
+        publish(d, "stable", ints, "2026-01-01", encoding={"dtype": "uint8"})
+    with pytest.raises(ValueError, match="has no _FillValue"):
+        _run("1981-10-01", "1981-10-03")
+    with pytest.raises(ValueError, match="outside the uint8 range"):
+        _run("1981-10-01", "1981-10-03", raw_data_fill_values={"swe_daily_inst": 300, "depth_daily_inst": 300})
+
+    _run("1981-10-01", "1981-10-03", raw_data_fill_values={"swe_daily_inst": 255, "depth_daily_inst": 255})
+    store = open_repo().readonly_session("main").store
+    stored = xr.open_zarr(store, group="raw_data", consolidated=False, mask_and_scale=False).swe_daily_inst
+    assert stored.dtype == "uint8" and stored.attrs["_FillValue"] == 255
+    raw = xr.open_zarr(store, group="raw_data", consolidated=False).swe_daily_inst
+    np.testing.assert_array_equal(raw.isel(time=0).values, ints)
+    assert np.isnan(raw.isel(time=1).values).all()  # the unwritten slot reads as the fill value, i.e. missing
+
+
+def test_unsigned_source_stored_as_signed_keeps_its_values(harness, ua):
+    publish, open_repo = ua
+    ints = (np.arange(40 * 50).reshape(40, 50) % 255).astype("float32")  # 0-254, above int8's range
+    ints[:4, :6] = np.nan
+    for d in (DAYS[0], DAYS[2]):
+        publish(d, "stable", ints, "2026-01-01", encoding={"dtype": "int8", "_Unsigned": "true", "_FillValue": np.int8(-1)})
+    _run("1981-10-01", "1981-10-03")
+
+    store = open_repo().readonly_session("main").store
+    stored = xr.open_zarr(store, group="raw_data", consolidated=False, mask_and_scale=False).swe_daily_inst
+    assert stored.dtype == "int8" and stored.attrs["_Unsigned"] == "true"
+    raw = xr.open_zarr(store, group="raw_data", consolidated=False).swe_daily_inst
+    np.testing.assert_array_equal(raw.isel(time=0).values, ints)
+    assert np.isnan(raw.isel(time=1).values).all()
 
 
 def test_unit_conversion_composes_with_source_packing():
