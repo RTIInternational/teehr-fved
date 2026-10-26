@@ -2,8 +2,7 @@ import { useEffect } from 'react';
 
 import { FORECAST_DASHBOARD_DEFAULTS, selectDefault } from '@/config/dashboardDefaults';
 import { ActionTypes, useDashboard } from '@/features/forecast/DashboardContext';
-import { useConfigurations } from '@/shared/queries/configurations';
-import { useVariables } from '@/shared/queries/variables';
+import { useDistinctValues } from '@/shared/queries/distinctValues';
 
 /**
  * Load filters from data warehouse API and apply defaults
@@ -13,9 +12,9 @@ import { useVariables } from '@/shared/queries/variables';
 export const useInitialFilters = (table: string) => {
   const { dispatch } = useDashboard();
 
-  const configurations = useConfigurations(table);
-  const variables = useVariables(table);
-  useVariables('primary_timeseries'); // Pre-load primary variables
+  const configurations = useDistinctValues(table, 'configuration_name');
+  const variables = useDistinctValues(table, 'variable_name');
+  useDistinctValues('primary_timeseries', 'variable_name');
 
   const defaultConfiguration = selectDefault(
     FORECAST_DASHBOARD_DEFAULTS.preferredConfiguration,
