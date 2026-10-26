@@ -10,6 +10,13 @@ export type InvalidFeature = {
 
 export type LngLatTuple = [number, number];
 
+export type MapViewport = {
+  center: LngLatTuple;
+  zoom: number;
+  bearing?: number;
+  pitch?: number;
+};
+
 export type MapFilters = {
   configuration?: string | null;
   variable?: string | null;
