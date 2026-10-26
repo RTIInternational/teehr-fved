@@ -287,6 +287,22 @@ def test_integer_source_without_fill_value_needs_one(harness, ua, monkeypatch):
     assert np.isnan(raw.isel(time=1).values).all()  # the unwritten slot reads as the fill value, i.e. missing
 
 
+def test_unsigned_source_stored_as_signed_keeps_its_values(harness, ua):
+    publish, open_repo = ua
+    ints = (np.arange(40 * 50).reshape(40, 50) % 255).astype("float32")  # 0-254, above int8's range
+    ints[:4, :6] = np.nan
+    for d in (DAYS[0], DAYS[2]):
+        publish(d, "stable", ints, "2026-01-01", encoding={"dtype": "int8", "_Unsigned": "true", "_FillValue": np.int8(-1)})
+    _run("1981-10-01", "1981-10-03")
+
+    store = open_repo().readonly_session("main").store
+    stored = xr.open_zarr(store, group="raw_data", consolidated=False, mask_and_scale=False).swe_daily_inst
+    assert stored.dtype == "int8" and stored.attrs["_Unsigned"] == "true"
+    raw = xr.open_zarr(store, group="raw_data", consolidated=False).swe_daily_inst
+    np.testing.assert_array_equal(raw.isel(time=0).values, ints)
+    assert np.isnan(raw.isel(time=1).values).all()
+
+
 def test_unit_conversion_composes_with_source_packing():
     ds = xr.Dataset({
         "swe_daily_inst": ("x", np.arange(3, dtype="int16"), {"units": "m", "scale_factor": np.float32(0.01), "add_offset": np.float32(1)}),

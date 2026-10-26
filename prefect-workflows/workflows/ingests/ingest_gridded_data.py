@@ -194,7 +194,8 @@ def _raw_data_encoding(da: xr.DataArray, fill_value: int | None = None) -> dict:
         raise ValueError(f"Fill value {fill} for '{da.name}' is outside the {dtype} range [{info.min}, {info.max}].")
     # zarr's own fill must match, or unwritten chunks read as valid data (e.g. 0)
     packing = {"dtype": dtype, "_FillValue": fill, "fill_value": fill}
-    packing.update({k: da.encoding[k] for k in ("scale_factor", "add_offset") if k in da.encoding})
+    # _Unsigned: netCDF-3 style unsigned data, stored signed (fills too) and decoded to the unsigned range
+    packing.update({k: da.encoding[k] for k in ("scale_factor", "add_offset", "_Unsigned") if k in da.encoding})
     return packing
 
 
