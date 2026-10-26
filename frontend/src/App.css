@@ -244,6 +244,18 @@ main {
   transform: translateY(-1px);
 }
 
+.dashboard-switcher-bar {
+  background: #f8fafc;
+}
+
+.dashboard-switcher-disabled {
+  opacity: 0.65;
+}
+
+.dashboard-switcher-mobile .form-select {
+  max-width: 320px;
+}
+
 @media (max-width: 768px) {
   .welcome-hero {
     border-bottom-left-radius: 0;
