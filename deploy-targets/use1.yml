@@ -1,0 +1,27 @@
+# us-east-1 cluster (fved-cluster). Values from aws-project-amzifved-infrastructure
+# and the previous project.garden.yml; keys documented in teehr-cloud-core
+# docs/platform-app-deployment-contract.md.
+aws:
+  region: us-east-1
+remoteCluster:
+  contextArn: arn:aws:eks:us-east-1:794457362858:cluster/fved-cluster
+  ecrRegistry: 794457362858.dkr.ecr.us-east-1.amazonaws.com
+hostname: dev.low.amzifved.aws.rti.org
+nfsServerDns: fs-0d53828f401595456.efs.us-east-1.amazonaws.com
+irsa:
+  polarisRoleArn: arn:aws:iam::794457362858:role/fved-polaris-irsa
+  prefectJobRoleArn: arn:aws:iam::794457362858:role/fved-prefect-jobs-irsa
+  xpublishRoleArn: arn:aws:iam::794457362858:role/fved-xpublish-api-irsa
+polaris:
+  catalogWarehouse: s3://dev-fved-iceberg-warehouse-rti-use1/
+  catalogRoleArn: arn:aws:iam::794457362858:role/fved-iceberg-s3-warehouse-access
+icechunk:
+  bucket: dev-fved-icechunk-warehouse-rti-use1
+  accessRoleArn: arn:aws:iam::794457362858:role/fved-icechunk-s3-warehouse-access
+pmtiles:
+  bucket: dev-fved-icechunk-warehouse-rti-use1
+deploy:
+  clusterName: fved-cluster
+  # The action role has cluster admin through its EKS access entry.
+  clusterRoleArn: arn:aws:iam::794457362858:role/github-actions-eks-deploy-amzi-fved
+  actionRoleArn: arn:aws:iam::794457362858:role/github-actions-eks-deploy-amzi-fved
