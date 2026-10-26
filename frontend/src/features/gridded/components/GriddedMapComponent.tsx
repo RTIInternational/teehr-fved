@@ -9,6 +9,7 @@ import { buildGriddedTileUrl, buildPmtilesUrl } from '@/shared/api/gridded/tiles
 import { ensureFreshToken } from '@/shared/auth/keycloak';
 import { usePolygonLayers, useTilesLegend } from '@/shared/queries/gridded/tiles';
 import type { PolygonFeatureProps, PolygonFeatures } from '@/shared/types/gridded/tiles';
+import type { MapViewport } from '@/shared/types/maps';
 
 import { useDashboard, ActionTypes } from '../DashboardContext';
 import { useCurrentTimestep } from '../hooks/useCurrentTimestep';
@@ -53,6 +54,18 @@ const POLYGON_LAYER_ID = 'polygon-layer';
 const POLYGON_SOURCE_ID = 'polygon-source';
 const POLYGON_SELECTED_LAYER_ID = 'polygon-layer-selected';
 
+const viewportSignature = (viewport: MapViewport | null) => {
+  if (!viewport) return null;
+  return `${viewport.center[0].toFixed(5)}:${viewport.center[1].toFixed(5)}:${viewport.zoom.toFixed(3)}`;
+};
+
+const normalizeViewport = (viewport: MapViewport): MapViewport => {
+  return {
+    center: [Number(viewport.center[0].toFixed(5)), Number(viewport.center[1].toFixed(5))],
+    zoom: Number(viewport.zoom.toFixed(3)),
+  };
+};
+
 // A polygon that spans a tile boundary is split across tiles, so the same feature
 // can come back once per tile. Collapse those down to one entry per location id.
 const dedupePolygonFeatures = (features?: maplibregl.MapGeoJSONFeature[]) => {
@@ -71,7 +84,14 @@ const dedupePolygonFeatures = (features?: maplibregl.MapGeoJSONFeature[]) => {
 
 const GriddedMapComponent = () => {
   const { state, dispatch } = useDashboard();
-  const { mapFilters, mapLoaded, activeOverlays, activePolygonLayer, selectedLocation } = state;
+  const {
+    mapFilters,
+    mapViewport,
+    mapLoaded,
+    activeOverlays,
+    activePolygonLayer,
+    selectedLocation,
+  } = state;
   const { dataset, variable, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
   const polygonLayers = usePolygonLayers();
@@ -80,6 +100,8 @@ const GriddedMapComponent = () => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
+  const latestViewportRef = useRef<MapViewport | null>(mapViewport ?? null);
+  const isApplyingViewportRef = useRef(false);
   // Separate popup for polygon hover so it never clobbers the click popup
   const hoverPopup = useRef<maplibregl.Popup | null>(null);
   // Holds the current Bearer token for synchronous use inside transformRequest
@@ -105,6 +127,10 @@ const GriddedMapComponent = () => {
   const fetchedLegends = useRef<Set<string>>(new Set());
 
   const tilesLegend = useTilesLegend(dataset, variable, colorRamp, colorRampMin, colorRampMax);
+
+  useEffect(() => {
+    latestViewportRef.current = mapViewport ?? null;
+  }, [mapViewport]);
 
   // Fetch ArcGIS legend JSON for newly-activated overlays that declare a legendUrl.
   useEffect(() => {
@@ -135,6 +161,10 @@ const GriddedMapComponent = () => {
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
 
+    const initialViewport = latestViewportRef.current
+      ? normalizeViewport(latestViewportRef.current)
+      : null;
+
     const mapInstance = new maplibregl.Map({
       container: mapContainer.current,
       style: {
@@ -142,11 +172,18 @@ const GriddedMapComponent = () => {
         sources: {},
         layers: [],
       },
-      // Reclamation regions' extent
-      bounds: [
-        [-124.8, 25.8],
-        [-93.5, 49.0],
-      ],
+      ...(initialViewport
+        ? {
+            center: initialViewport.center,
+            zoom: initialViewport.zoom,
+          }
+        : {
+            // Reclamation regions' extent
+            bounds: [
+              [-124.8, 25.8],
+              [-93.5, 49.0],
+            ] as [[number, number], [number, number]],
+          }),
       attributionControl: false,
       // Add the Bearer token to every tile request aimed at the xpublish-api.
       // transformRequest is synchronous — tokenRef is kept current by updateTileLayer.
@@ -183,6 +220,26 @@ const GriddedMapComponent = () => {
       dispatch({ type: ActionTypes.SET_MAP_LOADED, payload: true });
     });
 
+    mapInstance.on('moveend', () => {
+      if (isApplyingViewportRef.current) {
+        isApplyingViewportRef.current = false;
+        return;
+      }
+
+      const center = mapInstance.getCenter();
+      const nextViewport = normalizeViewport({
+        center: [center.lng, center.lat],
+        zoom: mapInstance.getZoom(),
+      });
+
+      if (viewportSignature(latestViewportRef.current) === viewportSignature(nextViewport)) {
+        return;
+      }
+
+      latestViewportRef.current = nextViewport;
+      dispatch({ type: ActionTypes.SET_MAP_VIEWPORT, payload: nextViewport });
+    });
+
     mapInstance.on('error', (e: maplibregl.ErrorEvent) => {
       console.error('GriddedMapComponent: MapLibre error:', e);
       // e.sourceId is set for tile/source errors (e.g. 404 for areas with no data); only surface fatal map errors.
@@ -202,6 +259,25 @@ const GriddedMapComponent = () => {
       }
     };
   }, [dispatch]);
+
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !mapLoaded || !mapViewport) return;
+
+    const currentViewport = normalizeViewport({
+      center: [mapInstance.getCenter().lng, mapInstance.getCenter().lat],
+      zoom: mapInstance.getZoom(),
+    });
+    const targetViewport = normalizeViewport(mapViewport);
+
+    if (viewportSignature(currentViewport) === viewportSignature(targetViewport)) {
+      return;
+    }
+
+    isApplyingViewportRef.current = true;
+    latestViewportRef.current = targetViewport;
+    mapInstance.jumpTo({ center: targetViewport.center, zoom: targetViewport.zoom });
+  }, [mapLoaded, mapViewport]);
 
   // Update the gridded tile layer when filters change
   const updateTileLayer = useCallback(async () => {

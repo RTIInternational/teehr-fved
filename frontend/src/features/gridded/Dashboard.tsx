@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useCallback } from 'react';
 
 import DashboardPanel from '@/shared/components/DashboardPanel';
 
@@ -8,6 +9,7 @@ import GriddedPolygonPanel from './components/GriddedPolygonPanel';
 import GriddedTimeseriesPanel from './components/GriddedTimeseriesPanel';
 import { useDashboard, ActionTypes } from './DashboardContext';
 import { useGriddedVariableStyles } from './hooks/useGriddedVariableStyles';
+import { useViewportUrlSync } from './hooks/useViewportUrlSync';
 
 export type GriddedTabName = 'dataset' | 'polygons';
 
@@ -19,6 +21,15 @@ const TABS: { id: GriddedTabName; label: string }[] = [
 export const Dashboard = () => {
   const { state, dispatch } = useDashboard();
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
+
+  const setMapViewport = useCallback(
+    (viewport: NonNullable<typeof state.mapViewport>) => {
+      dispatch({ type: ActionTypes.SET_MAP_VIEWPORT, payload: viewport });
+    },
+    [dispatch]
+  );
+
+  useViewportUrlSync({ mapViewport: state.mapViewport, setMapViewport });
 
   // Reset style-tracking when dataset changes
   useEffect(() => {
