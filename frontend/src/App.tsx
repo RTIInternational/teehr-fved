@@ -82,8 +82,12 @@ const AdminRoute = ({ children }: React.PropsWithChildren) => {
 };
 
 const AppRoutes = () => {
+  const location = useLocation();
+  const hasDashboardSwitcher =
+    location.pathname === '/forecast' || location.pathname === '/gridded';
+
   return (
-    <div className="App">
+    <div className={`App${hasDashboardSwitcher ? ' app-has-dashboard-switcher' : ''}`}>
       <Navbar />
       <DashboardQuickSwitchBar />
       <main>

@@ -32,8 +32,8 @@ export const Dashboard = () => {
   useViewportUrlSync({ mapViewport: state.mapViewport, setMapViewport });
 
   return (
-    <div className="d-flex flex-column" style={{ height: 'calc(100dvh - 56px)', minHeight: 0 }}>
-      {/* Height adjusted for navbar (Bootstrap navbar is typically 56px) */}
+    <div className="d-flex flex-column" style={{ height: '100%', minHeight: 0 }}>
+      {/* Fills the remaining app shell height beneath navbar/switcher. */}
 
       <div className="container-fluid flex-grow-1 p-0" style={{ minHeight: 0, overflow: 'hidden' }}>
         <div
