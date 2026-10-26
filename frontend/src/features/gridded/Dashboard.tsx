@@ -44,7 +44,7 @@ export const Dashboard = () => {
   }, [state.mapFilters.variable, applyVariableStyleIfNew]);
 
   return (
-    <div className="d-flex flex-column" style={{ height: 'calc(100dvh - 56px)', minHeight: 0 }}>
+    <div className="d-flex flex-column" style={{ height: '100%', minHeight: 0 }}>
       <div className="container-fluid flex-grow-1 p-0" style={{ minHeight: 0, overflow: 'hidden' }}>
         <div
           className="dashboard-grid h-100"
