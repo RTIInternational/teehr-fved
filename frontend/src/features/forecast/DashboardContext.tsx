@@ -2,7 +2,7 @@ import React, { createContext, useContext, useReducer, type Dispatch } from 'rea
 
 import { FORECAST_DASHBOARD_DEFAULTS } from '@/config/dashboardDefaults';
 import type { MapLocation } from '@/shared/types/locations';
-import type { MapFilters } from '@/shared/types/maps';
+import type { MapFilters, MapViewport } from '@/shared/types/maps';
 import type { TimeseriesFilters } from '@/shared/types/timeseries';
 
 // Dynamic date helpers - returns dates for 10 days ago through today
@@ -19,6 +19,7 @@ const getToday = () => {
 
 export type DashboardState = {
   mapFilters: MapFilters;
+  mapViewport: MapViewport | null;
   timeseriesFilters: TimeseriesFilters;
   selectedLocation: MapLocation | null;
   mapLoaded: boolean;
@@ -33,6 +34,10 @@ type DashboardAction =
   | {
       type: typeof ActionTypes.UPDATE_MAP_FILTERS;
       payload: Partial<MapFilters>;
+    }
+  | {
+      type: typeof ActionTypes.SET_MAP_VIEWPORT;
+      payload: MapViewport | null;
     }
   | {
       type: typeof ActionTypes.UPDATE_TIMESERIES_FILTERS;
@@ -62,6 +67,8 @@ const initialState: DashboardState = {
     variable: null,
     metricName: 'relative_bias',
   },
+
+  mapViewport: null,
 
   // Timeseries filters (forecast-specific defaults)
   timeseriesFilters: {
@@ -94,6 +101,7 @@ export const ActionTypes = {
   // Filter updates
   INITIALIZE_FILTERS: 'INITIALIZE_FILTERS',
   UPDATE_MAP_FILTERS: 'UPDATE_MAP_FILTERS',
+  SET_MAP_VIEWPORT: 'SET_MAP_VIEWPORT',
   UPDATE_TIMESERIES_FILTERS: 'UPDATE_TIMESERIES_FILTERS',
 
   // Location selection
@@ -172,6 +180,12 @@ const reducer = (state: DashboardState, action: DashboardAction) => {
         },
       };
     }
+
+    case ActionTypes.SET_MAP_VIEWPORT:
+      return {
+        ...state,
+        mapViewport: action.payload,
+      };
 
     case ActionTypes.UPDATE_TIMESERIES_FILTERS: {
       return {

@@ -37,5 +37,6 @@ export type MapMetricClamped = {
 
 export type MapState = {
   mapFilters: MapFilters;
+  mapViewport?: MapViewport | null;
   mapLoaded: boolean;
 };

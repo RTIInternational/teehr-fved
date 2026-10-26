@@ -1,3 +1,5 @@
+import { useCallback } from 'react';
+
 import LocationCard from '@/shared/components/LocationCard';
 import LocationMetrics from '@/shared/components/LocationMetrics';
 import MapComponent from '@/shared/components/MapComponent';
@@ -9,6 +11,7 @@ import { useDashboard, ActionTypes } from './DashboardContext';
 import { useFilters } from './hooks/useFilters';
 import { useInitialFilters } from './hooks/useInitialFilters';
 import { useLocationSelection } from './hooks/useLocationSelection';
+import { useViewportUrlSync } from './hooks/useViewportUrlSync';
 
 export const Dashboard = () => {
   const tables = ['fcst_metrics_by_location', 'fcst_metrics_by_lead_time_bins'];
@@ -18,6 +21,15 @@ export const Dashboard = () => {
   const { mapFilters, updateMapFilters, timeseriesFilters, updateTimeseriesFilters } = useFilters();
 
   useInitialFilters(tables[0]);
+
+  const setMapViewport = useCallback(
+    (viewport: NonNullable<typeof state.mapViewport>) => {
+      dispatch({ type: ActionTypes.SET_MAP_VIEWPORT, payload: viewport });
+    },
+    [dispatch]
+  );
+
+  useViewportUrlSync({ mapViewport: state.mapViewport, setMapViewport });
 
   return (
     <div className="d-flex flex-column" style={{ height: 'calc(100dvh - 56px)', minHeight: 0 }}>

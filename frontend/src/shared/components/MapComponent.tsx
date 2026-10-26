@@ -10,7 +10,7 @@ import React, { useEffect, useRef, useCallback, useMemo, useState, type Dispatch
 import 'maplibre-gl/dist/maplibre-gl.css';
 import MapLegend from '@/shared/components/MapLegend';
 import type { MapLocation } from '@/shared/types/locations';
-import type { InvalidFeature, MapMetricClamped, MapState } from '@/shared/types/maps';
+import type { InvalidFeature, MapMetricClamped, MapState, MapViewport } from '@/shared/types/maps';
 import { getMetricColorExpression, getMetricLabel, isLngLatTuple } from '@/shared/utils/mapMetrics';
 
 import { useMetricLocations } from '../queries/metrics';
@@ -30,6 +30,7 @@ type MapComponentProps<TActionTypes extends ActionTypesShape> = {
 
 type ActionTypesShape = {
   SET_MAP_LOADED: string;
+  SET_MAP_VIEWPORT: string;
   SET_ERROR: string;
 };
 
@@ -39,9 +40,25 @@ type MapComponentAction<TActionTypes extends ActionTypesShape> =
       payload: boolean;
     }
   | {
+      type: TActionTypes['SET_MAP_VIEWPORT'];
+      payload: MapViewport | null;
+    }
+  | {
       type: TActionTypes['SET_ERROR'];
       payload: string;
     };
+
+const viewportSignature = (viewport: MapViewport | null) => {
+  if (!viewport) return null;
+  return `${viewport.center[0].toFixed(5)}:${viewport.center[1].toFixed(5)}:${viewport.zoom.toFixed(3)}`;
+};
+
+const normalizeViewport = (viewport: MapViewport): MapViewport => {
+  return {
+    center: [Number(viewport.center[0].toFixed(5)), Number(viewport.center[1].toFixed(5))],
+    zoom: Number(viewport.zoom.toFixed(3)),
+  };
+};
 
 const MapComponent = <TActionTypes extends ActionTypesShape>({
   state,
@@ -58,16 +75,27 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<Map>(null);
   const popup = useRef<Popup>(null);
+  const latestViewportRef = useRef<MapViewport | null>(state.mapViewport ?? null);
+  const isApplyingViewportRef = useRef(false);
+  const lastLocationLayerRenderKeyRef = useRef<string | null>(null);
+  const lastAutoFitDataKeyRef = useRef<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const locationFilters =
-    state.mapFilters.configuration && state.mapFilters.variable
-      ? {
-          table,
-          configuration: state.mapFilters.configuration,
-          variable: state.mapFilters.variable,
-        }
-      : undefined;
+  useEffect(() => {
+    latestViewportRef.current = state.mapViewport ?? null;
+  }, [state.mapViewport]);
+
+  const locationFilters = useMemo(() => {
+    if (!state.mapFilters.configuration || !state.mapFilters.variable) {
+      return undefined;
+    }
+
+    return {
+      table,
+      configuration: state.mapFilters.configuration,
+      variable: state.mapFilters.variable,
+    };
+  }, [table, state.mapFilters.configuration, state.mapFilters.variable]);
 
   const locations = useMetricLocations(locationFilters);
 
@@ -172,6 +200,28 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
         dispatch({ type: ActionTypes.SET_MAP_LOADED, payload: true });
       });
 
+      map.current.on('moveend', () => {
+        if (!map.current) return;
+
+        if (isApplyingViewportRef.current) {
+          isApplyingViewportRef.current = false;
+          return;
+        }
+
+        const center = map.current.getCenter();
+        const nextViewport = normalizeViewport({
+          center: [center.lng, center.lat],
+          zoom: map.current.getZoom(),
+        });
+
+        if (viewportSignature(latestViewportRef.current) === viewportSignature(nextViewport)) {
+          return;
+        }
+
+        latestViewportRef.current = nextViewport;
+        dispatch({ type: ActionTypes.SET_MAP_VIEWPORT, payload: nextViewport });
+      });
+
       // Add click handler for empty space (deselect location)
       map.current.on('click', (e) => {
         if (!map.current) return;
@@ -224,11 +274,38 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
     };
   }, [initializeMap]);
 
+  // Keep the rendered map viewport in sync with externally-hydrated state (e.g. URL params).
+  useEffect(() => {
+    if (!map.current || !state.mapLoaded || !state.mapViewport) return;
+
+    const mapInstance = map.current;
+    const currentViewport: MapViewport = {
+      center: [mapInstance.getCenter().lng, mapInstance.getCenter().lat],
+      zoom: mapInstance.getZoom(),
+    };
+
+    if (viewportSignature(currentViewport) === viewportSignature(state.mapViewport)) {
+      return;
+    }
+
+    // Prevent the programmatic jump from feeding back into moveend state updates.
+    isApplyingViewportRef.current = true;
+    latestViewportRef.current = state.mapViewport;
+    mapInstance.jumpTo({ center: state.mapViewport.center, zoom: state.mapViewport.zoom });
+  }, [state.mapLoaded, state.mapViewport]);
+
   // Update map when locations change
   useEffect(() => {
     if (!map.current || !state.mapLoaded) return;
 
     const mapInstance = map.current;
+    const metricName = state.mapFilters.metricName ?? 'relative_bias';
+    const locationRenderKey = `${locations.dataUpdatedAt}:${metricName}`;
+
+    if (lastLocationLayerRenderKeyRef.current === locationRenderKey) {
+      return;
+    }
+    lastLocationLayerRenderKeyRef.current = locationRenderKey;
 
     // Validate GeoJSON structure
     if (!locations.data || !locations.data?.features || !Array.isArray(locations.data?.features)) {
@@ -434,9 +511,7 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
       }
 
       // Get color expression for metric-based coloring
-      const colorExpression = getMetricColorExpression(
-        state.mapFilters.metricName ?? 'relative_bias'
-      );
+      const colorExpression = getMetricColorExpression(metricName);
 
       // Add locations layer with error handling
       try {
@@ -498,8 +573,14 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
       if (mapInstance.getLayer('overlay-line'))
         mapInstance.moveLayer('overlay-line', 'locations-layer');
 
-      // Fit map to the extent of the loaded features
-      if (validFeatures.length > 0) {
+      // Fit to data only when there is no externally controlled viewport (e.g. URL hydration).
+      const dataVersionKey = String(locations.dataUpdatedAt);
+      if (
+        validFeatures.length > 0 &&
+        !latestViewportRef.current &&
+        lastAutoFitDataKeyRef.current !== dataVersionKey
+      ) {
+        lastAutoFitDataKeyRef.current = dataVersionKey;
         const lons = validFeatures.map((f) => f.geometry.coordinates[0]);
         const lats = validFeatures.map((f) => f.geometry.coordinates[1]);
         const minLon = Math.min(...lons);
@@ -540,6 +621,7 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
     };
   }, [
     locations.data,
+    locations.dataUpdatedAt,
     state.mapLoaded,
     state.mapFilters.metricName,
     selectLocation,
