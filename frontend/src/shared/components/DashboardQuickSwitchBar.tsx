@@ -1,29 +1,43 @@
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import { DASHBOARD_NAV_ITEMS } from '@/config/dashboardNavigation';
+import {
+  DASHBOARD_NAV_ITEMS,
+  DASHBOARD_ROUTE,
+  DEFAULT_DASHBOARD_VIEW,
+  getDashboardViewFromSearch,
+} from '@/config/dashboardNavigation';
 import { buildSearchFromViewportOnly } from '@/shared/utils/mapViewportUrl';
-
-const DASHBOARD_ROUTES_WITH_SWITCHER = new Set(['/forecast', '/gridded']);
 
 const DashboardQuickSwitchBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isVisible = DASHBOARD_ROUTES_WITH_SWITCHER.has(location.pathname);
+  const isVisible = location.pathname === DASHBOARD_ROUTE;
   const viewportSearch = useMemo(
     () => buildSearchFromViewportOnly(location.search),
     [location.search]
   );
 
+  const activeView = useMemo(
+    () => getDashboardViewFromSearch(location.search) ?? DEFAULT_DASHBOARD_VIEW,
+    [location.search]
+  );
+
   const activeId = useMemo(() => {
-    return DASHBOARD_NAV_ITEMS.find((item) => item.route === location.pathname)?.id ?? null;
-  }, [location.pathname]);
+    return DASHBOARD_NAV_ITEMS.find((item) => (item.viewKey ?? item.id) === activeView)?.id ?? null;
+  }, [activeView]);
 
   const enabledItems = DASHBOARD_NAV_ITEMS.filter((item) => item.status === 'available');
 
-  const navigateToDashboard = (route: string) => {
-    const target = `${route}${viewportSearch}`;
+  const navigateToDashboard = (viewKey: string | undefined, fallbackId: string) => {
+    const resolvedView = viewKey ?? fallbackId;
+    const params = new URLSearchParams(
+      viewportSearch.startsWith('?') ? viewportSearch.slice(1) : ''
+    );
+    params.set('view', resolvedView);
+    const search = params.toString();
+    const target = search ? `${DASHBOARD_ROUTE}?${search}` : DASHBOARD_ROUTE;
     const current = `${location.pathname}${location.search}`;
     if (target === current) return;
     navigate(target);
@@ -46,7 +60,7 @@ const DashboardQuickSwitchBar = () => {
                 key={item.id}
                 type="button"
                 className={`btn btn-sm ${isActive ? 'btn-primary' : 'btn-outline-primary'} ${isDisabled ? 'dashboard-switcher-disabled' : ''}`}
-                onClick={() => navigateToDashboard(item.route)}
+                onClick={() => navigateToDashboard(item.viewKey, item.id)}
                 disabled={isDisabled}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={isDisabled ? `${item.label} (coming soon)` : item.label}
@@ -69,7 +83,7 @@ const DashboardQuickSwitchBar = () => {
             onChange={(e) => {
               const selected = enabledItems.find((item) => item.id === e.target.value);
               if (selected) {
-                navigateToDashboard(selected.route);
+                navigateToDashboard(selected.viewKey, selected.id);
               }
             }}
             aria-label="Select dashboard"

@@ -15,7 +15,7 @@ const Navbar = () => {
   const canViewHubDeployment = authenticated && roles.includes('jupyter-user');
 
   const getBreadcrumbs = () => {
-    const dashboardLabel = getDashboardLabelByRoute(location.pathname);
+    const dashboardLabel = getDashboardLabelByRoute(location.pathname, location.search);
     const pathMap: Record<string, string> = {
       '/admin': 'Admin Page',
       '/admin/api-keys': 'API Keys',

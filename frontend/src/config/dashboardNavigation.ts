@@ -12,6 +12,9 @@ export type DashboardNavigationItem = {
   viewKey?: string;
 };
 
+export const DASHBOARD_ROUTE = '/dashboard';
+export const DEFAULT_DASHBOARD_VIEW = 'streamflow';
+
 export const DASHBOARD_NAV_ITEMS: DashboardNavigationItem[] = [
   {
     id: 'streamflow',
@@ -19,7 +22,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavigationItem[] = [
     description:
       'Real-time forecast analysis and validation tools for operational and research data streams.',
     features: ['Live forecast data', 'Forecast vs observation comparison', 'Lead time analysis'],
-    route: '/forecast',
+    route: DASHBOARD_ROUTE,
     status: 'available',
     image: '/api/static/preview-forecast.png',
     color: 'secondary',
@@ -36,7 +39,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavigationItem[] = [
       'Point-based timeseries query',
       'Overlay layers (NWS CPC, SMAP, VIIRS)',
     ],
-    route: '/gridded',
+    route: DASHBOARD_ROUTE,
     status: 'available',
     image: '/api/static/preview-snow.png',
     color: 'info',
@@ -55,7 +58,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavigationItem[] = [
       'Filter by physical, geographical, temporal or hydrologic attributes to see trends',
       'Sampling uncertainty estimated',
     ],
-    route: '/forecast-water-supply',
+    route: DASHBOARD_ROUTE,
     status: 'coming-soon',
     image: '/api/static/preview-data.png',
     color: 'success',
@@ -72,7 +75,7 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavigationItem[] = [
       'Aggregated and detailed summaries',
       'Filter by physical, geographical, temporal or hydrologic attributes to see trends',
     ],
-    route: '/retrospective-model-comparisons',
+    route: DASHBOARD_ROUTE,
     status: 'coming-soon',
     image: '/api/static/preview-data.png',
     color: 'primary',
@@ -80,7 +83,38 @@ export const DASHBOARD_NAV_ITEMS: DashboardNavigationItem[] = [
   },
 ];
 
-export const getDashboardLabelByRoute = (route: string) => {
+export const getDashboardViewFromSearch = (search: string) => {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  return params.get('view');
+};
+
+export const buildDashboardHref = (viewKey: string, search = '') => {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  params.set('view', viewKey);
+  const query = params.toString();
+  return query ? `${DASHBOARD_ROUTE}?${query}` : DASHBOARD_ROUTE;
+};
+
+export const isAvailableDashboardView = (viewKey: string | null) => {
+  if (!viewKey) return false;
+  return DASHBOARD_NAV_ITEMS.some(
+    (item) => item.status === 'available' && (item.viewKey ?? item.id) === viewKey
+  );
+};
+
+export const getDashboardLabelByRoute = (route: string, search = '') => {
+  if (route === DASHBOARD_ROUTE) {
+    const viewKey = getDashboardViewFromSearch(search);
+    if (!viewKey) {
+      return DASHBOARD_NAV_ITEMS.find(
+        (item) =>
+          item.status === 'available' && (item.viewKey ?? item.id) === DEFAULT_DASHBOARD_VIEW
+      )?.label;
+    }
+
+    return DASHBOARD_NAV_ITEMS.find((item) => (item.viewKey ?? item.id) === viewKey)?.label;
+  }
+
   const availableMatch = DASHBOARD_NAV_ITEMS.find(
     (item) => item.route === route && item.status === 'available'
   );

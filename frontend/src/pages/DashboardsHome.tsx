@@ -1,15 +1,20 @@
 import { Container, Row, Col, Card, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
-import { DASHBOARD_NAV_ITEMS, type DashboardNavigationItem } from '@/config/dashboardNavigation';
+import {
+  DASHBOARD_NAV_ITEMS,
+  buildDashboardHref,
+  type DashboardNavigationItem,
+} from '@/config/dashboardNavigation';
 
 const DashboardsHome = () => {
   const dashboards = DASHBOARD_NAV_ITEMS;
 
   const getCardComponent = (dashboard: DashboardNavigationItem) => {
     if (dashboard.status === 'available') {
+      const href = buildDashboardHref(dashboard.viewKey ?? dashboard.id);
       return (
-        <Link to={dashboard.route} style={{ textDecoration: 'none' }}>
+        <Link to={href} style={{ textDecoration: 'none' }}>
           <Card
             className="h-100 dashboard-card dashboard-card-available"
             style={{ cursor: 'pointer' }}

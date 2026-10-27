@@ -1,6 +1,13 @@
 import { Container, Alert } from 'react-bootstrap';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
+import {
+  DASHBOARD_ROUTE,
+  DEFAULT_DASHBOARD_VIEW,
+  buildDashboardHref,
+  getDashboardViewFromSearch,
+  isAvailableDashboardView,
+} from '@/config/dashboardNavigation';
 import { ForecastDashboard, ForecastDashboardProvider } from '@/features/forecast';
 import { GriddedDashboard, GriddedDashboardProvider } from '@/features/gridded';
 import AdminHome from '@/pages/admin/AdminHome';
@@ -81,10 +88,37 @@ const AdminRoute = ({ children }: React.PropsWithChildren) => {
   return children;
 };
 
+const UnifiedDashboardRoute = () => {
+  const location = useLocation();
+  const currentView = getDashboardViewFromSearch(location.search);
+
+  if (!isAvailableDashboardView(currentView)) {
+    return <Navigate to={buildDashboardHref(DEFAULT_DASHBOARD_VIEW, location.search)} replace />;
+  }
+
+  if (currentView === 'snow') {
+    return (
+      <GriddedDashboardProvider>
+        <GriddedDashboard />
+      </GriddedDashboardProvider>
+    );
+  }
+
+  return (
+    <ForecastDashboardProvider>
+      <ForecastDashboard />
+    </ForecastDashboardProvider>
+  );
+};
+
+const LegacyDashboardRedirect = ({ view }: { view: string }) => {
+  const location = useLocation();
+  return <Navigate to={buildDashboardHref(view, location.search)} replace />;
+};
+
 const AppRoutes = () => {
   const location = useLocation();
-  const hasDashboardSwitcher =
-    location.pathname === '/forecast' || location.pathname === '/gridded';
+  const hasDashboardSwitcher = location.pathname === DASHBOARD_ROUTE;
 
   return (
     <div className={`App${hasDashboardSwitcher ? ' app-has-dashboard-switcher' : ''}`}>
@@ -95,25 +129,15 @@ const AppRoutes = () => {
           <Route path="/" element={<Home />} />
           <Route path="/hub" element={<DashboardsHome />} />
           <Route
-            path="/forecast"
+            path={DASHBOARD_ROUTE}
             element={
               <RequireAuth>
-                <ForecastDashboardProvider>
-                  <ForecastDashboard />
-                </ForecastDashboardProvider>
+                <UnifiedDashboardRoute />
               </RequireAuth>
             }
           />
-          <Route
-            path="/gridded"
-            element={
-              <RequireAuth>
-                <GriddedDashboardProvider>
-                  <GriddedDashboard />
-                </GriddedDashboardProvider>
-              </RequireAuth>
-            }
-          />
+          <Route path="/forecast" element={<LegacyDashboardRedirect view="streamflow" />} />
+          <Route path="/gridded" element={<LegacyDashboardRedirect view="snow" />} />
           <Route
             path="/admin"
             element={
