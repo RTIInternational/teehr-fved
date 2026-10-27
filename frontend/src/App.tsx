@@ -8,8 +8,7 @@ import {
   getDashboardViewFromSearch,
   isAvailableDashboardView,
 } from '@/config/dashboardNavigation';
-import { ForecastDashboard, ForecastDashboardProvider } from '@/features/forecast';
-import { GriddedDashboard, GriddedDashboardProvider } from '@/features/gridded';
+import { UnifiedDashboardPage } from '@/features/dashboard';
 import AdminHome from '@/pages/admin/AdminHome';
 import AdminLayout from '@/pages/admin/AdminLayout';
 import ApiKeysAdmin from '@/pages/admin/ApiKeysAdmin';
@@ -96,19 +95,9 @@ const UnifiedDashboardRoute = () => {
     return <Navigate to={buildDashboardHref(DEFAULT_DASHBOARD_VIEW, location.search)} replace />;
   }
 
-  if (currentView === 'snow') {
-    return (
-      <GriddedDashboardProvider>
-        <GriddedDashboard />
-      </GriddedDashboardProvider>
-    );
-  }
+  const resolvedView = currentView ?? DEFAULT_DASHBOARD_VIEW;
 
-  return (
-    <ForecastDashboardProvider>
-      <ForecastDashboard />
-    </ForecastDashboardProvider>
-  );
+  return <UnifiedDashboardPage view={resolvedView} />;
 };
 
 const LegacyDashboardRedirect = ({ view }: { view: string }) => {

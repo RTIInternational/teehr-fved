@@ -283,6 +283,57 @@ main {
   max-width: 320px;
 }
 
+.unified-dashboard-shell {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.unified-dashboard-shell__map {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+
+.unified-dashboard-shell__overlay {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.unified-dashboard-shell__overlay--top-left {
+  top: 12px;
+  left: 12px;
+  max-width: min(420px, calc(100% - 24px));
+}
+
+.unified-dashboard-shell__overlay--top-right {
+  top: 12px;
+  right: 12px;
+  max-width: min(460px, calc(100% - 24px));
+}
+
+.unified-dashboard-shell__overlay--bottom {
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+}
+
+.unified-dashboard-shell__mobile-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  pointer-events: none;
+  padding: 0 10px 10px;
+}
+
+.unified-dashboard-shell__card {
+  pointer-events: auto;
+}
+
 @media (max-width: 767.98px) {
   .App.app-has-dashboard-switcher {
     --app-switcher-height: 56px;
