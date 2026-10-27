@@ -21,8 +21,11 @@ type MapComponentProps<TActionTypes extends ActionTypesShape> = {
   table: string;
   ActionTypes: TActionTypes;
   selectLocation: (location: MapLocation | null) => void;
+  selectedLocation?: MapLocation | null;
   mapFilterControls?: React.ReactNode;
   showSearch?: boolean;
+  showMapControls?: boolean;
+  showLegend?: boolean;
   overlayLocations?: FeatureCollection;
   overlayVisible?: boolean;
   hoveredOverlayId?: string;
@@ -66,8 +69,11 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
   table,
   ActionTypes,
   selectLocation,
+  selectedLocation,
   mapFilterControls,
   showSearch = true,
+  showMapControls = true,
+  showLegend = true,
   overlayLocations,
   overlayVisible = true,
   hoveredOverlayId,
@@ -630,6 +636,16 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
     selectFeatureOnMap,
   ]);
 
+  // Keep highlighted location in sync when selection is driven externally
+  // (for example from shell-level search overlays).
+  useEffect(() => {
+    if (!map.current || !state.mapLoaded) return;
+    if (!map.current.getLayer('locations-selected')) return;
+
+    const selectedId = selectedLocation?.primary_location_id;
+    map.current.setFilter('locations-selected', ['==', 'primary_location_id', selectedId ?? '']);
+  }, [selectedLocation?.primary_location_id, state.mapLoaded]);
+
   // Overlay layer (e.g. huc8 polygons) at 50% opacity
   useEffect(() => {
     if (!map.current || !state.mapLoaded) return;
@@ -762,7 +778,7 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
         )}
 
         {/* Map Controls */}
-        {state.mapLoaded && mapFilterControls}
+        {state.mapLoaded && showMapControls && mapFilterControls}
 
         {/* Location search */}
         {state.mapLoaded && showSearch && (
@@ -848,7 +864,7 @@ const MapComponent = <TActionTypes extends ActionTypesShape>({
         )}
 
         {/* Map Legend */}
-        {state.mapLoaded && <MapLegend metric={state.mapFilters.metricName} />}
+        {state.mapLoaded && showLegend && <MapLegend metric={state.mapFilters.metricName} />}
       </div>
     </div>
   );

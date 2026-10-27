@@ -1,25 +1,26 @@
-import { ForecastDashboard, ForecastDashboardProvider } from '@/features/forecast';
+import { ForecastDashboardProvider } from '@/features/forecast';
 import { GriddedDashboard, GriddedDashboardProvider } from '@/features/gridded';
 
-import UnifiedDashboardShell from './UnifiedDashboardShell';
+import StreamflowDashboardView from './StreamflowDashboardView';
 
 type UnifiedDashboardPageProps = {
   view: string;
 };
 
 const UnifiedDashboardPage = ({ view }: UnifiedDashboardPageProps) => {
-  const mapContent =
-    view === 'snow' ? (
+  if (view === 'snow') {
+    return (
       <GriddedDashboardProvider>
         <GriddedDashboard />
       </GriddedDashboardProvider>
-    ) : (
-      <ForecastDashboardProvider>
-        <ForecastDashboard />
-      </ForecastDashboardProvider>
     );
+  }
 
-  return <UnifiedDashboardShell mapContent={mapContent} />;
+  return (
+    <ForecastDashboardProvider>
+      <StreamflowDashboardView />
+    </ForecastDashboardProvider>
+  );
 };
 
 export default UnifiedDashboardPage;

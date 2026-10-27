@@ -305,7 +305,7 @@ main {
 .unified-dashboard-shell__overlay--top-left {
   top: 12px;
   left: 12px;
-  max-width: min(420px, calc(100% - 24px));
+  max-width: min(620px, calc(100% - 24px));
 }
 
 .unified-dashboard-shell__overlay--top-right {
@@ -332,6 +332,77 @@ main {
 
 .unified-dashboard-shell__card {
   pointer-events: auto;
+}
+
+.streamflow-unified-view__map-frame {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+
+.streamflow-unified-view__side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.streamflow-unified-view__desktop-side-card {
+  width: min(560px, calc(100vw - 36px));
+}
+
+.streamflow-unified-view__timeseries-card {
+  height: min(52vh, 560px);
+}
+
+.streamflow-unified-view__desktop-metrics-card {
+  height: min(34vh, 320px);
+}
+
+.streamflow-unified-view__desktop-map-overlays {
+  width: min(420px, calc(100vw - 36px));
+}
+
+.streamflow-unified-view__map-overlay-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.streamflow-unified-view__search-card {
+  border-radius: 10px;
+}
+
+.streamflow-unified-view__map-overlay-stack .dropdown > .btn {
+  width: 100%;
+}
+
+.streamflow-unified-view__map-overlay-stack .card {
+  border-radius: 10px;
+}
+
+.streamflow-unified-view__empty-card {
+  border-radius: 8px;
+  min-height: 140px;
+}
+
+.streamflow-unified-view__mobile-sheet-stack {
+  max-height: min(74dvh, 680px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.streamflow-unified-view__mobile-sheet-card {
+  background: rgba(248, 250, 252, 0.96);
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  box-shadow: 0 -8px 22px rgba(15, 23, 42, 0.18);
+  padding: 10px;
+}
+
+.streamflow-unified-view__mobile-metrics {
+  min-height: 260px;
 }
 
 @media (max-width: 767.98px) {
