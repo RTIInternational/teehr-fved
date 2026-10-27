@@ -21,6 +21,13 @@ html {
   --app-navbar-height: 56px;
   --app-switcher-height: 0px;
   --app-top-offset: calc(var(--app-navbar-height) + var(--app-switcher-height));
+
+  /* Bootstrap compatibility bridge aligned to theme tokens */
+  --bs-primary: var(--color-action-primary-default);
+  --bs-primary-rgb: 0, 62, 81;
+  --bs-link-color: var(--color-text-link);
+  --bs-link-hover-color: var(--color-action-primary-hover);
+  --bs-border-color: var(--color-border-default);
 }
 
 #root {
@@ -128,6 +135,46 @@ html {
 
 .text-muted {
   color: var(--color-text-secondary) !important;
+}
+
+/* Minimal Bootstrap compatibility bridge */
+.btn-primary {
+  --bs-btn-bg: var(--color-action-primary-default);
+  --bs-btn-border-color: var(--color-action-primary-default);
+  --bs-btn-hover-bg: var(--color-action-primary-hover);
+  --bs-btn-hover-border-color: var(--color-action-primary-hover);
+  --bs-btn-active-bg: var(--color-action-primary-hover);
+  --bs-btn-active-border-color: var(--color-action-primary-hover);
+  --bs-btn-disabled-bg: var(--color-action-primary-disabled);
+  --bs-btn-disabled-border-color: var(--color-action-primary-disabled);
+  --bs-btn-focus-shadow-rgb: 0, 115, 150;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--color-action-primary-default);
+  --bs-btn-border-color: var(--color-action-primary-default);
+  --bs-btn-hover-bg: var(--color-action-primary-default);
+  --bs-btn-hover-border-color: var(--color-action-primary-default);
+  --bs-btn-hover-color: var(--color-text-on-dark);
+  --bs-btn-active-bg: var(--color-action-primary-hover);
+  --bs-btn-active-border-color: var(--color-action-primary-hover);
+  --bs-btn-active-color: var(--color-text-on-dark);
+  --bs-btn-disabled-color: var(--color-action-primary-disabled);
+  --bs-btn-disabled-border-color: var(--color-action-primary-disabled);
+  --bs-btn-focus-shadow-rgb: 0, 115, 150;
+}
+
+.table-light {
+  --bs-table-bg: var(--color-surface-interactive);
+  --bs-table-color: var(--color-text-primary);
+}
+
+.table-primary {
+  --bs-table-bg: color-mix(in srgb, var(--color-action-primary-default) 14%, white);
+  --bs-table-striped-bg: color-mix(in srgb, var(--color-action-primary-default) 20%, white);
+  --bs-table-active-bg: color-mix(in srgb, var(--color-action-primary-default) 24%, white);
+  --bs-table-hover-bg: color-mix(in srgb, var(--color-action-primary-default) 18%, white);
+  --bs-table-color: var(--color-text-primary);
 }
 
 /* Home Page Styles */
