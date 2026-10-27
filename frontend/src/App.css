@@ -405,6 +405,61 @@ main {
   min-height: 260px;
 }
 
+.snow-unified-view__map-frame {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+
+.snow-unified-view__desktop-side-card {
+  width: min(560px, calc(100vw - 36px));
+}
+
+.snow-unified-view__side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.snow-unified-view__tabs-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: min(58vh, 620px);
+}
+
+.snow-unified-view__desktop-timeseries-card {
+  height: min(34vh, 330px);
+}
+
+.snow-unified-view__timeseries-shell {
+  height: 100%;
+}
+
+.snow-unified-view__desktop-legend-card {
+  width: min(340px, calc(100vw - 36px));
+}
+
+.snow-unified-view__legend-card {
+  border-radius: 10px;
+}
+
+.snow-unified-view__mobile-sheet-stack {
+  max-height: min(74dvh, 680px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.snow-unified-view__mobile-sheet-card {
+  background: rgba(248, 250, 252, 0.96);
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  box-shadow: 0 -8px 22px rgba(15, 23, 42, 0.18);
+  padding: 10px;
+}
+
 @media (max-width: 767.98px) {
   .App.app-has-dashboard-switcher {
     --app-switcher-height: 56px;

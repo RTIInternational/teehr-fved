@@ -1,6 +1,7 @@
 import { ForecastDashboardProvider } from '@/features/forecast';
-import { GriddedDashboard, GriddedDashboardProvider } from '@/features/gridded';
+import { GriddedDashboardProvider } from '@/features/gridded';
 
+import SnowDashboardView from './SnowDashboardView';
 import StreamflowDashboardView from './StreamflowDashboardView';
 
 type UnifiedDashboardPageProps = {
@@ -11,7 +12,7 @@ const UnifiedDashboardPage = ({ view }: UnifiedDashboardPageProps) => {
   if (view === 'snow') {
     return (
       <GriddedDashboardProvider>
-        <GriddedDashboard />
+        <SnowDashboardView />
       </GriddedDashboardProvider>
     );
   }

@@ -82,7 +82,11 @@ const dedupePolygonFeatures = (features?: maplibregl.MapGeoJSONFeature[]) => {
   }, []);
 };
 
-const GriddedMapComponent = () => {
+type GriddedMapComponentProps = {
+  showLegend?: boolean;
+};
+
+const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) => {
   const { state, dispatch } = useDashboard();
   const {
     mapFilters,
@@ -603,7 +607,7 @@ const GriddedMapComponent = () => {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />
-      {(colorLegend || activeLegendEntries.length > 0) && (
+      {showLegend && (colorLegend || activeLegendEntries.length > 0) && (
         <div
           style={{
             position: 'absolute',
