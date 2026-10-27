@@ -47,7 +47,7 @@ const GriddedColorBar = ({ legend }: GriddedColorBarProps) => {
             width: BAR_WIDTH,
             height: BAR_HEIGHT,
             background: gradient,
-            border: '1px solid #999',
+            border: '1px solid var(--color-border-default)',
             flexShrink: 0,
           }}
         />

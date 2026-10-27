@@ -40,7 +40,7 @@ const MapLegend = ({ metric, floating = true }: MapLegendProps) => {
                 width: '12px',
                 height: '12px',
                 backgroundColor: color,
-                border: '1px solid #ccc',
+                border: '1px solid var(--color-border-default)',
                 marginRight: '6px',
               }}
             ></div>

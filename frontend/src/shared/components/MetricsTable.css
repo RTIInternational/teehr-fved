@@ -11,9 +11,9 @@
 }
 
 .metrics-table-header {
-  background-color: #f8f9fa;
+  background-color: var(--color-surface-interactive);
   padding: 12px 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--color-border-default);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -23,12 +23,12 @@
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .metrics-count {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--color-text-secondary);
   font-weight: normal;
 }
 
@@ -48,12 +48,12 @@
 }
 
 .metrics-table th {
-  background-color: #f8f9fa;
+  background-color: var(--color-surface-interactive);
   padding: 0.35rem 0.5rem;
   text-align: left;
   font-weight: 600;
-  color: #555;
-  border-bottom: 1px solid #dee2e6;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-default);
   position: sticky;
   top: 0;
   white-space: nowrap; /* Prevent header text wrapping */
@@ -63,19 +63,19 @@
 
 /* Sortable header styles */
 .sortable-header:hover {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: color-mix(in srgb, var(--color-action-primary-default) 8%, white);
   border-radius: 4px;
 }
 
 .sort-indicator {
   font-size: 12px;
   margin-left: 4px;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 /* Filter input styles */
 .metrics-table th input[type='text'] {
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border-default);
   border-radius: 3px;
   padding: 2px 6px;
   width: 100%;
@@ -83,9 +83,9 @@
 }
 
 .metrics-table th input[type='text']:focus {
-  border-color: #0d6efd;
+  border-color: var(--color-border-focus);
   outline: none;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--color-border-focus) 25%, transparent);
 }
 
 .metrics-table th {
@@ -94,35 +94,35 @@
 
 .metrics-table td {
   padding: 0.3rem 0.5rem;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 35%, transparent);
   white-space: nowrap; /* Prevent cell content wrapping */
   vertical-align: middle;
 }
 
 /* Keep subtle semantic distinction for grouped columns without changing header theme */
 .group-by-cell {
-  background-color: #f8f9fa;
+  background-color: var(--color-surface-interactive);
   font-weight: 500;
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid var(--color-border-default);
 }
 
 .metric-cell {
-  color: #333;
+  color: var(--color-text-primary);
   text-align: right;
   font-family: 'Courier New', monospace;
 }
 
 .metrics-table tr:hover {
-  background-color: #f5f5f5;
+  background-color: color-mix(in srgb, var(--color-surface-interactive) 80%, white);
 }
 
 .metric-name {
   font-weight: 500;
-  color: #333;
+  color: var(--color-text-primary);
 }
 
 .metric-value {
-  color: #333;
+  color: var(--color-text-primary);
   text-align: right;
   font-family: 'Courier New', monospace;
 }
@@ -132,7 +132,7 @@
 .metrics-table-empty {
   padding: 24px;
   text-align: center;
-  color: #666;
+  color: var(--color-text-secondary);
 }
 
 .metrics-table-loading {
@@ -145,8 +145,8 @@
 .loading-spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #007bff;
+  border: 2px solid color-mix(in srgb, var(--color-border-default) 40%, white);
+  border-top: 2px solid var(--color-action-primary-default);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -161,9 +161,9 @@
 }
 
 .metrics-table-error {
-  color: #dc3545;
-  background-color: #f8d7da;
-  border: 1px solid #f5c6cb;
+  color: var(--color-status-danger-default);
+  background-color: color-mix(in srgb, var(--color-status-danger-default) 18%, white);
+  border: 1px solid color-mix(in srgb, var(--color-status-danger-default) 35%, white);
   border-radius: 4px;
   margin: 16px;
 }
