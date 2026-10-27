@@ -1,0 +1,76 @@
+import { THEME_COLOR_CONTRACT } from './colorContract';
+
+export const SEMANTIC_THEME_TOKENS = {
+  surfaces: {
+    app: THEME_COLOR_CONTRACT.surfaces.appBackground,
+    panel: THEME_COLOR_CONTRACT.surfaces.panelBackground,
+    subtle: THEME_COLOR_CONTRACT.surfaces.subtleBackground,
+    interactive: THEME_COLOR_CONTRACT.surfaces.interactiveBackground,
+  },
+  text: {
+    primary: THEME_COLOR_CONTRACT.text.primary,
+    secondary: THEME_COLOR_CONTRACT.text.secondary,
+    onDark: THEME_COLOR_CONTRACT.text.onDark,
+    link: THEME_COLOR_CONTRACT.text.link,
+  },
+  borders: {
+    default: THEME_COLOR_CONTRACT.borders.default,
+    strong: THEME_COLOR_CONTRACT.borders.strong,
+    focus: THEME_COLOR_CONTRACT.borders.focus,
+  },
+  actions: {
+    primary: { ...THEME_COLOR_CONTRACT.actions.primary },
+    secondary: { ...THEME_COLOR_CONTRACT.actions.secondary },
+    ghost: { ...THEME_COLOR_CONTRACT.actions.ghost },
+  },
+  status: {
+    info: { ...THEME_COLOR_CONTRACT.status.info },
+    success: { ...THEME_COLOR_CONTRACT.status.success },
+    warning: { ...THEME_COLOR_CONTRACT.status.warning },
+    danger: { ...THEME_COLOR_CONTRACT.status.danger },
+  },
+} as const;
+
+export type SemanticThemeTokens = typeof SEMANTIC_THEME_TOKENS;
+
+export const THEME_TOKEN_CSS_VARIABLES = {
+  surfaceApp: '--color-surface-app',
+  surfacePanel: '--color-surface-panel',
+  surfaceSubtle: '--color-surface-subtle',
+  surfaceInteractive: '--color-surface-interactive',
+  textPrimary: '--color-text-primary',
+  textSecondary: '--color-text-secondary',
+  textOnDark: '--color-text-on-dark',
+  textLink: '--color-text-link',
+  borderDefault: '--color-border-default',
+  borderStrong: '--color-border-strong',
+  borderFocus: '--color-border-focus',
+  actionPrimaryDefault: '--color-action-primary-default',
+  actionPrimaryHover: '--color-action-primary-hover',
+  actionPrimaryFocus: '--color-action-primary-focus',
+  actionPrimaryDisabled: '--color-action-primary-disabled',
+  actionSecondaryDefault: '--color-action-secondary-default',
+  actionSecondaryHover: '--color-action-secondary-hover',
+  actionSecondaryFocus: '--color-action-secondary-focus',
+  actionSecondaryDisabled: '--color-action-secondary-disabled',
+  actionGhostDefault: '--color-action-ghost-default',
+  actionGhostHover: '--color-action-ghost-hover',
+  actionGhostFocus: '--color-action-ghost-focus',
+  actionGhostDisabled: '--color-action-ghost-disabled',
+  statusInfoDefault: '--color-status-info-default',
+  statusInfoHover: '--color-status-info-hover',
+  statusInfoFocus: '--color-status-info-focus',
+  statusInfoDisabled: '--color-status-info-disabled',
+  statusSuccessDefault: '--color-status-success-default',
+  statusSuccessHover: '--color-status-success-hover',
+  statusSuccessFocus: '--color-status-success-focus',
+  statusSuccessDisabled: '--color-status-success-disabled',
+  statusWarningDefault: '--color-status-warning-default',
+  statusWarningHover: '--color-status-warning-hover',
+  statusWarningFocus: '--color-status-warning-focus',
+  statusWarningDisabled: '--color-status-warning-disabled',
+  statusDangerDefault: '--color-status-danger-default',
+  statusDangerHover: '--color-status-danger-hover',
+  statusDangerFocus: '--color-status-danger-focus',
+  statusDangerDisabled: '--color-status-danger-disabled',
+} as const;

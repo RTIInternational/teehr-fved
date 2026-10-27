@@ -1,0 +1,71 @@
+:root,
+[data-theme='default'] {
+  /* Brand palette tokens */
+  --color-brand-dark-blue-3035: #003e51;
+  --color-brand-light-blue-633: #007396;
+  --color-brand-mustard-1245: #c69214;
+  --color-brand-tan-468: #ddcba4;
+
+  --color-brand-orange-165: #ff671f;
+  --color-brand-green-357: #215732;
+  --color-brand-purple-2091: #4c12a1;
+  --color-brand-red-484: #9a3324;
+
+  --color-brand-metallic-gold: #c5a65a;
+  --color-brand-metallic-silver: #b2b7bd;
+  --color-brand-metallic-copper: #b87333;
+
+  /* Surface tokens */
+  --color-surface-app: #f6f2e8;
+  --color-surface-panel: #ffffff;
+  --color-surface-subtle: #ddcba4;
+  --color-surface-interactive: #f2ebdd;
+
+  /* Text tokens */
+  --color-text-primary: #003e51;
+  --color-text-secondary: #2b6478;
+  --color-text-on-dark: #ffffff;
+  --color-text-link: #007396;
+
+  /* Border tokens */
+  --color-border-default: #c8b892;
+  --color-border-strong: #003e51;
+  --color-border-focus: #007396;
+
+  /* Action tokens */
+  --color-action-primary-default: #003e51;
+  --color-action-primary-hover: #00506a;
+  --color-action-primary-focus: #007396;
+  --color-action-primary-disabled: #7a98a4;
+
+  --color-action-secondary-default: #c69214;
+  --color-action-secondary-hover: #a97610;
+  --color-action-secondary-focus: #007396;
+  --color-action-secondary-disabled: #d6b56a;
+
+  --color-action-ghost-default: transparent;
+  --color-action-ghost-hover: #ddcba4;
+  --color-action-ghost-focus: #007396;
+  --color-action-ghost-disabled: transparent;
+
+  /* Status tokens */
+  --color-status-info-default: #007396;
+  --color-status-info-hover: #005f7d;
+  --color-status-info-focus: #007396;
+  --color-status-info-disabled: #73afc6;
+
+  --color-status-success-default: #215732;
+  --color-status-success-hover: #1a4729;
+  --color-status-success-focus: #007396;
+  --color-status-success-disabled: #7fa08a;
+
+  --color-status-warning-default: #c69214;
+  --color-status-warning-hover: #a97610;
+  --color-status-warning-focus: #007396;
+  --color-status-warning-disabled: #d6b56a;
+
+  --color-status-danger-default: #9a3324;
+  --color-status-danger-hover: #7f2a1d;
+  --color-status-danger-focus: #007396;
+  --color-status-danger-disabled: #be8a80;
+}

@@ -20,6 +20,7 @@ import DashboardQuickSwitchBar from '@/shared/components/DashboardQuickSwitchBar
 import Navbar from '@/shared/components/Navbar';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
+import '@/theme/themeTokens.css';
 import './App.css';
 
 const RequireAuth = ({ children }: React.PropsWithChildren) => {
