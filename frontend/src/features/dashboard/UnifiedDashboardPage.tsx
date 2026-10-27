@@ -515,6 +515,7 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
 
   return (
     <UnifiedDashboardShell
+      transitionKey={view}
       mapContent={mapContent}
       desktopTopLeftCard={{
         content: isSnowView ? snowSideOverlayContent : streamflowSideCard,
