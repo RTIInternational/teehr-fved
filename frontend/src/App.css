@@ -9,6 +9,8 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
+  background-color: var(--color-surface-app);
+  color: var(--color-text-primary);
 }
 
 html {
@@ -34,6 +36,8 @@ html {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  background-color: var(--color-surface-app);
+  color: var(--color-text-primary);
 }
 
 .App > main {
@@ -54,12 +58,14 @@ html {
 /* Custom card styling */
 .card {
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-  border: 1px solid rgba(0, 0, 0, 0.125);
+  border: 1px solid var(--color-border-default);
+  background-color: var(--color-surface-panel);
+  color: var(--color-text-primary);
 }
 
 .card-header {
-  background-color: #f8f9fa;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+  background-color: var(--color-surface-interactive);
+  border-bottom: 1px solid var(--color-border-default);
 }
 
 /* Map container styling */
@@ -80,7 +86,7 @@ html {
 
 .form-label {
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-secondary);
 }
 
 /* Loading states */
@@ -121,13 +127,13 @@ html {
 }
 
 .text-muted {
-  color: #6c757d !important;
+  color: var(--color-text-secondary) !important;
 }
 
 /* Home Page Styles */
 .home-page {
   min-height: 100vh;
-  background-color: #f8f9fa;
+  background-color: var(--color-surface-app);
 }
 
 .hero-section {
@@ -272,7 +278,7 @@ main {
 }
 
 .dashboard-switcher-bar {
-  background: #f8fafc;
+  background: var(--color-surface-interactive);
 }
 
 .dashboard-switcher-disabled {
@@ -451,9 +457,9 @@ main {
 }
 
 .streamflow-unified-view__mobile-sheet-card {
-  background: rgba(248, 250, 252, 0.96);
+  background: color-mix(in srgb, var(--color-surface-panel) 96%, transparent);
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.4);
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 65%, transparent);
   box-shadow: 0 -8px 22px rgba(15, 23, 42, 0.18);
   padding: 10px;
 }
@@ -510,9 +516,9 @@ main {
 }
 
 .snow-unified-view__mobile-sheet-card {
-  background: rgba(248, 250, 252, 0.96);
+  background: color-mix(in srgb, var(--color-surface-panel) 96%, transparent);
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.4);
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 65%, transparent);
   box-shadow: 0 -8px 22px rgba(15, 23, 42, 0.18);
   padding: 10px;
 }
@@ -543,7 +549,7 @@ main {
 
 /* Preset A: Hydro Topographic */
 .bg-preset-hydro {
-  --bg-base: #eef6f5;
+  --bg-base: var(--color-surface-app);
   background: var(--bg-base);
   position: relative;
 }
@@ -562,10 +568,10 @@ main {
 
 /* Optional: deepen card separation for hydro preset */
 .bg-preset-hydro .card {
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--color-surface-panel) 92%, transparent);
   backdrop-filter: blur(2px);
   box-shadow: 0 10px 24px rgba(16, 24, 40, 0.08);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid color-mix(in srgb, var(--color-border-default) 60%, transparent);
 }
 
 .bg-preset-hydro > * {
