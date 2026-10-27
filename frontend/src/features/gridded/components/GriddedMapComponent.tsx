@@ -1,15 +1,23 @@
+import type { Feature, Point } from 'geojson';
 import maplibregl from 'maplibre-gl';
 import { FetchSource, PMTiles, Protocol } from 'pmtiles';
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, type Dispatch } from 'react';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
+import {
+  ActionTypes as ForecastActionTypes,
+  type DashboardState as ForecastDashboardState,
+} from '@/features/forecast/DashboardContext';
 import { GRIDDED_API_BASE_URL } from '@/shared/api/gridded/client';
 import { fetchGriddedEdrPoint } from '@/shared/api/gridded/edr';
 import { buildGriddedTileUrl, buildPmtilesUrl } from '@/shared/api/gridded/tiles';
 import { ensureFreshToken } from '@/shared/auth/keycloak';
 import { usePolygonLayers, useTilesLegend } from '@/shared/queries/gridded/tiles';
+import { useMetricLocations } from '@/shared/queries/metrics';
 import type { PolygonFeatureProps, PolygonFeatures } from '@/shared/types/gridded/tiles';
+import type { MapLocation } from '@/shared/types/locations';
 import type { MapViewport } from '@/shared/types/maps';
+import { getMetricColorExpression, getMetricLabel, isLngLatTuple } from '@/shared/utils/mapMetrics';
 
 import { useDashboard, ActionTypes } from '../DashboardContext';
 import { useCurrentTimestep } from '../hooks/useCurrentTimestep';
@@ -83,10 +91,22 @@ const dedupePolygonFeatures = (features?: maplibregl.MapGeoJSONFeature[]) => {
 };
 
 type GriddedMapComponentProps = {
+  mode?: 'snow' | 'streamflow';
   showLegend?: boolean;
+  streamflow?: {
+    state: ForecastDashboardState;
+    dispatch: Dispatch<any>;
+    table: string;
+    selectedLocation: MapLocation | null;
+    selectLocation: (location: MapLocation | null) => void;
+  };
 };
 
-const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) => {
+const GriddedMapComponent = ({
+  mode = 'snow',
+  showLegend = true,
+  streamflow,
+}: GriddedMapComponentProps) => {
   const { state, dispatch } = useDashboard();
   const {
     mapFilters,
@@ -98,13 +118,37 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
   } = state;
   const { dataset, variable, colorRamp, colorRampMin, colorRampMax } = mapFilters;
 
+  const streamflowState = streamflow?.state;
+  const streamflowDispatch = streamflow?.dispatch;
+  const streamflowSelectedLocation = streamflow?.selectedLocation ?? null;
+  const streamflowSelectLocation = streamflow?.selectLocation;
+  const streamflowTable = streamflow?.table;
+  const isStreamflow = mode === 'streamflow' && !!streamflowState && !!streamflowDispatch;
+  const activeViewport = isStreamflow ? streamflowState.mapViewport : mapViewport;
+  const activeMapLoaded = isStreamflow ? (streamflowState?.mapLoaded ?? false) : mapLoaded;
+
+  const streamflowFilters =
+    isStreamflow &&
+    streamflowState?.mapFilters.configuration &&
+    streamflowState?.mapFilters.variable
+      ? {
+          table: streamflowTable ?? 'fcst_metrics_by_location',
+          configuration: streamflowState.mapFilters.configuration,
+          variable: streamflowState.mapFilters.variable,
+        }
+      : undefined;
+
+  const streamflowLocations = useMetricLocations(streamflowFilters);
+
   const polygonLayers = usePolygonLayers();
   const currentTimestep = useCurrentTimestep();
 
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
-  const latestViewportRef = useRef<MapViewport | null>(mapViewport ?? null);
+  const griddedDispatchRef = useRef(dispatch);
+  const streamflowDispatchRef = useRef(streamflowDispatch);
+  const latestViewportRef = useRef<MapViewport | null>(activeViewport ?? null);
   const isApplyingViewportRef = useRef(false);
   // Separate popup for polygon hover so it never clobbers the click popup
   const hoverPopup = useRef<maplibregl.Popup | null>(null);
@@ -118,8 +162,45 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
     null
   );
 
+  const removeStreamflowArtifacts = useCallback((mapInstance: maplibregl.Map) => {
+    if (mapInstance.getLayer('locations-layer')) mapInstance.removeLayer('locations-layer');
+    if (mapInstance.getLayer('locations-selected')) mapInstance.removeLayer('locations-selected');
+    if (mapInstance.getSource('locations')) mapInstance.removeSource('locations');
+    popup.current?.remove();
+  }, []);
+
+  const removeSnowArtifacts = useCallback((mapInstance: maplibregl.Map) => {
+    if (clickHandlerRef.current) {
+      mapInstance.off('click', clickHandlerRef.current);
+      clickHandlerRef.current = null;
+    }
+
+    if (mapInstance.getLayer('gridded-layer')) mapInstance.removeLayer('gridded-layer');
+    if (mapInstance.getSource('gridded-tiles')) mapInstance.removeSource('gridded-tiles');
+
+    OVERLAY_LAYERS.forEach(({ id }) => {
+      if (mapInstance.getLayer(id)) mapInstance.removeLayer(id);
+      if (mapInstance.getSource(id)) mapInstance.removeSource(id);
+    });
+
+    if (mapInstance.getLayer(POLYGON_SELECTED_LAYER_ID))
+      mapInstance.removeLayer(POLYGON_SELECTED_LAYER_ID);
+    if (mapInstance.getLayer(`${POLYGON_LAYER_ID}-outline`))
+      mapInstance.removeLayer(`${POLYGON_LAYER_ID}-outline`);
+    if (mapInstance.getLayer(POLYGON_LAYER_ID)) mapInstance.removeLayer(POLYGON_LAYER_ID);
+    if (mapInstance.getSource(POLYGON_SOURCE_ID)) mapInstance.removeSource(POLYGON_SOURCE_ID);
+
+    hoverPopup.current?.remove();
+    polygonFetchSource.current = null;
+  }, []);
+
   // Prime the token so a polygon layer selected before the first tile load
   // still builds its FetchSource with an Authorization header.
+  useEffect(() => {
+    griddedDispatchRef.current = dispatch;
+    streamflowDispatchRef.current = streamflowDispatch;
+  }, [dispatch, streamflowDispatch]);
+
   useEffect(() => {
     void ensureFreshToken().then((token) => {
       tokenRef.current = token;
@@ -133,8 +214,8 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
   const tilesLegend = useTilesLegend(dataset, variable, colorRamp, colorRampMin, colorRampMax);
 
   useEffect(() => {
-    latestViewportRef.current = mapViewport ?? null;
-  }, [mapViewport]);
+    latestViewportRef.current = activeViewport ?? null;
+  }, [activeViewport]);
 
   // Fetch ArcGIS legend JSON for newly-activated overlays that declare a legendUrl.
   useEffect(() => {
@@ -221,7 +302,10 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
       });
       mapInstance.addLayer({ id: 'osm', type: 'raster', source: 'osm' });
 
-      dispatch({ type: ActionTypes.SET_MAP_LOADED, payload: true });
+      griddedDispatchRef.current({ type: ActionTypes.SET_MAP_LOADED, payload: true });
+      if (streamflowDispatchRef.current) {
+        streamflowDispatchRef.current({ type: ForecastActionTypes.SET_MAP_LOADED, payload: true });
+      }
     });
 
     mapInstance.on('moveend', () => {
@@ -241,7 +325,13 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
       }
 
       latestViewportRef.current = nextViewport;
-      dispatch({ type: ActionTypes.SET_MAP_VIEWPORT, payload: nextViewport });
+      griddedDispatchRef.current({ type: ActionTypes.SET_MAP_VIEWPORT, payload: nextViewport });
+      if (streamflowDispatchRef.current) {
+        streamflowDispatchRef.current({
+          type: ForecastActionTypes.SET_MAP_VIEWPORT,
+          payload: nextViewport,
+        });
+      }
     });
 
     mapInstance.on('error', (e: maplibregl.ErrorEvent) => {
@@ -249,7 +339,7 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
       // e.sourceId is set for tile/source errors (e.g. 404 for areas with no data); only surface fatal map errors.
       const sourceId = (e as { sourceId?: string }).sourceId;
       if (!sourceId) {
-        dispatch({
+        griddedDispatchRef.current({
           type: ActionTypes.SET_ERROR,
           payload: `Map error: ${e.error?.message || 'Unknown error'}`,
         });
@@ -262,17 +352,17 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
         map.current = null;
       }
     };
-  }, [dispatch]);
+  }, []);
 
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapLoaded || !mapViewport) return;
+    if (!mapInstance || !activeMapLoaded || !activeViewport) return;
 
     const currentViewport = normalizeViewport({
       center: [mapInstance.getCenter().lng, mapInstance.getCenter().lat],
       zoom: mapInstance.getZoom(),
     });
-    const targetViewport = normalizeViewport(mapViewport);
+    const targetViewport = normalizeViewport(activeViewport);
 
     if (viewportSignature(currentViewport) === viewportSignature(targetViewport)) {
       return;
@@ -281,12 +371,169 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
     isApplyingViewportRef.current = true;
     latestViewportRef.current = targetViewport;
     mapInstance.jumpTo({ center: targetViewport.center, zoom: targetViewport.zoom });
-  }, [mapLoaded, mapViewport]);
+  }, [activeMapLoaded, activeViewport]);
+
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !activeMapLoaded) return;
+
+    if (isStreamflow) {
+      removeSnowArtifacts(mapInstance);
+      return;
+    }
+
+    removeStreamflowArtifacts(mapInstance);
+  }, [activeMapLoaded, isStreamflow, removeSnowArtifacts, removeStreamflowArtifacts]);
+
+  useEffect(() => {
+    if (!isStreamflow || !streamflowState || !streamflowSelectLocation) return;
+
+    const mapInstance = map.current;
+    if (!mapInstance || !activeMapLoaded) return;
+    if (!mapInstance.isStyleLoaded()) return;
+
+    const metricName = streamflowState.mapFilters.metricName ?? 'relative_bias';
+    const features = streamflowLocations.data?.features ?? [];
+
+    const handleLocationClick = (e: maplibregl.MapLayerMouseEvent) => {
+      if (!e.features || e.features.length === 0) return;
+      const feature = e.features[0] as Feature<Point>;
+      if (!feature.properties || !feature.geometry?.coordinates) return;
+      if (!isLngLatTuple(feature.geometry.coordinates)) return;
+
+      const coordinates = feature.geometry.coordinates;
+      streamflowSelectLocation({
+        primary_location_id: String(feature.properties.primary_location_id ?? ''),
+        secondary_location_id: String(feature.properties.secondary_location_id ?? ''),
+        name: String(feature.properties.name ?? ''),
+        coordinates,
+      });
+    };
+
+    const handleLocationHover = (e: maplibregl.MapLayerMouseEvent) => {
+      mapInstance.getCanvas().style.cursor = 'pointer';
+      if (!e.features?.length) return;
+      const feature = e.features[0] as Feature<Point>;
+      const coordinates = feature.geometry.coordinates;
+      const properties = feature.properties;
+
+      if (!properties || !streamflowState.mapFilters.metricName || !isLngLatTuple(coordinates))
+        return;
+
+      const metricValue =
+        properties[streamflowState.mapFilters.metricName as keyof typeof properties];
+      const metricLabel = getMetricLabel(streamflowState.mapFilters.metricName);
+
+      popup.current
+        ?.setLngLat(coordinates)
+        .setHTML(
+          `
+          <div style="padding: 8px; font-size: 0.85rem;">
+            <div style="font-weight: 600; margin-bottom: 4px; color: #495057;">${escapeHtml(properties.name ?? 'Unnamed location')}</div>
+            <div style="margin: 2px 0;"><strong>ID:</strong> ${escapeHtml(properties.primary_location_id ?? 'N/A')}</div>
+            <div style="margin: 2px 0;"><strong>Lat:</strong> ${coordinates[1].toFixed(4)}</div>
+            <div style="margin: 2px 0;"><strong>Lon:</strong> ${coordinates[0].toFixed(4)}</div>
+            <div style="margin: 2px 0;"><strong>${escapeHtml(metricLabel)}:</strong> ${metricValue !== null && metricValue !== undefined ? Number(metricValue).toFixed(3) : 'N/A'}</div>
+            <div style="margin-top: 4px; font-size: 0.75rem; color: #6c757d;">Click to select</div>
+          </div>
+        `
+        )
+        .addTo(mapInstance);
+    };
+
+    const handleLocationLeave = () => {
+      mapInstance.getCanvas().style.cursor = '';
+      popup.current?.remove();
+    };
+
+    removeStreamflowArtifacts(mapInstance);
+
+    if (features.length === 0) {
+      return;
+    }
+
+    mapInstance.addSource('locations', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features,
+      },
+    });
+
+    const colorExpression = getMetricColorExpression(metricName);
+
+    mapInstance.addLayer({
+      id: 'locations-layer',
+      type: 'circle',
+      source: 'locations',
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 6, 8, 9, 12, 12],
+        'circle-color': colorExpression,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': 'black',
+        'circle-opacity': 0.8,
+      },
+    });
+
+    mapInstance.addLayer({
+      id: 'locations-selected',
+      type: 'circle',
+      source: 'locations',
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 8, 8, 11, 12, 14],
+        'circle-color': colorExpression,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': 'black',
+        'circle-opacity': 1,
+      },
+      filter: ['==', 'primary_location_id', streamflowSelectedLocation?.primary_location_id ?? ''],
+    });
+
+    mapInstance.on('click', 'locations-layer', handleLocationClick);
+    mapInstance.on('mouseenter', 'locations-layer', handleLocationHover);
+    mapInstance.on('mouseleave', 'locations-layer', handleLocationLeave);
+
+    return () => {
+      const currentMap = map.current;
+      if (!currentMap || currentMap !== mapInstance) return;
+
+      try {
+        if (currentMap.getLayer('locations-layer')) {
+          currentMap.off('click', 'locations-layer', handleLocationClick);
+          currentMap.off('mouseenter', 'locations-layer', handleLocationHover);
+          currentMap.off('mouseleave', 'locations-layer', handleLocationLeave);
+        }
+      } catch {
+        // The map can be disposed between effect scheduling and cleanup.
+      }
+    };
+  }, [
+    activeMapLoaded,
+    isStreamflow,
+    streamflowLocations.data,
+    streamflowSelectedLocation?.primary_location_id,
+    streamflowSelectLocation,
+    streamflowState,
+    removeStreamflowArtifacts,
+  ]);
+
+  useEffect(() => {
+    if (!isStreamflow) return;
+    const mapInstance = map.current;
+    if (!mapInstance || !activeMapLoaded || !mapInstance.isStyleLoaded()) return;
+    if (!mapInstance.getLayer('locations-selected')) return;
+
+    mapInstance.setFilter('locations-selected', [
+      '==',
+      'primary_location_id',
+      streamflowSelectedLocation?.primary_location_id ?? '',
+    ]);
+  }, [activeMapLoaded, isStreamflow, streamflowSelectedLocation?.primary_location_id]);
 
   // Update the gridded tile layer when filters change
   const updateTileLayer = useCallback(async () => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapLoaded) return;
+    if (!mapInstance || !mapLoaded || isStreamflow) return;
 
     // Remove previous layer and source
     if (mapInstance.getLayer('gridded-layer')) mapInstance.removeLayer('gridded-layer');
@@ -325,7 +572,16 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
       source: 'gridded-tiles',
       paint: { 'raster-opacity': 0.8 },
     });
-  }, [mapLoaded, dataset, variable, currentTimestep, colorRamp, colorRampMin, colorRampMax]);
+  }, [
+    mapLoaded,
+    dataset,
+    variable,
+    currentTimestep,
+    colorRamp,
+    colorRampMin,
+    colorRampMax,
+    isStreamflow,
+  ]);
 
   useEffect(() => {
     void updateTileLayer();
@@ -335,7 +591,7 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
   // Overlays are inserted below gridded-layer so the primary data renders on top.
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapLoaded) return;
+    if (!mapInstance || !mapLoaded || isStreamflow) return;
 
     OVERLAY_LAYERS.forEach(({ id, sourceConfig, layerConfig }) => {
       const isActive = activeOverlays.includes(id);
@@ -356,12 +612,12 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
         if (hasSource) mapInstance.removeSource(id);
       }
     });
-  }, [mapLoaded, activeOverlays]);
+  }, [mapLoaded, activeOverlays, isStreamflow]);
 
   // Sync polygon layer from pmtiles when activePolygonLayer changes
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapLoaded) return;
+    if (!mapInstance || !mapLoaded || isStreamflow) return;
 
     const polygonLayerId = POLYGON_LAYER_ID;
     const polygonSourceId = POLYGON_SOURCE_ID;
@@ -507,24 +763,30 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
       mapInstance.off('mouseleave', polygonLayerId, handlePolygonLeave);
       hoverPopup.current?.remove();
     };
-  }, [mapLoaded, activePolygonLayer, polygonLayers.data]);
+  }, [mapLoaded, activePolygonLayer, polygonLayers.data, isStreamflow]);
 
   // Keep the highlight layer in sync with the polygon chosen in the panel
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapLoaded || !mapInstance.getLayer(POLYGON_SELECTED_LAYER_ID)) return;
+    if (
+      !mapInstance ||
+      !mapLoaded ||
+      isStreamflow ||
+      !mapInstance.getLayer(POLYGON_SELECTED_LAYER_ID)
+    )
+      return;
 
     mapInstance.setFilter(POLYGON_SELECTED_LAYER_ID, [
       '==',
       'id',
       selectedLocation?.primary_location_id ?? '',
     ]);
-  }, [mapLoaded, selectedLocation, activePolygonLayer]);
+  }, [mapLoaded, selectedLocation, activePolygonLayer, isStreamflow]);
 
   // Update EDR click handler when active filters change
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapLoaded) return;
+    if (!mapInstance || !mapLoaded || isStreamflow) return;
 
     // Remove previous click handler
     if (clickHandlerRef.current) {
@@ -596,9 +858,10 @@ const GriddedMapComponent = ({ showLegend = true }: GriddedMapComponentProps) =>
         mapInstance.off('click', clickHandlerRef.current);
       }
     };
-  }, [mapLoaded, dataset, variable, currentTimestep, activePolygonLayer, dispatch]);
+  }, [mapLoaded, dataset, variable, currentTimestep, activePolygonLayer, dispatch, isStreamflow]);
 
-  const colorLegend = mapLoaded && dataset && variable ? (tilesLegend.data ?? null) : null;
+  const colorLegend =
+    !isStreamflow && mapLoaded && dataset && variable ? (tilesLegend.data ?? null) : null;
 
   const activeLegendEntries = OVERLAY_LAYERS.filter(
     (o) => activeOverlays.includes(o.id) && overlayLegends[o.id]
