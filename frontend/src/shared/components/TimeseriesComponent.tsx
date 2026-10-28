@@ -9,7 +9,7 @@ import type { TimeseriesState } from '@/shared/types/timeseries';
 
 type TimeseriesControlInjectedProps = {
   setRequestFilters: (filters: TimeseriesRequestFilters) => void;
-  onViewModeChange: (viewMode: string) => void;
+  onViewModeChange: (viewMode: 'filters' | 'plot') => void;
 };
 
 type TimeseriesComponentProps<TControlsProps extends object> = {

@@ -16,7 +16,6 @@ import KeycloakAdmin from '@/pages/admin/KeycloakAdmin';
 import DashboardsHome from '@/pages/DashboardsHome';
 import Home from '@/pages/Home';
 import { useAuth } from '@/shared/auth';
-import DashboardQuickSwitchBar from '@/shared/components/DashboardQuickSwitchBar';
 import Navbar from '@/shared/components/Navbar';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -107,14 +106,10 @@ const LegacyDashboardRedirect = ({ view }: { view: string }) => {
 };
 
 const AppRoutes = () => {
-  const location = useLocation();
-  const hasDashboardSwitcher = location.pathname === DASHBOARD_ROUTE;
-
   return (
-    <div className={`App${hasDashboardSwitcher ? ' app-has-dashboard-switcher' : ''}`}>
+    <div className="App">
       <Navbar />
-      <DashboardQuickSwitchBar />
-      <main>
+      <main className="app-main-content">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/hub" element={<DashboardsHome />} />

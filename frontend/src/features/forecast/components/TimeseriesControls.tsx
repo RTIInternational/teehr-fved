@@ -21,7 +21,7 @@ export type TimeseriesControlsProps = {
   setRequestFilters: (filters: TimeseriesRequestFilters) => void;
   selectedLocation: MapLocation;
   mapFilters: MapFilters;
-  onViewModeChange: (viewMode: string) => void;
+  onViewModeChange: (viewMode: 'filters' | 'plot') => void;
 };
 
 const TimeseriesControls = ({
