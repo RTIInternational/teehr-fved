@@ -150,6 +150,7 @@ const GriddedMapComponent = ({
   const streamflowDispatchRef = useRef(streamflowDispatch);
   const latestViewportRef = useRef<MapViewport | null>(activeViewport ?? null);
   const isApplyingViewportRef = useRef(false);
+  const lastStreamflowAutoFitDataKeyRef = useRef<string | null>(null);
   // Separate popup for polygon hover so it never clobbers the click popup
   const hoverPopup = useRef<maplibregl.Popup | null>(null);
   // Holds the current Bearer token for synchronous use inside transformRequest
@@ -209,7 +210,9 @@ const GriddedMapComponent = ({
 
   // Map of overlay id -> array of { label, imageData, contentType, width, height }
   const [overlayLegends, setOverlayLegends] = useState<Record<string, ArcGisLegendEntry[]>>({});
+  const [styleReadyVersion, setStyleReadyVersion] = useState(0);
   const fetchedLegends = useRef<Set<string>>(new Set());
+  const streamflowStyleWaitMapRef = useRef<maplibregl.Map | null>(null);
 
   const tilesLegend = useTilesLegend(dataset, variable, colorRamp, colorRampMin, colorRampMax);
 
@@ -302,11 +305,21 @@ const GriddedMapComponent = ({
       });
       mapInstance.addLayer({ id: 'osm', type: 'raster', source: 'osm' });
 
+      setStyleReadyVersion((version) => version + 1);
+
       griddedDispatchRef.current({ type: ActionTypes.SET_MAP_LOADED, payload: true });
       if (streamflowDispatchRef.current) {
         streamflowDispatchRef.current({ type: ForecastActionTypes.SET_MAP_LOADED, payload: true });
       }
     });
+
+    const handleStyleData = () => {
+      if (mapInstance.isStyleLoaded()) {
+        setStyleReadyVersion((version) => version + 1);
+      }
+    };
+
+    mapInstance.on('styledata', handleStyleData);
 
     mapInstance.on('moveend', () => {
       if (isApplyingViewportRef.current) {
@@ -347,6 +360,7 @@ const GriddedMapComponent = ({
     });
 
     return () => {
+      mapInstance.off('styledata', handleStyleData);
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -390,7 +404,29 @@ const GriddedMapComponent = ({
 
     const mapInstance = map.current;
     if (!mapInstance || !activeMapLoaded) return;
-    if (!mapInstance.isStyleLoaded()) return;
+    if (!mapInstance.isStyleLoaded()) {
+      if (streamflowStyleWaitMapRef.current === mapInstance) {
+        return;
+      }
+
+      streamflowStyleWaitMapRef.current = mapInstance;
+
+      const handleIdle = () => {
+        streamflowStyleWaitMapRef.current = null;
+        setStyleReadyVersion((version) => version + 1);
+      };
+
+      void mapInstance.once('idle', handleIdle);
+
+      return () => {
+        mapInstance.off('idle', handleIdle);
+        if (streamflowStyleWaitMapRef.current === mapInstance) {
+          streamflowStyleWaitMapRef.current = null;
+        }
+      };
+    }
+
+    streamflowStyleWaitMapRef.current = null;
 
     const metricName = streamflowState.mapFilters.metricName ?? 'relative_bias';
     const features = streamflowLocations.data?.features ?? [];
@@ -493,6 +529,32 @@ const GriddedMapComponent = ({
     mapInstance.on('mouseenter', 'locations-layer', handleLocationHover);
     mapInstance.on('mouseleave', 'locations-layer', handleLocationLeave);
 
+    const hasExternalViewport = !!streamflowState.mapViewport;
+    const dataVersionKey = String(streamflowLocations.dataUpdatedAt);
+
+    if (!hasExternalViewport && lastStreamflowAutoFitDataKeyRef.current !== dataVersionKey) {
+      const lons = features.map((f) => f.geometry?.coordinates?.[0]).filter(Number.isFinite);
+      const lats = features.map((f) => f.geometry?.coordinates?.[1]).filter(Number.isFinite);
+
+      if (lons.length > 0 && lats.length > 0) {
+        const minLon = Math.min(...lons);
+        const maxLon = Math.max(...lons);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+
+        if (isFinite(minLon) && isFinite(minLat) && isFinite(maxLon) && isFinite(maxLat)) {
+          lastStreamflowAutoFitDataKeyRef.current = dataVersionKey;
+          mapInstance.fitBounds(
+            [
+              [minLon, minLat],
+              [maxLon, maxLat],
+            ],
+            { padding: 50, duration: 700, maxZoom: 14 }
+          );
+        }
+      }
+    }
+
     return () => {
       const currentMap = map.current;
       if (!currentMap || currentMap !== mapInstance) return;
@@ -510,7 +572,9 @@ const GriddedMapComponent = ({
   }, [
     activeMapLoaded,
     isStreamflow,
+    styleReadyVersion,
     streamflowLocations.data,
+    streamflowLocations.dataUpdatedAt,
     streamflowSelectedLocation?.primary_location_id,
     streamflowSelectLocation,
     streamflowState,
@@ -528,7 +592,12 @@ const GriddedMapComponent = ({
       'primary_location_id',
       streamflowSelectedLocation?.primary_location_id ?? '',
     ]);
-  }, [activeMapLoaded, isStreamflow, streamflowSelectedLocation?.primary_location_id]);
+  }, [
+    activeMapLoaded,
+    isStreamflow,
+    styleReadyVersion,
+    streamflowSelectedLocation?.primary_location_id,
+  ]);
 
   // Update the gridded tile layer when filters change
   const updateTileLayer = useCallback(async () => {
