@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type SyntheticEvent } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Accordion, Button, Card, CloseButton } from 'react-bootstrap';
 
 import type { MapLocation } from '@/shared/types/locations';
@@ -8,8 +8,8 @@ type DrawerKey = 'timeseries' | 'metrics';
 type StreamflowDataDockProps = {
   selectedLocation: MapLocation | null;
   onClearSelection: () => void;
-  timeseriesContent: ReactNode;
-  metricsContent: ReactNode;
+  timeseriesContent: (headerControlsTarget: HTMLElement | null) => ReactNode;
+  metricsContent: (headerControlsTarget: HTMLElement | null) => ReactNode;
   errorContent?: ReactNode;
 };
 
@@ -22,27 +22,19 @@ const StreamflowDataDock = ({
 }: StreamflowDataDockProps) => {
   const [activeDrawer, setActiveDrawer] = useState<DrawerKey | null>('timeseries');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [timeseriesControlsTarget, setTimeseriesControlsTarget] = useState<HTMLElement | null>(
+    null
+  );
+  const [metricsControlsTarget, setMetricsControlsTarget] = useState<HTMLElement | null>(null);
 
   const hasSelection = Boolean(selectedLocation);
 
-  const handleAccordionSelect = (
-    eventKey: string | string[] | null | undefined,
-    _event: SyntheticEvent<unknown>
-  ) => {
+  const handleDrawerToggle = (drawer: DrawerKey) => {
     if (!hasSelection) {
       return;
     }
 
-    if (Array.isArray(eventKey)) {
-      return;
-    }
-
-    if (eventKey === 'timeseries' || eventKey === 'metrics') {
-      setActiveDrawer(eventKey);
-      return;
-    }
-
-    setActiveDrawer(null);
+    setActiveDrawer((current) => (current === drawer ? null : drawer));
   };
 
   const handleClearSelection = () => {
@@ -86,31 +78,74 @@ const StreamflowDataDock = ({
 
         <Accordion
           activeKey={hasSelection ? (activeDrawer ?? undefined) : undefined}
-          onSelect={handleAccordionSelect}
           className="streamflow-data-dock__accordion"
         >
           <Accordion.Item
             eventKey="timeseries"
             className={`streamflow-data-dock__drawer${hasSelection ? '' : ' is-disabled'}`}
           >
-            <Accordion.Header>
-              <span aria-disabled={!hasSelection}>📈 Time Series</span>
-            </Accordion.Header>
-            <Accordion.Body className="streamflow-data-dock__drawer-body">
-              <div className="streamflow-data-dock__timeseries-frame">{timeseriesContent}</div>
-            </Accordion.Body>
+            <div className="streamflow-data-dock__drawer-header-row">
+              <button
+                type="button"
+                className="streamflow-data-dock__drawer-toggle"
+                aria-expanded={activeDrawer === 'timeseries'}
+                onClick={() => handleDrawerToggle('timeseries')}
+                disabled={!hasSelection}
+              >
+                <span aria-hidden="true" className="streamflow-data-dock__drawer-chevron">
+                  {activeDrawer === 'timeseries' ? '▼' : '▶'}
+                </span>
+                <span aria-disabled={!hasSelection}>📈 Time Series</span>
+              </button>
+              <div
+                className="streamflow-data-dock__drawer-header-controls"
+                ref={(element) => {
+                  setTimeseriesControlsTarget(element);
+                }}
+                aria-hidden={!hasSelection}
+              />
+            </div>
+            <Accordion.Collapse eventKey="timeseries">
+              <div className="accordion-body streamflow-data-dock__drawer-body">
+                <div className="streamflow-data-dock__timeseries-frame">
+                  {timeseriesContent(timeseriesControlsTarget)}
+                </div>
+              </div>
+            </Accordion.Collapse>
           </Accordion.Item>
 
           <Accordion.Item
             eventKey="metrics"
             className={`streamflow-data-dock__drawer${hasSelection ? '' : ' is-disabled'}`}
           >
-            <Accordion.Header>
-              <span aria-disabled={!hasSelection}>📊 Metrics</span>
-            </Accordion.Header>
-            <Accordion.Body className="streamflow-data-dock__drawer-body">
-              <div className="streamflow-data-dock__metrics-frame">{metricsContent}</div>
-            </Accordion.Body>
+            <div className="streamflow-data-dock__drawer-header-row">
+              <button
+                type="button"
+                className="streamflow-data-dock__drawer-toggle"
+                aria-expanded={activeDrawer === 'metrics'}
+                onClick={() => handleDrawerToggle('metrics')}
+                disabled={!hasSelection}
+              >
+                <span aria-hidden="true" className="streamflow-data-dock__drawer-chevron">
+                  {activeDrawer === 'metrics' ? '▼' : '▶'}
+                </span>
+                <span aria-disabled={!hasSelection}>📊 Metrics</span>
+              </button>
+              <div
+                className="streamflow-data-dock__drawer-header-controls"
+                ref={(element) => {
+                  setMetricsControlsTarget(element);
+                }}
+                aria-hidden={!hasSelection}
+              />
+            </div>
+            <Accordion.Collapse eventKey="metrics">
+              <div className="accordion-body streamflow-data-dock__drawer-body">
+                <div className="streamflow-data-dock__metrics-frame">
+                  {metricsContent(metricsControlsTarget)}
+                </div>
+              </div>
+            </Accordion.Collapse>
           </Accordion.Item>
         </Accordion>
       </Card.Body>

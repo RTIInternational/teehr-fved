@@ -312,6 +312,26 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
     <EmptyTimeseriesCard />
   );
 
+  const streamflowDockTimeseriesPanel = (headerControlsTarget: HTMLElement | null) =>
+    selectedLocation ? (
+      <TimeseriesComponent
+        key={`dock-${selectedLocation.primary_location_id}`}
+        state={forecastState}
+        Controls={TimeseriesControls}
+        controlsProps={{
+          table: STREAMFLOW_TABLES[0],
+          timeseriesFilters,
+          updateTimeseriesFilters,
+          selectedLocation,
+          mapFilters,
+        }}
+        embeddedInAccordion
+        headerControlsTarget={headerControlsTarget}
+      />
+    ) : (
+      <EmptyTimeseriesCard />
+    );
+
   const streamflowSideCard = (
     <div className="streamflow-unified-view__side-stack">
       {forecastState.error && (
@@ -339,12 +359,24 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
     <EmptyMetricsCard />
   );
 
+  const streamflowDockMetricsPanel = (headerControlsTarget: HTMLElement | null) =>
+    selectedLocation ? (
+      <LocationMetrics
+        selectedLocation={selectedLocation}
+        tables={STREAMFLOW_TABLES}
+        embeddedInAccordion
+        headerControlsTarget={headerControlsTarget}
+      />
+    ) : (
+      <EmptyMetricsCard />
+    );
+
   const streamflowDesktopDataDock = (
     <StreamflowDataDock
       selectedLocation={selectedLocation}
       onClearSelection={() => selectLocation(null)}
-      timeseriesContent={streamflowTimeseriesPanel}
-      metricsContent={streamflowMetricsCard}
+      timeseriesContent={streamflowDockTimeseriesPanel}
+      metricsContent={streamflowDockMetricsPanel}
       errorContent={
         forecastState.error ? (
           <div className="alert alert-danger alert-dismissible mb-0" role="alert">

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card, Form, ButtonGroup, Button } from 'react-bootstrap';
+import { createPortal } from 'react-dom';
 
 import MetricsTable from '@/shared/components/MetricsTable';
 import { useMetricsByLocation } from '@/shared/queries/metrics';
@@ -9,9 +10,16 @@ import type { MapLocation } from '@/shared/types/locations';
 type LocationMetricsProps = {
   selectedLocation: MapLocation;
   tables: string[];
+  embeddedInAccordion?: boolean;
+  headerControlsTarget?: Element | null;
 };
 
-const LocationMetrics = ({ selectedLocation, tables }: LocationMetricsProps) => {
+const LocationMetrics = ({
+  selectedLocation,
+  tables,
+  embeddedInAccordion = false,
+  headerControlsTarget = null,
+}: LocationMetricsProps) => {
   const { data: tableProperties = {} } = useTableProperties(tables);
 
   // State for selected table and view mode
@@ -36,6 +44,94 @@ const LocationMetrics = ({ selectedLocation, tables }: LocationMetricsProps) => 
     return null;
   }
 
+  const controls = (
+    <>
+      {tables.length > 1 && (
+        <Form.Select
+          size="sm"
+          value={selectedTable || ''}
+          onChange={(e) => setSelectedTable(e.target.value)}
+          style={{ width: 'auto', minWidth: '200px' }}
+        >
+          <option value="">Select Table...</option>
+          {tables.map((tableName) => {
+            const description = tableProperties[tableName]?.description || tableName;
+            return (
+              <option key={tableName} value={tableName}>
+                {description}
+              </option>
+            );
+          })}
+        </Form.Select>
+      )}
+      {(hasLeadTimeBin || hasFilters) && (
+        <ButtonGroup size="sm">
+          {hasFilters && (
+            <Button
+              variant={viewMode === 'filters' ? 'primary' : 'outline-primary'}
+              onClick={() => setViewMode('filters')}
+              style={{ fontSize: '11px' }}
+            >
+              🔍 Filters
+            </Button>
+          )}
+          <Button
+            variant={viewMode === 'table' ? 'primary' : 'outline-primary'}
+            onClick={() => setViewMode('table')}
+            style={{ fontSize: '11px' }}
+          >
+            📊 Table
+          </Button>
+          {hasLeadTimeBin && (
+            <Button
+              variant={viewMode === 'plot' ? 'primary' : 'outline-primary'}
+              onClick={() => setViewMode('plot')}
+              style={{ fontSize: '11px' }}
+            >
+              📈 Plot
+            </Button>
+          )}
+        </ButtonGroup>
+      )}
+    </>
+  );
+
+  const controlsPortal = headerControlsTarget ? createPortal(controls, headerControlsTarget) : null;
+
+  const tableContent = (
+    <MetricsTable
+      metrics={metrics.data}
+      loading={metrics.isLoading}
+      error={metrics.error?.message}
+      title="Metrics"
+      emptyMessage={
+        selectedTable
+          ? `No metrics available for this location in ${selectedTable}.`
+          : 'Select a table to view metrics.'
+      }
+      showTitle={false}
+      tableProperties={selectedTable ? tableProperties[selectedTable] : null}
+      viewMode={viewMode}
+      onViewModeChange={setViewMode}
+    />
+  );
+
+  if (embeddedInAccordion) {
+    return (
+      <>
+        {controlsPortal}
+        <div className="location-metrics--embedded h-100 d-flex flex-column">
+          {!headerControlsTarget && (
+            <div className="location-metrics--embedded__controls">{controls}</div>
+          )}
+          <div className="p-0 flex-grow-1" style={{ overflow: 'hidden', minHeight: 0 }}>
+            {tableContent}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <Card
       className="shadow-lg h-100"
@@ -46,71 +142,11 @@ const LocationMetrics = ({ selectedLocation, tables }: LocationMetricsProps) => 
           <Card.Title as="h6" className="mb-0">
             📊 Metrics
           </Card.Title>
-          {tables.length > 1 && (
-            <Form.Select
-              size="sm"
-              value={selectedTable || ''}
-              onChange={(e) => setSelectedTable(e.target.value)}
-              style={{ width: 'auto', minWidth: '200px' }}
-            >
-              <option value="">Select Table...</option>
-              {tables.map((tableName) => {
-                const description = tableProperties[tableName]?.description || tableName;
-                return (
-                  <option key={tableName} value={tableName}>
-                    {description}
-                  </option>
-                );
-              })}
-            </Form.Select>
-          )}
-          {(hasLeadTimeBin || hasFilters) && (
-            <ButtonGroup size="sm">
-              {hasFilters && (
-                <Button
-                  variant={viewMode === 'filters' ? 'primary' : 'outline-primary'}
-                  onClick={() => setViewMode('filters')}
-                  style={{ fontSize: '11px' }}
-                >
-                  🔍 Filters
-                </Button>
-              )}
-              <Button
-                variant={viewMode === 'table' ? 'primary' : 'outline-primary'}
-                onClick={() => setViewMode('table')}
-                style={{ fontSize: '11px' }}
-              >
-                📊 Table
-              </Button>
-              {hasLeadTimeBin && (
-                <Button
-                  variant={viewMode === 'plot' ? 'primary' : 'outline-primary'}
-                  onClick={() => setViewMode('plot')}
-                  style={{ fontSize: '11px' }}
-                >
-                  📈 Plot
-                </Button>
-              )}
-            </ButtonGroup>
-          )}
+          {controls}
         </div>
       </Card.Header>
       <Card.Body className="p-0 flex-grow-1" style={{ overflow: 'hidden', minHeight: 0 }}>
-        <MetricsTable
-          metrics={metrics.data}
-          loading={metrics.isLoading}
-          error={metrics.error?.message}
-          title="Metrics"
-          emptyMessage={
-            selectedTable
-              ? `No metrics available for this location in ${selectedTable}.`
-              : 'Select a table to view metrics.'
-          }
-          showTitle={false}
-          tableProperties={selectedTable ? tableProperties[selectedTable] : null}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-        />
+        {tableContent}
       </Card.Body>
     </Card>
   );

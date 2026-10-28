@@ -528,6 +528,56 @@ main {
   font-weight: 600;
 }
 
+.streamflow-data-dock__drawer-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 65%, transparent);
+  background: color-mix(in srgb, var(--color-surface-panel) 96%, transparent);
+}
+
+.streamflow-data-dock__drawer-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: inherit;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.streamflow-data-dock__drawer-toggle:not(:disabled):hover {
+  background: color-mix(in srgb, var(--color-surface-interactive) 75%, transparent);
+}
+
+.streamflow-data-dock__drawer-toggle:disabled {
+  opacity: 0.6;
+}
+
+.streamflow-data-dock__drawer-chevron {
+  width: 10px;
+  font-size: 0.7rem;
+}
+
+.streamflow-data-dock__drawer-header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+  min-height: 28px;
+  flex-wrap: wrap;
+}
+
+.streamflow-data-dock__drawer-header-controls .btn-group,
+.streamflow-data-dock__drawer-header-controls .form-select {
+  margin: 0;
+}
+
 .streamflow-data-dock__drawer .accordion-body {
   padding: 8px;
 }
@@ -553,9 +603,20 @@ main {
   height: 100%;
 }
 
-.streamflow-data-dock__drawer.is-disabled .accordion-button {
-  opacity: 0.6;
-  pointer-events: none;
+.streamflow-data-dock__timeseries-frame > .timeseries-component--embedded,
+.streamflow-data-dock__metrics-frame > .location-metrics--embedded {
+  height: 100%;
+}
+
+.timeseries-component--embedded__controls,
+.location-metrics--embedded__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border-default) 70%, transparent);
+  background: color-mix(in srgb, var(--color-surface-panel) 95%, transparent);
+  flex-wrap: wrap;
 }
 
 .streamflow-unified-view__mobile-sheet-stack {
