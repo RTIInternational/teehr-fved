@@ -35,6 +35,7 @@ import {
 import { useGriddedVariableStyles } from '../gridded/hooks/useGriddedVariableStyles';
 import { useViewportUrlSync as useGriddedViewportUrlSync } from '../gridded/hooks/useViewportUrlSync';
 import { OVERLAY_LAYERS } from '../gridded/utils/overlayLayers';
+import StreamflowDataDock from './StreamflowDataDock';
 import UnifiedDashboardShell from './UnifiedDashboardShell';
 
 const STREAMFLOW_TABLES = ['fcst_metrics_by_location', 'fcst_metrics_by_lead_time_bins'];
@@ -338,6 +339,29 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
     <EmptyMetricsCard />
   );
 
+  const streamflowDesktopDataDock = (
+    <StreamflowDataDock
+      selectedLocation={selectedLocation}
+      onClearSelection={() => selectLocation(null)}
+      timeseriesContent={streamflowTimeseriesPanel}
+      metricsContent={streamflowMetricsCard}
+      errorContent={
+        forecastState.error ? (
+          <div className="alert alert-danger alert-dismissible mb-0" role="alert">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Error:</strong> {forecastState.error}
+            <button
+              type="button"
+              className="btn-close"
+              onClick={() => forecastDispatch({ type: ForecastActionTypes.CLEAR_ERROR })}
+              aria-label="Close"
+            ></button>
+          </div>
+        ) : null
+      }
+    />
+  );
+
   const streamflowMapOverlayCard = (
     <div className="streamflow-unified-view__map-overlay-stack">
       <Card className="shadow-sm streamflow-unified-view__search-card">
@@ -517,12 +541,14 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
     <UnifiedDashboardShell
       transitionKey={view}
       mapContent={mapContent}
-      desktopTopLeftCard={{
-        content: isSnowView ? snowSideOverlayContent : streamflowSideCard,
-        className: isSnowView
-          ? 'snow-unified-view__desktop-side-card'
-          : 'streamflow-unified-view__desktop-side-card',
-      }}
+      desktopTopLeftCard={
+        isSnowView
+          ? {
+              content: snowSideOverlayContent,
+              className: 'snow-unified-view__desktop-side-card',
+            }
+          : undefined
+      }
       desktopTopRightCard={{
         content: isSnowView ? snowLegendOverlay : streamflowMapOverlayCard,
         className: isSnowView
@@ -530,10 +556,10 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
           : 'streamflow-unified-view__desktop-map-overlays',
       }}
       desktopBottomCard={{
-        content: isSnowView ? snowTimeseriesOverlay : streamflowMetricsCard,
+        content: isSnowView ? snowTimeseriesOverlay : streamflowDesktopDataDock,
         className: isSnowView
           ? 'snow-unified-view__desktop-timeseries-card'
-          : 'streamflow-unified-view__desktop-metrics-card',
+          : 'streamflow-unified-view__desktop-data-dock-card',
       }}
       mobileBottomSheet={{
         content: isSnowView ? snowMobileBottomSheet : streamflowMobileBottomSheet,

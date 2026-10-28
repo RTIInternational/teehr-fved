@@ -371,6 +371,7 @@ main {
   left: 12px;
   right: 12px;
   bottom: 12px;
+  z-index: 26;
 }
 
 .unified-dashboard-shell__mobile-sheet {
@@ -464,8 +465,8 @@ main {
   height: min(52vh, 560px);
 }
 
-.streamflow-unified-view__desktop-metrics-card {
-  height: min(34vh, 320px);
+.streamflow-unified-view__desktop-data-dock-card {
+  width: 100%;
 }
 
 .streamflow-unified-view__desktop-map-overlays {
@@ -493,6 +494,68 @@ main {
 .streamflow-unified-view__empty-card {
   border-radius: 8px;
   min-height: 140px;
+}
+
+.streamflow-data-dock {
+  width: 100%;
+  height: min(34vh, 320px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: height 220ms ease;
+}
+
+.streamflow-data-dock--expanded {
+  height: min(90dvh, calc(100dvh - 92px));
+}
+
+.streamflow-data-dock__header {
+  background: color-mix(in srgb, var(--color-surface-panel) 92%, white);
+}
+
+.streamflow-data-dock__body {
+  min-height: 0;
+}
+
+.streamflow-data-dock__accordion {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.streamflow-data-dock__drawer .accordion-button {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.streamflow-data-dock__drawer .accordion-body {
+  padding: 8px;
+}
+
+.streamflow-data-dock__drawer-body {
+  min-height: 220px;
+}
+
+.streamflow-data-dock__timeseries-frame {
+  height: clamp(320px, 52vh, 620px);
+}
+
+.streamflow-data-dock--expanded .streamflow-data-dock__timeseries-frame {
+  height: clamp(360px, 72vh, 920px);
+}
+
+.streamflow-data-dock__metrics-frame {
+  min-height: 260px;
+}
+
+.streamflow-data-dock__timeseries-frame > .card,
+.streamflow-data-dock__metrics-frame > .card {
+  height: 100%;
+}
+
+.streamflow-data-dock__drawer.is-disabled .accordion-button {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .streamflow-unified-view__mobile-sheet-stack {
