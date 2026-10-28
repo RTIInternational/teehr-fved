@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import LocationCard from '@/shared/components/LocationCard';
 import LocationMetrics from '@/shared/components/LocationMetrics';
@@ -21,6 +21,29 @@ export const Dashboard = () => {
   const { mapFilters, updateMapFilters, timeseriesFilters, updateTimeseriesFilters } = useFilters();
 
   useInitialFilters(tables[0]);
+
+  const streamflowAutoRequestFilters = useMemo(() => {
+    if (!selectedLocation?.primary_location_id) {
+      return null;
+    }
+
+    const primary = timeseriesFilters.primary;
+    const secondary = timeseriesFilters.secondary;
+
+    if (
+      !primary.variables?.length ||
+      !secondary.variables?.length ||
+      !secondary.configurations?.length
+    ) {
+      return null;
+    }
+
+    return {
+      primary_location_id: selectedLocation.primary_location_id,
+      primary,
+      secondary,
+    };
+  }, [selectedLocation, timeseriesFilters]);
 
   const setMapViewport = useCallback(
     (viewport: NonNullable<typeof state.mapViewport>) => {
@@ -132,6 +155,8 @@ export const Dashboard = () => {
                 key={selectedLocation.primary_location_id}
                 state={state}
                 Controls={TimeseriesControls}
+                initialViewMode="plot"
+                autoRequestFilters={streamflowAutoRequestFilters}
                 controlsProps={{
                   table: tables[0],
                   timeseriesFilters,

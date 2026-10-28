@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Form, Row, Col, Button, InputGroup, Spinner, Alert } from 'react-bootstrap';
 
 import { useDatasets } from '@/shared/queries/gridded/datasets';
@@ -25,6 +25,7 @@ const GriddedControls = () => {
   const [overlaysExpanded, setOverlaysExpanded] = useState(false);
   const [polygonLayersExpanded, setPolygonLayersExpanded] = useState(false);
   const [mapControlsExpanded, setMapControlsExpanded] = useState(false);
+  const latestTimestepDatasetRef = useRef<string | null>(null);
   const { state, dispatch } = useDashboard();
   const { mapFilters, activeOverlays, activePolygonLayer } = state;
   const { dataset, variable, timestepIndex, colorRamp, colorRampMin, colorRampMax } = mapFilters;
@@ -55,6 +56,23 @@ const GriddedControls = () => {
       payload: { variable: variables.data[0], timestepIndex: 0 },
     });
   }, [dataset, variable, variables.data, dispatch]);
+
+  // Default each dataset to its latest available timestep on first load.
+  useEffect(() => {
+    if (!dataset || timesteps.data.length === 0) {
+      return;
+    }
+
+    if (latestTimestepDatasetRef.current === dataset) {
+      return;
+    }
+
+    latestTimestepDatasetRef.current = dataset;
+    dispatch({
+      type: ActionTypes.UPDATE_MAP_FILTERS,
+      payload: { timestepIndex: timesteps.data.length - 1 },
+    });
+  }, [dataset, timesteps.data, dispatch]);
 
   // Daily or coarser data picks a date only; sub-daily data picks the hour too
   const isDaily = shortestStep(timesteps.data.map(parseUtcTime)) >= 24 * 60 * 60 * 1000;

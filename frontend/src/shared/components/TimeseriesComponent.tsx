@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, Spinner, ButtonGroup, Button } from 'react-bootstrap';
 import { createPortal } from 'react-dom';
 
@@ -18,6 +18,8 @@ type TimeseriesComponentProps<TControlsProps extends object> = {
   controlsProps: TControlsProps;
   embeddedInAccordion?: boolean;
   headerControlsTarget?: Element | null;
+  initialViewMode?: 'filters' | 'plot';
+  autoRequestFilters?: TimeseriesRequestFilters | null;
 };
 
 const TimeseriesComponent = <TControlsProps extends object>({
@@ -26,11 +28,29 @@ const TimeseriesComponent = <TControlsProps extends object>({
   controlsProps,
   embeddedInAccordion = false,
   headerControlsTarget = null,
+  initialViewMode = 'filters',
+  autoRequestFilters = null,
 }: TimeseriesComponentProps<TControlsProps>) => {
-  const [viewMode, setViewMode] = useState('filters');
+  const [viewMode, setViewMode] = useState(initialViewMode);
   const [requestFilters, setRequestFilters] = useState<TimeseriesRequestFilters>();
+  const lastAutoRequestKeyRef = useRef<string | null>(null);
   const primary = usePrimaryTimeseries(requestFilters);
   const secondary = useSecondaryTimeseries(requestFilters);
+
+  useEffect(() => {
+    if (!autoRequestFilters) {
+      lastAutoRequestKeyRef.current = null;
+      return;
+    }
+
+    const nextRequestKey = JSON.stringify(autoRequestFilters);
+    if (lastAutoRequestKeyRef.current === nextRequestKey) {
+      return;
+    }
+
+    lastAutoRequestKeyRef.current = nextRequestKey;
+    setRequestFilters(autoRequestFilters);
+  }, [autoRequestFilters]);
 
   const primaryData = primary.data ?? [];
   const secondaryData = secondary.data ?? [];
@@ -72,6 +92,14 @@ const TimeseriesComponent = <TControlsProps extends object>({
         <p>Click on a location on the map to view its time series data.</p>
       </div>
     </div>
+  ) : viewMode === 'filters' ? (
+    <div className="p-3 flex-grow-1 overflow-auto">
+      <Controls
+        {...controlsProps}
+        setRequestFilters={setRequestFilters}
+        onViewModeChange={setViewMode}
+      />
+    </div>
   ) : primary.isLoading || secondary.isLoading ? (
     <div className="d-flex justify-content-center align-items-center flex-grow-1">
       <div className="text-center">
@@ -81,37 +109,26 @@ const TimeseriesComponent = <TControlsProps extends object>({
     </div>
   ) : (
     <>
-      {/* Show content based on view mode */}
-      {viewMode === 'plot' ? (
-        hasData ? (
-          <div className="flex-grow-1 p-2" style={{ overflow: 'hidden', minHeight: 0 }}>
-            <PlotlyChart
-              primaryData={primaryData}
-              secondaryData={secondaryData}
-              selectedLocation={state.selectedLocation}
-              filters={state.timeseriesFilters}
-              height="100%"
-            />
-          </div>
-        ) : (
-          <div className="d-flex align-items-center justify-content-center flex-grow-1 text-muted">
-            <div className="text-center">
-              <div style={{ fontSize: '2rem' }}>📊</div>
-              <h6>No Data Available</h6>
-              <p className="small">
-                Try switching to Filters to adjust the time range or check if data exists for this
-                location.
-              </p>
-            </div>
-          </div>
-        )
-      ) : (
-        <div className="p-3 flex-grow-1 overflow-auto">
-          <Controls
-            {...controlsProps}
-            setRequestFilters={setRequestFilters}
-            onViewModeChange={setViewMode}
+      {hasData ? (
+        <div className="flex-grow-1 p-2" style={{ overflow: 'hidden', minHeight: 0 }}>
+          <PlotlyChart
+            primaryData={primaryData}
+            secondaryData={secondaryData}
+            selectedLocation={state.selectedLocation}
+            filters={state.timeseriesFilters}
+            height="100%"
           />
+        </div>
+      ) : (
+        <div className="d-flex align-items-center justify-content-center flex-grow-1 text-muted">
+          <div className="text-center">
+            <div style={{ fontSize: '2rem' }}>📊</div>
+            <h6>No Data Available</h6>
+            <p className="small">
+              Try switching to Filters to adjust the time range or check if data exists for this
+              location.
+            </p>
+          </div>
         </div>
       )}
     </>

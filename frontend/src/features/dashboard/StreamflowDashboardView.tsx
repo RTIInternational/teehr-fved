@@ -97,6 +97,29 @@ const StreamflowDashboardView = () => {
       .slice(0, 15);
   }, [searchTerm, locations.data]);
 
+  const streamflowAutoRequestFilters = useMemo(() => {
+    if (!selectedLocation?.primary_location_id) {
+      return null;
+    }
+
+    const primary = timeseriesFilters.primary;
+    const secondary = timeseriesFilters.secondary;
+
+    if (
+      !primary.variables?.length ||
+      !secondary.variables?.length ||
+      !secondary.configurations?.length
+    ) {
+      return null;
+    }
+
+    return {
+      primary_location_id: selectedLocation.primary_location_id,
+      primary,
+      secondary,
+    };
+  }, [selectedLocation, timeseriesFilters]);
+
   const handleSearchSelect = useCallback(
     (feature: Feature<Point>) => {
       const properties = feature.properties;
@@ -145,6 +168,8 @@ const StreamflowDashboardView = () => {
       key={selectedLocation.primary_location_id}
       state={state}
       Controls={TimeseriesControls}
+      initialViewMode="plot"
+      autoRequestFilters={streamflowAutoRequestFilters}
       controlsProps={{
         table: TABLES[0],
         timeseriesFilters,

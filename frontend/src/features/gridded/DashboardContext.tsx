@@ -13,6 +13,9 @@ import type { MapViewport } from '@/shared/types/maps';
 
 import type { GriddedTabName } from './Dashboard';
 
+const DEFAULT_SNOW_DATASET = 'ua_swann_4km';
+const DEFAULT_SNOW_VARIABLE = 'swe_daily_inst';
+
 type PolygonFeaturesPayload = { features: PolygonFeatures; lngLat: ClickedPoint };
 
 export type DashboardState = {
@@ -48,8 +51,8 @@ export const timeseriesDatasets = (
 
 const initialState: DashboardState = {
   mapFilters: {
-    dataset: null,
-    variable: null,
+    dataset: DEFAULT_SNOW_DATASET,
+    variable: DEFAULT_SNOW_VARIABLE,
     timestepIndex: 0,
     colorRamp: 'raster/plasma',
     colorRampMin: 0,
