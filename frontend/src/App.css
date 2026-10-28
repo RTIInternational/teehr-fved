@@ -498,15 +498,24 @@ main {
 
 .streamflow-data-dock {
   width: 100%;
-  height: min(34vh, 320px);
+  height: auto;
+  max-height: none;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: height 220ms ease;
+  transition:
+    height 220ms ease,
+    max-height 220ms ease;
+}
+
+.streamflow-data-dock--has-open-drawer {
+  max-height: min(40dvh, 430px);
 }
 
 .streamflow-data-dock--expanded {
   height: min(90dvh, calc(100dvh - 92px));
+  max-height: min(90dvh, calc(100dvh - 92px));
 }
 
 .streamflow-data-dock__header {
@@ -515,17 +524,13 @@ main {
 
 .streamflow-data-dock__body {
   min-height: 0;
+  overflow: hidden;
 }
 
 .streamflow-data-dock__accordion {
   min-height: 0;
   flex: 1 1 auto;
-  overflow: auto;
-}
-
-.streamflow-data-dock__drawer .accordion-button {
-  font-size: 0.92rem;
-  font-weight: 600;
+  overflow: hidden;
 }
 
 .streamflow-data-dock__drawer-header-row {
@@ -578,24 +583,29 @@ main {
   margin: 0;
 }
 
-.streamflow-data-dock__drawer .accordion-body {
+.streamflow-data-dock__drawer-body {
   padding: 8px;
 }
 
-.streamflow-data-dock__drawer-body {
-  min-height: 220px;
+.streamflow-data-dock__drawer-body-scroll {
+  height: min(22dvh, 260px);
+  max-height: min(22dvh, 260px);
+  overflow: auto;
 }
 
 .streamflow-data-dock__timeseries-frame {
-  height: clamp(320px, 52vh, 620px);
+  height: 100%;
+  min-height: 220px;
 }
 
-.streamflow-data-dock--expanded .streamflow-data-dock__timeseries-frame {
-  height: clamp(360px, 72vh, 920px);
+.streamflow-data-dock--expanded .streamflow-data-dock__drawer-body-scroll {
+  height: min(72dvh, 900px);
+  max-height: min(72dvh, 900px);
 }
 
 .streamflow-data-dock__metrics-frame {
-  min-height: 260px;
+  height: 100%;
+  min-height: 220px;
 }
 
 .streamflow-data-dock__timeseries-frame > .card,

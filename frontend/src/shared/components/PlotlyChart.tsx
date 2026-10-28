@@ -311,6 +311,32 @@ const PlotlyChart = ({
     };
   }, [primaryData, secondaryData, selectedLocation, filters, allowForecastSelect, showLegend]);
 
+  useEffect(() => {
+    if (!plotRef.current) return;
+
+    const plotElement = plotRef.current;
+
+    const resizePlot = () => {
+      try {
+        Plotly.Plots.resize(plotElement);
+      } catch (error) {
+        console.error('PlotlyChart: Failed to resize plot', error);
+      }
+    };
+
+    const frameId = window.requestAnimationFrame(resizePlot);
+
+    const resizeObserver = new ResizeObserver(() => {
+      resizePlot();
+    });
+    resizeObserver.observe(plotElement);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
   return <div ref={plotRef} style={{ width: '100%', height }} />;
 };
 

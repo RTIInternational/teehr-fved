@@ -28,6 +28,7 @@ const StreamflowDataDock = ({
   const [metricsControlsTarget, setMetricsControlsTarget] = useState<HTMLElement | null>(null);
 
   const hasSelection = Boolean(selectedLocation);
+  const hasOpenDrawer = hasSelection && activeDrawer !== null;
 
   const handleDrawerToggle = (drawer: DrawerKey) => {
     if (!hasSelection) {
@@ -45,7 +46,7 @@ const StreamflowDataDock = ({
 
   return (
     <Card
-      className={`shadow-lg streamflow-data-dock${isExpanded ? ' streamflow-data-dock--expanded' : ''}`}
+      className={`shadow-lg streamflow-data-dock${hasOpenDrawer ? ' streamflow-data-dock--has-open-drawer' : ''}${isExpanded ? ' streamflow-data-dock--expanded' : ''}`}
       style={{ borderRadius: '10px' }}
     >
       <Card.Header className="py-2 px-3 d-flex align-items-center justify-content-between gap-2 streamflow-data-dock__header">
@@ -79,6 +80,7 @@ const StreamflowDataDock = ({
         <Accordion
           activeKey={hasSelection ? (activeDrawer ?? undefined) : undefined}
           className="streamflow-data-dock__accordion"
+          aria-label="Data sections"
         >
           <Accordion.Item
             eventKey="timeseries"
@@ -107,8 +109,10 @@ const StreamflowDataDock = ({
             </div>
             <Accordion.Collapse eventKey="timeseries">
               <div className="accordion-body streamflow-data-dock__drawer-body">
-                <div className="streamflow-data-dock__timeseries-frame">
-                  {timeseriesContent(timeseriesControlsTarget)}
+                <div className="streamflow-data-dock__drawer-body-scroll">
+                  <div className="streamflow-data-dock__timeseries-frame">
+                    {timeseriesContent(timeseriesControlsTarget)}
+                  </div>
                 </div>
               </div>
             </Accordion.Collapse>
@@ -141,8 +145,10 @@ const StreamflowDataDock = ({
             </div>
             <Accordion.Collapse eventKey="metrics">
               <div className="accordion-body streamflow-data-dock__drawer-body">
-                <div className="streamflow-data-dock__metrics-frame">
-                  {metricsContent(metricsControlsTarget)}
+                <div className="streamflow-data-dock__drawer-body-scroll">
+                  <div className="streamflow-data-dock__metrics-frame">
+                    {metricsContent(metricsControlsTarget)}
+                  </div>
                 </div>
               </div>
             </Accordion.Collapse>
