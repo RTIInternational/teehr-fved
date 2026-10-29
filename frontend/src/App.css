@@ -760,7 +760,7 @@ main {
 }
 
 .snow-unified-view__desktop-legend-card {
-  width: min(340px, calc(100vw - 36px));
+  width: min(170px, calc(100vw - 36px));
 }
 
 .snow-unified-view__legend-card {
