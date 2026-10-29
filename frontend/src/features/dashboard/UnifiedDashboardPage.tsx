@@ -590,9 +590,9 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
 
   const snowMobileBottomSheet = (
     <div className="snow-unified-view__mobile-sheet-stack">
+      {snowLegendOverlay}
       {snowSideOverlayContent}
       {snowTimeseriesOverlay}
-      {snowLegendOverlay}
     </div>
   );
 
@@ -603,15 +603,15 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
       desktopTopLeftCard={
         isSnowView
           ? {
-              content: snowSideOverlayContent,
-              className: 'snow-unified-view__desktop-side-card',
+              content: snowLegendOverlay,
+              className: 'snow-unified-view__desktop-legend-card',
             }
           : undefined
       }
       desktopTopRightCard={{
-        content: isSnowView ? snowLegendOverlay : streamflowMapOverlayCard,
+        content: isSnowView ? snowSideOverlayContent : streamflowMapOverlayCard,
         className: isSnowView
-          ? 'snow-unified-view__desktop-legend-card'
+          ? 'snow-unified-view__desktop-side-card'
           : 'streamflow-unified-view__desktop-map-overlays',
       }}
       desktopBottomCard={{

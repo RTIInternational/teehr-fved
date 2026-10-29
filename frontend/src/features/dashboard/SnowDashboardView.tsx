@@ -209,9 +209,9 @@ const SnowDashboardView = () => {
 
   const mobileBottomSheet = (
     <div className="snow-unified-view__mobile-sheet-stack">
+      {legendOverlay}
       {sideOverlayContent}
       {timeseriesOverlay}
-      {legendOverlay}
     </div>
   );
 
@@ -225,12 +225,12 @@ const SnowDashboardView = () => {
     <UnifiedDashboardShell
       mapContent={mapContent}
       desktopTopLeftCard={{
-        content: sideOverlayContent,
-        className: 'snow-unified-view__desktop-side-card',
-      }}
-      desktopTopRightCard={{
         content: legendOverlay,
         className: 'snow-unified-view__desktop-legend-card',
+      }}
+      desktopTopRightCard={{
+        content: sideOverlayContent,
+        className: 'snow-unified-view__desktop-side-card',
       }}
       desktopBottomCard={{
         content: timeseriesOverlay,
