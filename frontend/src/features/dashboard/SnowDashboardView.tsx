@@ -14,6 +14,7 @@ import { ActionTypes, useDashboard } from '../gridded/DashboardContext';
 import { useGriddedVariableStyles } from '../gridded/hooks/useGriddedVariableStyles';
 import { useViewportUrlSync } from '../gridded/hooks/useViewportUrlSync';
 import { OVERLAY_LAYERS } from '../gridded/utils/overlayLayers';
+import SnowDisplayPopover from './SnowDisplayPopover';
 import UnifiedDashboardShell from './UnifiedDashboardShell';
 
 type ArcGisLegendEntry = {
@@ -229,8 +230,8 @@ const SnowDashboardView = () => {
         className: 'snow-unified-view__desktop-legend-card',
       }}
       desktopTopRightCard={{
-        content: sideOverlayContent,
-        className: 'snow-unified-view__desktop-side-card',
+        content: <SnowDisplayPopover content={sideOverlayContent} />,
+        className: 'snow-unified-view__desktop-display-card',
       }}
       desktopBottomCard={{
         content: timeseriesOverlay,

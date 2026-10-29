@@ -35,6 +35,7 @@ import {
 import { useGriddedVariableStyles } from '../gridded/hooks/useGriddedVariableStyles';
 import { useViewportUrlSync as useGriddedViewportUrlSync } from '../gridded/hooks/useViewportUrlSync';
 import { OVERLAY_LAYERS } from '../gridded/utils/overlayLayers';
+import SnowDisplayPopover from './SnowDisplayPopover';
 import StreamflowDataDock from './StreamflowDataDock';
 import UnifiedDashboardShell from './UnifiedDashboardShell';
 
@@ -609,9 +610,13 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
           : undefined
       }
       desktopTopRightCard={{
-        content: isSnowView ? snowSideOverlayContent : streamflowMapOverlayCard,
+        content: isSnowView ? (
+          <SnowDisplayPopover content={snowSideOverlayContent} />
+        ) : (
+          streamflowMapOverlayCard
+        ),
         className: isSnowView
-          ? 'snow-unified-view__desktop-side-card'
+          ? 'snow-unified-view__desktop-display-card'
           : 'streamflow-unified-view__desktop-map-overlays',
       }}
       desktopBottomCard={{

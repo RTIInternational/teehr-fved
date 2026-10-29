@@ -738,6 +738,53 @@ main {
   width: min(560px, calc(100vw - 36px));
 }
 
+.snow-unified-view__desktop-display-card {
+  width: auto;
+}
+
+.snow-display-popover {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.snow-display-popover__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 92px;
+  font-weight: 600;
+}
+
+.snow-display-popover__button i {
+  font-size: 0.82rem;
+}
+
+.snow-display-popover__button-label {
+  white-space: nowrap;
+}
+
+.snow-display-popover__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(460px, calc(100vw - 36px));
+  z-index: 5;
+}
+
+@media (max-width: 1199.98px) {
+  .snow-display-popover__button {
+    min-width: 36px;
+    justify-content: center;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .snow-display-popover__button-label {
+    display: none;
+  }
+}
+
 .snow-unified-view__side-stack {
   display: flex;
   flex-direction: column;
