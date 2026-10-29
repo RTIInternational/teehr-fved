@@ -93,6 +93,7 @@ const dedupePolygonFeatures = (features?: maplibregl.MapGeoJSONFeature[]) => {
 type GriddedMapComponentProps = {
   mode?: 'snow' | 'streamflow';
   showLegend?: boolean;
+  suppressThematicLayers?: boolean;
   streamflow?: {
     state: ForecastDashboardState;
     dispatch: Dispatch<any>;
@@ -105,6 +106,7 @@ type GriddedMapComponentProps = {
 const GriddedMapComponent = ({
   mode = 'snow',
   showLegend = true,
+  suppressThematicLayers = false,
   streamflow,
 }: GriddedMapComponentProps) => {
   const { state, dispatch } = useDashboard();
@@ -404,6 +406,12 @@ const GriddedMapComponent = ({
 
     const mapInstance = map.current;
     if (!mapInstance || !activeMapLoaded) return;
+
+    if (suppressThematicLayers) {
+      removeStreamflowArtifacts(mapInstance);
+      return;
+    }
+
     if (!mapInstance.isStyleLoaded()) {
       if (streamflowStyleWaitMapRef.current === mapInstance) {
         return;
@@ -578,6 +586,7 @@ const GriddedMapComponent = ({
     streamflowSelectedLocation?.primary_location_id,
     streamflowSelectLocation,
     streamflowState,
+    suppressThematicLayers,
     removeStreamflowArtifacts,
   ]);
 

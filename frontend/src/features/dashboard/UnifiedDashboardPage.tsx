@@ -1,7 +1,9 @@
 import type { Feature, Point } from 'geojson';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from 'react-bootstrap';
+import { useLocation, useNavigate } from 'react-router-dom';
 
+import { DASHBOARD_NAV_ITEMS, buildDashboardHref } from '@/config/dashboardNavigation';
 import { ForecastDashboardProvider } from '@/features/forecast';
 import TimeseriesControls from '@/features/forecast/components/TimeseriesControls';
 import {
@@ -62,6 +64,13 @@ const TABS: { id: GriddedTabName; label: string }[] = [
   { id: 'dataset', label: 'Dataset' },
   { id: 'polygons', label: 'Polygon Attributes' },
 ];
+
+const VIEW_ICONS: Record<string, string> = {
+  streamflow: '📈',
+  snow: '❄️',
+  'water-supply': '💧',
+  crmms: '🧪',
+};
 
 const EmptyTimeseriesCard = () => {
   return (
@@ -170,11 +179,65 @@ const GriddedLegendCard = () => {
 };
 
 type UnifiedDashboardContentProps = {
-  view: string;
+  view: string | null;
+};
+
+const DashboardViewPicker = ({ onSelectView }: { onSelectView: (viewKey: string) => void }) => {
+  return (
+    <Card className="dashboard-view-picker shadow-lg border-0">
+      <Card.Header className="dashboard-view-picker__header">
+        <h4 className="mb-1">Choose a Dashboard View</h4>
+        <p className="mb-0">Select one of the available views to load its analysis overlays.</p>
+      </Card.Header>
+      <Card.Body className="dashboard-view-picker__body">
+        <div className="dashboard-view-picker__grid">
+          {DASHBOARD_NAV_ITEMS.map((item) => {
+            const viewKey = item.viewKey ?? item.id;
+            const isDisabled = item.status !== 'available';
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`dashboard-view-picker__option ${isDisabled ? 'is-disabled' : ''}`}
+                disabled={isDisabled}
+                onClick={() => onSelectView(viewKey)}
+                aria-label={isDisabled ? `${item.label} (coming soon)` : `Open ${item.label} view`}
+              >
+                <div className="dashboard-view-picker__option-header">
+                  <span className="dashboard-view-picker__icon" aria-hidden="true">
+                    {VIEW_ICONS[item.id] ?? '🗺️'}
+                  </span>
+                  <div>
+                    <div className="dashboard-view-picker__title">{item.label}</div>
+                    {isDisabled ? (
+                      <span className="dashboard-view-picker__badge">Coming Soon</span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <p className="dashboard-view-picker__description">{item.description}</p>
+
+                <ul className="dashboard-view-picker__features">
+                  {item.features.slice(0, 3).map((feature) => (
+                    <li key={feature}>{feature}</li>
+                  ))}
+                </ul>
+              </button>
+            );
+          })}
+        </div>
+      </Card.Body>
+    </Card>
+  );
 };
 
 const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isStreamflowView = view === 'streamflow';
   const isSnowView = view === 'snow';
+  const showViewPicker = !isStreamflowView && !isSnowView;
 
   const { state: forecastState, dispatch: forecastDispatch } = useForecastDashboard();
   const { state: griddedState, dispatch: griddedDispatch } = useGriddedDashboard();
@@ -182,9 +245,16 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
   const { mapFilters, updateMapFilters, timeseriesFilters, updateTimeseriesFilters } = useFilters();
   const [searchTerm, setSearchTerm] = useState('');
 
+  const handleSelectDashboardView = useCallback(
+    (viewKey: string) => {
+      navigate(buildDashboardHref(viewKey, location.search));
+    },
+    [navigate, location.search]
+  );
+
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
 
-  useInitialFilters(STREAMFLOW_TABLES[0]);
+  useInitialFilters(STREAMFLOW_TABLES[0], isStreamflowView);
 
   const setForecastMapViewport = useCallback(
     (viewport: NonNullable<typeof forecastState.mapViewport>) => {
@@ -220,6 +290,10 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
   }, [griddedState.mapFilters.variable, applyVariableStyleIfNew]);
 
   const locationFilters = useMemo(() => {
+    if (!isStreamflowView) {
+      return undefined;
+    }
+
     if (!mapFilters.configuration || !mapFilters.variable) {
       return undefined;
     }
@@ -229,7 +303,7 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
       configuration: mapFilters.configuration,
       variable: mapFilters.variable,
     };
-  }, [mapFilters.configuration, mapFilters.variable]);
+  }, [isStreamflowView, mapFilters.configuration, mapFilters.variable]);
 
   const locations = useMetricLocations(locationFilters);
 
@@ -308,6 +382,7 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
       <GriddedMapComponent
         mode={isSnowView ? 'snow' : 'streamflow'}
         showLegend={false}
+        suppressThematicLayers={showViewPicker}
         streamflow={{
           state: forecastState,
           dispatch: forecastDispatch,
@@ -597,6 +672,18 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
     </div>
   );
 
+  if (showViewPicker) {
+    return (
+      <UnifiedDashboardShell
+        mapContent={mapContent}
+        centerCard={{
+          content: <DashboardViewPicker onSelectView={handleSelectDashboardView} />,
+          className: 'dashboard-view-picker__container',
+        }}
+      />
+    );
+  }
+
   return (
     <UnifiedDashboardShell
       transitionKey={view}
@@ -636,7 +723,7 @@ const UnifiedDashboardContent = ({ view }: UnifiedDashboardContentProps) => {
 };
 
 type UnifiedDashboardPageProps = {
-  view: string;
+  view: string | null;
 };
 
 const UnifiedDashboardPage = ({ view }: UnifiedDashboardPageProps) => {

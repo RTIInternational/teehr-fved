@@ -95,11 +95,23 @@ export const buildDashboardHref = (viewKey: string, search = '') => {
   return query ? `${DASHBOARD_ROUTE}?${query}` : DASHBOARD_ROUTE;
 };
 
+export const buildDashboardBaseHref = (search = '') => {
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  params.delete('view');
+  const query = params.toString();
+  return query ? `${DASHBOARD_ROUTE}?${query}` : DASHBOARD_ROUTE;
+};
+
 export const isAvailableDashboardView = (viewKey: string | null) => {
   if (!viewKey) return false;
   return DASHBOARD_NAV_ITEMS.some(
     (item) => item.status === 'available' && (item.viewKey ?? item.id) === viewKey
   );
+};
+
+export const isKnownDashboardView = (viewKey: string | null) => {
+  if (!viewKey) return false;
+  return DASHBOARD_NAV_ITEMS.some((item) => (item.viewKey ?? item.id) === viewKey);
 };
 
 export const getDashboardLabelByRoute = (route: string, search = '') => {

@@ -5,7 +5,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   DASHBOARD_NAV_ITEMS,
   DASHBOARD_ROUTE,
-  DEFAULT_DASHBOARD_VIEW,
   getDashboardViewFromSearch,
 } from '@/config/dashboardNavigation';
 import { useAuth } from '@/shared/auth';
@@ -27,10 +26,7 @@ const Navbar = () => {
     [location.search]
   );
 
-  const activeView = useMemo(
-    () => getDashboardViewFromSearch(location.search) ?? DEFAULT_DASHBOARD_VIEW,
-    [location.search]
-  );
+  const activeView = useMemo(() => getDashboardViewFromSearch(location.search), [location.search]);
 
   const activeId = useMemo(() => {
     return DASHBOARD_NAV_ITEMS.find((item) => (item.viewKey ?? item.id) === activeView)?.id ?? null;
@@ -200,7 +196,7 @@ const Navbar = () => {
 
             <Link
               className="btn btn-outline-primary btn-sm w-100 mt-2"
-              to="/"
+              to="/about"
               onClick={closeDrawer}
             >
               About

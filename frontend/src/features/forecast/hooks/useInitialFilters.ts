@@ -7,14 +7,15 @@ import { useDistinctValues } from '@/shared/queries/distinctValues';
 /**
  * Load filters from data warehouse API and apply defaults
  * @param table Data warehouse table to reference in queries
+ * @param enabled Set false to skip loading and applying defaults
  * @returns UseQueryResult objects for configurations and variables
  */
-export const useInitialFilters = (table: string) => {
+export const useInitialFilters = (table: string, enabled = true) => {
   const { dispatch } = useDashboard();
 
-  const configurations = useDistinctValues(table, 'configuration_name');
-  const variables = useDistinctValues(table, 'variable_name');
-  useDistinctValues('primary_timeseries', 'variable_name');
+  const configurations = useDistinctValues(table, 'configuration_name', undefined, enabled);
+  const variables = useDistinctValues(table, 'variable_name', undefined, enabled);
+  useDistinctValues('primary_timeseries', 'variable_name', undefined, enabled);
 
   const defaultConfiguration = selectDefault(
     FORECAST_DASHBOARD_DEFAULTS.preferredConfiguration,
@@ -27,6 +28,10 @@ export const useInitialFilters = (table: string) => {
   );
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     if (!defaultConfiguration || !defaultVariable) {
       return;
     }
@@ -38,7 +43,7 @@ export const useInitialFilters = (table: string) => {
         variable: defaultVariable,
       },
     });
-  }, [defaultConfiguration, defaultVariable, dispatch]);
+  }, [enabled, defaultConfiguration, defaultVariable, dispatch]);
 
   return {
     configurations,

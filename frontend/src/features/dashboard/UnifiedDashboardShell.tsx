@@ -7,6 +7,7 @@ type OverlayCardProps = {
 
 type UnifiedDashboardShellProps = {
   mapContent: ReactNode;
+  centerCard?: OverlayCardProps;
   desktopTopLeftCard?: OverlayCardProps;
   desktopTopRightCard?: OverlayCardProps;
   desktopBottomCard?: OverlayCardProps;
@@ -15,6 +16,7 @@ type UnifiedDashboardShellProps = {
 };
 
 type OverlaySet = {
+  centerCard?: OverlayCardProps;
   desktopTopLeftCard?: OverlayCardProps;
   desktopTopRightCard?: OverlayCardProps;
   desktopBottomCard?: OverlayCardProps;
@@ -43,6 +45,14 @@ const renderOverlaySet = (overlaySet: OverlaySet | null, phaseClassName?: string
 
   return (
     <>
+      {overlaySet.centerCard && (
+        <div
+          className={`unified-dashboard-shell__overlay unified-dashboard-shell__overlay--center ${phaseClassName ?? ''}`.trim()}
+        >
+          {renderOverlayCard(overlaySet.centerCard, phaseClassName)}
+        </div>
+      )}
+
       {overlaySet.desktopTopLeftCard && (
         <div
           className={`unified-dashboard-shell__overlay unified-dashboard-shell__overlay--top-left d-none d-md-block ${phaseClassName ?? ''}`.trim()}
@@ -80,6 +90,7 @@ const renderOverlaySet = (overlaySet: OverlaySet | null, phaseClassName?: string
 
 const UnifiedDashboardShell = ({
   mapContent,
+  centerCard,
   desktopTopLeftCard,
   desktopTopRightCard,
   desktopBottomCard,
@@ -88,12 +99,13 @@ const UnifiedDashboardShell = ({
 }: UnifiedDashboardShellProps) => {
   const activeOverlaySet = useMemo(
     () => ({
+      centerCard,
       desktopTopLeftCard,
       desktopTopRightCard,
       desktopBottomCard,
       mobileBottomSheet,
     }),
-    [desktopTopLeftCard, desktopTopRightCard, desktopBottomCard, mobileBottomSheet]
+    [centerCard, desktopTopLeftCard, desktopTopRightCard, desktopBottomCard, mobileBottomSheet]
   );
   const previousOverlaySetRef = useRef<OverlaySet>(activeOverlaySet);
   const previousTransitionKeyRef = useRef(transitionKey);

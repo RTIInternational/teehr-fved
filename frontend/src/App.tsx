@@ -3,10 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 
 import {
   DASHBOARD_ROUTE,
-  DEFAULT_DASHBOARD_VIEW,
+  buildDashboardBaseHref,
   buildDashboardHref,
   getDashboardViewFromSearch,
-  isAvailableDashboardView,
+  isKnownDashboardView,
 } from '@/config/dashboardNavigation';
 import { UnifiedDashboardPage } from '@/features/dashboard';
 import AdminHome from '@/pages/admin/AdminHome';
@@ -91,13 +91,11 @@ const UnifiedDashboardRoute = () => {
   const location = useLocation();
   const currentView = getDashboardViewFromSearch(location.search);
 
-  if (!isAvailableDashboardView(currentView)) {
-    return <Navigate to={buildDashboardHref(DEFAULT_DASHBOARD_VIEW, location.search)} replace />;
+  if (currentView && !isKnownDashboardView(currentView)) {
+    return <Navigate to={buildDashboardBaseHref(location.search)} replace />;
   }
 
-  const resolvedView = currentView ?? DEFAULT_DASHBOARD_VIEW;
-
-  return <UnifiedDashboardPage view={resolvedView} />;
+  return <UnifiedDashboardPage view={currentView} />;
 };
 
 const LegacyDashboardRedirect = ({ view }: { view: string }) => {
@@ -111,7 +109,8 @@ const AppRoutes = () => {
       <Navbar />
       <main className="app-main-content">
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Navigate to={DASHBOARD_ROUTE} replace />} />
+          <Route path="/about" element={<Home />} />
           <Route path="/hub" element={<DashboardsHome />} />
           <Route
             path={DASHBOARD_ROUTE}
