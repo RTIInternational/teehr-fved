@@ -1,38 +1,39 @@
 from prefect import flow, task, get_run_logger
 from prefect.cache_policies import NO_CACHE
+import time
 import icechunk as ic
 import numpy as np
 import pandas as pd
 import xarray as xr
-from topozarr import create_pyramid
-import rioxarray  # noqa: F401 (rio accessor)
+import zarr
 
 from utils import grid_utils as gu
 from utils import time_grid as tg
 from workflows.models.ingest_gridded_data_input import (
-    BuildPyramidsDataInput,
+    BuildOverviewsDataInput,
     PackedEncoding,
-    PYRAMID_GROUP_PATH,
-    PYRAMID_CHUNK_SIZE,
+    OVERVIEW_GROUP_PATH,
+    OVERVIEW_CHUNK_SIZE,
 )
 
 
 @flow(
-    flow_run_name="build-pyramids",
+    flow_run_name="build-overviews",
     timeout_seconds=3 * 60 * 60
 )
-def build_pyramids(args: BuildPyramidsDataInput) -> None:
-    """Build multiscale pyramids for the steps the data group changed, and write them into their slots.
+def build_overviews(args: BuildOverviewsDataInput) -> None:
+    """Build map overviews for the steps the data group changed, and write them into their slots.
 
-    Reads the repo's data group (``/raw_data``, or ``/references`` when not materialized), only the
-    steps the pyramids lack or hold from an older write, reprojects to web mercator, creates
-    downsampled pyramid levels, and writes them on the repo's time grid (creating the levels on the
-    first run).
+    Reads the repo's data group (``/data``, or ``/references`` when not materialized), only the
+    steps the overviews lack or hold from an older write, and averages blocks of
+    ``overview_factors`` pixels on the data's own grid into ``/overviews/<factor>``. The tile
+    server uses the data group as full resolution and the overviews as coarser levels, and
+    reprojects each tile on request.
 
     Parameters
     ----------
-    args : BuildPyramidsDataInput
-        Pydantic model containing all flow parameters. See BuildPyramidsDataInput for field descriptions.
+    args : BuildOverviewsDataInput
+        Pydantic model containing all flow parameters. See BuildOverviewsDataInput for field descriptions.
     """
     logger = get_run_logger()
 
@@ -56,140 +57,143 @@ def build_pyramids(args: BuildPyramidsDataInput) -> None:
         logger.info(f"No data found in {data_group}.")
         return
 
-    # topozarr names levels by their index in args.factors, not by factor
-    first_level = f"{PYRAMID_GROUP_PATH}/0"
+    first_level = f"{OVERVIEW_GROUP_PATH}/{args.overview_factors[0]}"
     stale = tg.stale_steps(data_meta, tg.read_step_metadata(store, first_level, dim))
     if len(stale) == 0:
-        logger.info(f"{PYRAMID_GROUP_PATH} is up to date.")
+        logger.info(f"{OVERVIEW_GROUP_PATH} is up to date.")
         return
     data_ds = gu.open_zarr_group(store=store, group_path=data_group)
     data_ds = data_ds.drop_vars([n for n in tg.STEP_COORDS if n in data_ds.variables])
-    # Values are decoded, with NaN for missing, as in /raw_data; a source's own fill marker (e.g. -9999
-    # in /references) would otherwise reach reprojection and coarsening as the fill to skip
+    # Scalars such as the grid mapping ride along as coords; only gridded variables get overviews
+    data_ds = data_ds.set_coords([v for v in data_ds.data_vars if data_ds[v].ndim == 0])
+    y_dim, x_dim = data_ds.attrs["spatial:dimensions"]
+    data_ds = data_ds[[v for v in data_ds.data_vars if {y_dim, x_dim} <= set(data_ds[v].dims)]]
+    # Values are decoded, with NaN for missing, as in /data; a source's own fill marker (e.g. -9999
+    # in /references) would otherwise reach coarsening as a value
     for var in data_ds.data_vars:
         if np.issubdtype(data_ds[var].dtype, np.floating):
             data_ds[var].encoding.pop("missing_value", None)
             data_ds[var].encoding["_FillValue"] = np.nan
-    _check_packing_units(data_ds, args.pyramid_encoding)
+    _check_packing_units(data_ds, args.overview_encoding)
 
     # Batches of whole shards bound memory by the batch; each is committed, so a failed run resumes
     batches = tg.shard_batches(stale, data_meta.index, args.time_batch_size)
-    logger.info(f"Building pyramids for {len(stale)} step(s) in {len(batches)} batch(es).")
+    logger.info(f"Building overviews for {len(stale)} step(s) in {len(batches)} batch(es).")
+    started = time.perf_counter()
     for i, batch in enumerate(batches, start=1):
-        _write_pyramid_batch(repo, data_ds.sel({dim: batch}), data_meta.loc[batch], args)
-        logger.info(f"Processed pyramid batch {i} of {len(batches)} ({len(batch)} step(s)).")
+        batch_started = time.perf_counter()
+        _write_overview_batch(repo, data_group, data_ds.sel({dim: batch}), data_meta.loc[batch], args)
+        logger.info(
+            f"Processed overview batch {i} of {len(batches)} ({len(batch)} step(s)) "
+            f"in {time.perf_counter() - batch_started:.1f}s."
+        )
+    logger.info(f"Built overviews for {len(stale)} step(s) in {time.perf_counter() - started:.1f}s.")
 
 
-def _check_packing_units(ds: xr.Dataset, pyramid_encoding: dict[str, PackedEncoding]) -> None:
+def _check_packing_units(ds: xr.Dataset, overview_encoding: dict[str, PackedEncoding]) -> None:
     """Fail if a packing range is given in other units than its variable is stored in."""
-    for var, packing in pyramid_encoding.items():
+    for var, packing in overview_encoding.items():
         stored_units = ds[var].attrs.get("units") if var in ds else None
         if var in ds and stored_units != packing.units:
             raise ValueError(
-                f"pyramid_encoding for '{var}' is in '{packing.units}', but the variable is stored in '{stored_units}'."
+                f"overview_encoding for '{var}' is in '{packing.units}', but the variable is stored in '{stored_units}'."
             )
 
 
-def _clip_to_packed_range(ds: xr.Dataset, pyramid_encoding: dict[str, PackedEncoding]) -> xr.Dataset:
+def _clip_to_packed_range(ds: xr.Dataset, overview_encoding: dict[str, PackedEncoding]) -> xr.Dataset:
     """Clip packed variables to their packing range, so values cannot wrap."""
-    for var, packing in pyramid_encoding.items():
+    for var, packing in overview_encoding.items():
         if var in ds:
             ds[var] = ds[var].clip(packing.min_value, packing.max_value).assign_attrs(ds[var].attrs)
     return ds
 
 
-def _pyramid_encoding(ds: xr.Dataset, args: BuildPyramidsDataInput) -> dict:
-    """Chunk/shard encoding for a new pyramid level, with any per-variable packing applied."""
+def _overview_encoding(ds: xr.Dataset, args: BuildOverviewsDataInput) -> dict:
+    """Chunk/shard encoding for a new overview level: packed where configured, float32 otherwise."""
     encoding = gu.create_encoding_config(
         ds,
         append_dim=args.append_dim,
-        chunk_size=PYRAMID_CHUNK_SIZE,
-        # Tiles read one step at a time; shards span as many steps as /raw_data's
+        chunk_size=OVERVIEW_CHUNK_SIZE,
+        # Tiles read one step at a time; shards span as many steps as /data's
         num_shard_chunks=args.num_shard_chunks * args.time_chunk_size,
         time_chunk_size=1,
     )
-    for var, packing in args.pyramid_encoding.items():
-        if var in encoding:
-            encoding[var].update(packing.to_encoding())
+    for var in ds.data_vars:
+        packing = args.overview_encoding.get(var)
+        encoding[var].update(packing.to_encoding() if packing else {"dtype": "float32"})
     return encoding
 
 
+def _block_sum(values: np.ndarray, k: int) -> np.ndarray:
+    """Sum each k x k block of the last two axes, dropping a partial block at the far edges.
+
+    Adds the k*k interleaved slices; several times faster than xarray's coarsen or a reshape-and-sum.
+    """
+    y, x = values.shape[-2] // k * k, values.shape[-1] // k * k
+    return sum(values[..., i:y:k, j:x:k] for i in range(k) for j in range(k))
+
+
+def _overview_levels(ds: xr.Dataset, factors: list[int]) -> dict[int, xr.Dataset]:
+    """Average ``factor`` x ``factor`` blocks of pixels for each factor, skipping missing values.
+
+    Each level is summed from the previous one's block sums and valid-pixel counts, so its means match
+    averaging the full-resolution pixels directly.
+    """
+    y_dim, x_dim = ds.attrs["spatial:dimensions"]
+    dims, sums, counts = {}, {}, {}
+    for var in ds.data_vars:
+        da = ds[var].transpose(..., y_dim, x_dim)
+        valid = ~np.isnan(da.values)
+        dims[var], sums[var], counts[var] = da.dims, np.where(valid, da.values, 0), valid.astype(np.uint16)
+    y, x = ds[y_dim].values, ds[x_dim].values
+    coords = {n: c for n, c in ds.coords.items() if y_dim not in c.dims and x_dim not in c.dims}
+    levels, previous = {}, 1
+    for factor in factors:
+        k = factor // previous
+        sums = {var: _block_sum(total, k) for var, total in sums.items()}
+        counts = {var: _block_sum(count, k) for var, count in counts.items()}
+        y, x = y[: len(y) // k * k].reshape(-1, k).mean(axis=1), x[: len(x) // k * k].reshape(-1, k).mean(axis=1)
+        with np.errstate(invalid="ignore"):
+            data = {var: (dims[var], sums[var] / counts[var], ds[var].attrs) for var in sums}
+        level = xr.Dataset(
+            data,
+            coords={**coords, y_dim: (y_dim, y, ds[y_dim].attrs), x_dim: (x_dim, x, ds[x_dim].attrs)},
+            attrs=dict(ds.attrs),
+        )
+        level.attrs["spatial:transform"] = gu.spatial_transform(level)
+        levels[factor], previous = level, factor
+    return levels
+
+
 @task(cache_policy=NO_CACHE)
-def _write_pyramid_batch(
+def _write_overview_batch(
     repo: ic.Repository,
+    data_group: str,
     ds_batch: xr.Dataset,
     batch_meta: pd.DataFrame,
-    args: BuildPyramidsDataInput,
+    args: BuildOverviewsDataInput,
 ) -> None:
-    """Reproject one batch of time steps, build its pyramid levels, and write them into their slots."""
+    """Average one batch of time steps into each overview level, and write them into their slots."""
     logger = get_run_logger()
     dim = args.append_dim
-
-    # Set spatial dims and reproject to web mercator
-    ds_mercator = gu.reproject_dataset(
-        dataset=ds_batch,
-        target_crs=args.target_crs,
-        x_dim=args.x_dim,
-        y_dim=args.y_dim,
-        fallback_crs=args.fallback_source_crs
-    )
-    logger.info(f"Reprojected {len(ds_batch.indexes[args.append_dim].unique())} time step(s) to {args.target_crs}.")
-
-    # Create multiscale pyramids for the new slice
-    pyramid = create_pyramid(
-        ds_mercator,
-        factors=args.factors,
-        x_dim="x",
-        y_dim="y",
-        method=args.pyramid_method,
-    )
-    dt = pyramid.as_datatree()
-    logger.info(f"Created pyramids with {len(dt.children)} levels and factors: {args.factors}.")
+    ds_batch = ds_batch.load()
 
     rw_session = repo.writable_session("main")
     _, origin, time_step = tg.read_grid(rw_session.store)
-    axis_end = xr.open_zarr(rw_session.store, group=gu.read_data_group(rw_session.store), consolidated=False)[dim].to_index()[-1]
+    axis_end = xr.open_zarr(rw_session.store, group=data_group, consolidated=False)[dim].to_index()[-1]
 
-    # The parent '/pyramids' group holds the 'multiscales' block, written once
-    if not gu.group_contains_data(rw_session.store, f"{PYRAMID_GROUP_PATH}/0"):
-        logger.info(f"Writing root GeoZarr pyramid metadata to: {PYRAMID_GROUP_PATH}")
-        xr.Dataset(attrs=dt.attrs).to_zarr(
-            rw_session.store, group=PYRAMID_GROUP_PATH, mode="w", zarr_format=3, consolidated=False
-        )
+    # The tile server reads the data group as the full-resolution level, so it needs the transform too
+    group_attrs = zarr.open_group(rw_session.store, path=data_group.strip("/"), mode="a", zarr_format=3).attrs
+    if "spatial:transform" not in group_attrs:
+        group_attrs["spatial:transform"] = gu.spatial_transform(ds_batch)
+        logger.info(f"Recorded spatial:transform on {data_group}.")
 
-    layout = pyramid.attrs.get("multiscales", {}).get("layout", [])
-
-    for level_name, level_tree_node in dt.children.items():
-        attrs = level_tree_node.attrs.copy()
-
-        # Inject GeoZarr spatial transform and shape attrs for xpublish-tiles
-        level_idx = int(level_name)
-        if level_idx < len(layout):
-            level_layout = layout[level_idx]
-            attrs["spatial:transform"] = level_layout["spatial:transform"]
-            if "spatial:shape" in level_layout:
-                attrs["spatial:shape"] = level_layout["spatial:shape"]
-        if "proj:code" in pyramid.attrs:
-            attrs["proj:code"] = pyramid.attrs["proj:code"]
-
-        level_ds = level_tree_node.to_dataset()
-        # Drop scalar (0-D) data variables
-        level_ds = level_ds.drop_vars(
-            [v for v in level_ds.data_vars if level_ds[v].ndim == 0]
-        )
-        level_ds = gu.standardize_and_inject_geozarr(
-            level_ds.rio.write_crs(args.target_crs),  # pyramid levels are in target_crs
-            x_dim="x",
-            y_dim="y",
-        )
-        level_ds.attrs.update(attrs)
-        level_ds = _clip_to_packed_range(level_ds, args.pyramid_encoding)
-        level_ds = level_ds.drop_vars([n for n in tg.STEP_COORDS if n in level_ds.variables])
-
-        group = f"{PYRAMID_GROUP_PATH}/{level_name}"
+    for factor, level_ds in _overview_levels(ds_batch, args.overview_factors).items():
+        level_ds = _clip_to_packed_range(level_ds, args.overview_encoding)
+        group = f"{OVERVIEW_GROUP_PATH}/{factor}"
         existing = tg.read_step_metadata(rw_session.store, group, dim)
         if existing is None:
-            tg.create_group(rw_session, group, level_ds, origin, time_step, dim, axis_end, encoding=_pyramid_encoding(level_ds, args))
+            tg.create_group(rw_session, group, level_ds, origin, time_step, dim, axis_end, encoding=_overview_encoding(level_ds, args))
             logger.info(f"Created {group} on a {time_step} grid from {origin} to {axis_end}.")
             existing = tg.read_step_metadata(rw_session.store, group, dim)
         else:
@@ -208,7 +212,7 @@ def _write_pyramid_batch(
         tg.region_write(rw_session, group, level_ds, dim)
 
     snapshot_id = rw_session.commit(
-        f"Committed {len(dt.children)} pyramid levels ({len(batch_meta)} time step(s)) "
+        f"Committed {len(args.overview_factors)} overview levels ({len(batch_meta)} time step(s)) "
         f"to {args.dest_bucket}/{args.base_prefix}/{args.configuration_name}"
     )
-    logger.info(f"Pyramids committed with snapshot ID: {snapshot_id}.")
+    logger.info(f"Overviews committed with snapshot ID: {snapshot_id}.")

@@ -1,6 +1,6 @@
 import base64
-import contextvars
 import struct
+import time
 from typing import Callable
 
 import numpy as np
@@ -16,10 +16,12 @@ import icechunk as ic
 from pyproj import CRS as PyprojCRS
 import zarr
 import os
+import rioxarray  # noqa: F401 (rio accessor)
 
 from prefect import task, get_run_logger
 from prefect.cache_policies import NO_CACHE
-from teehr.utils.concurrency import resolve_budget, run_concurrent_map
+from teehr.fetching.utils import REFERENCE_BUILD_MIN_ITEMS, REFERENCE_WORKER_MEMORY
+from teehr.utils.concurrency import map_blocking, resolve_budget, run_sync, use_process_pool
 
 # Store kwargs whose values are kept out of logs
 _SECRET_KWARGS = {"access_key_id", "secret_access_key", "session_token", "service_account_key", "bearer_token"}
@@ -35,7 +37,7 @@ _VIRTUAL_STORES = {
 
 # Root-group attribute naming the group that holds a repo's full-resolution data
 DATA_GROUP_ATTR = "data_group"
-_DEFAULT_DATA_GROUP = "/raw_data"
+_DEFAULT_DATA_GROUP = "/data"
 
 # GeoTIFF geokey value for a user-defined CRS, i.e. one without an EPSG code
 _GEOTIFF_USER_DEFINED = 32767
@@ -197,7 +199,7 @@ def write_data_group(store: ic.IcechunkStore, group_path: str) -> bool:
 
 
 def read_data_group(store: ic.IcechunkStore) -> str:
-    """The repo's data group: ``/references`` or ``/raw_data`` (repos built before it was recorded)."""
+    """The repo's data group: ``/references`` or ``/data`` (repos built before it was recorded)."""
     try:
         attrs = zarr.open_group(store, mode="r", zarr_format=3).attrs
     except (zarr.errors.GroupNotFoundError, FileNotFoundError):
@@ -234,24 +236,22 @@ def _open_virtual_safe(
     parser: vz.parsers,
     ignore_missing_file: bool,
     ignore_unreadable_file: bool = True,
-    preprocess: Callable[[xr.Dataset, str], xr.Dataset] | None = None,
-) -> xr.Dataset | None:
-    """Open a virtual dataset safely, handling missing or unreadable files."""
-    logger = get_run_logger()
+) -> tuple[xr.Dataset | None, str | None]:
+    """Open a virtual dataset, skipping a missing or unreadable file; returns it or the reason it was skipped.
+
+    Runs in worker processes, which have no Prefect logger, so the caller logs the reason.
+    """
     try:
-        ds = open_virtual_dataset(url, registry=registry, parser=parser)
+        return open_virtual_dataset(url, registry=registry, parser=parser), None
     except Exception as e:
         # Some parsers (e.g. VirtualTIFF) wrap a missing object in their own error, so ask the store
         if isinstance(e, FileNotFoundError) or _is_missing(registry, url):
             if not ignore_missing_file:
                 raise
-            logger.warning(f"Missing file skipped: {url}")
-            return None
+            return None, f"Missing file skipped: {url}"
         if not ignore_unreadable_file:
             raise
-        logger.warning(f"Corrupt or unreadable file skipped: {url} ({e})")
-        return None
-    return preprocess(ds, url) if preprocess else ds
+        return None, f"Corrupt or unreadable file skipped: {url} ({e})"
 
 
 @task(cache_policy=NO_CACHE)
@@ -288,17 +288,34 @@ def create_virtual_xarray_dataset(
         Additional keyword arguments to pass to xr.concat.
     """
     logger = get_run_logger()
-    # Opening is network-bound, so size the threads by the io budget; each carries the
-    # Prefect run context, which get_run_logger needs and worker threads don't inherit
-    ctx = contextvars.copy_context()
-    opened = run_concurrent_map(
-        lambda url: ctx.copy().run(
-            _open_virtual_safe, url, registry, parser, ignore_missing_file, ignore_unreadable_file, preprocess
-        ),
+    # HDF5 parsing holds a global lock, so threads parse one file at a time; big jobs use processes
+    budget = resolve_budget(memory_per_process=REFERENCE_WORKER_MEMORY)
+    processes = budget.processes if use_process_pool(len(file_list), budget.processes, REFERENCE_BUILD_MIN_ITEMS) else 0
+    logger.info(f"Parsing {len(file_list)} file(s) in {processes or budget.io} {'processes' if processes else 'threads'}.")
+    started = time.perf_counter()
+    done = 0
+
+    def on_complete(_: int, result: tuple[xr.Dataset | None, str | None]) -> None:
+        nonlocal done
+        done += 1
+        if result[1]:
+            logger.warning(result[1])
+        if done % max(1, len(file_list) // 10) == 0 or done == len(file_list):
+            elapsed = time.perf_counter() - started
+            logger.info(f"Parsed {done} of {len(file_list)} file(s) in {elapsed:.1f}s ({done / elapsed:.2f} files/s).")
+
+    opened = run_sync(map_blocking(
+        _open_virtual_safe,
         file_list,
-        max_workers=resolve_budget().io,
-    )
-    virtual_datasets = [ds for ds in opened if ds is not None]
+        workers=budget.io,
+        args=(registry, parser, ignore_missing_file, ignore_unreadable_file),
+        processes=processes,
+        on_complete=on_complete,
+    ))
+    # Preprocessing runs here, since a source's preprocess may not pickle
+    virtual_datasets = [
+        preprocess(ds, url) if preprocess else ds for (ds, _), url in zip(opened, file_list) if ds is not None
+    ]
     if len(virtual_datasets) == 0:
         raise ValueError("No virtual datasets were created. Check the file list and registry of the source data.")
     logger.info(f"Found {len(virtual_datasets)} virtual datasets from {len(file_list)} files.")
@@ -436,44 +453,15 @@ def create_encoding_config(
     return encoding_config
 
 
-def reproject_dataset(
-    dataset: xr.Dataset,
-    target_crs: str,
-    x_dim: str,
-    y_dim: str,
-    fallback_crs: str | None = None
-) -> xr.Dataset:
-    """Reproject an xarray dataset to a target CRS.
+def spatial_transform(ds: xr.Dataset) -> list[float]:
+    """GeoZarr ``spatial:transform`` of a regular grid: pixel size and the outer corner of the first pixel.
 
-    Parameters
-    ----------
-    dataset : xr.Dataset
-        The dataset to reproject.
-    target_crs : str
-        The target CRS to reproject the dataset to.
-    x_dim : str
-        The name of the x dimension.
-    y_dim : str
-        The name of the y dimension.
-    fallback_crs : str | None
-        CRS applied, with a warning, only if the dataset has none. Without either, this raises.
+    Its dims come from the ``spatial:dimensions`` attr (``[y, x]``) that ingest writes.
     """
-    logger = get_run_logger()
-    logger.info(
-        f"Reprojecting dataset to target CRS: {target_crs} and setting spatial dims: x={x_dim}, y={y_dim}."
-    )
-    dataset = dataset.rio.set_spatial_dims(x_dim=x_dim, y_dim=y_dim)
-    if dataset.rio.crs is None:
-        if fallback_crs is None:
-            raise ValueError("Dataset has no CRS and no fallback_source_crs was provided.")
-        logger.warning(f"No CRS found in the dataset; applying fallback_source_crs {fallback_crs}.")
-        dataset = dataset.rio.write_crs(fallback_crs)
-    else:
-        logger.info(f"Source dataset has a CRS defined: {dataset.rio.crs}.")
-        dataset = dataset.rio.write_crs(dataset.rio.crs)
-    ds_mercator = dataset.rio.reproject(target_crs)
-    ds_mercator = ds_mercator.proj.assign_crs(spatial_ref=target_crs)
-    return ds_mercator
+    y_dim, x_dim = ds.attrs["spatial:dimensions"]
+    x, y = ds[x_dim].values, ds[y_dim].values
+    dx, dy = float(x[1] - x[0]), float(y[1] - y[0])
+    return [dx, 0.0, float(x[0]) - dx / 2, 0.0, dy, float(y[0]) - dy / 2]
 
 
 def standardize_and_inject_geozarr(
@@ -639,15 +627,6 @@ def restore_grid_mapping_attrs(ds: xr.Dataset) -> xr.Dataset:
         if "grid_mapping" in ds[var].encoding:
             ds[var].attrs["grid_mapping"] = ds[var].encoding.pop("grid_mapping")
     return ds
-
-
-def group_contains_data(store: ic.IcechunkStore, group_path: str) -> bool:
-    """Return True if the group at ``group_path`` (e.g. "/pyramids/0") exists and holds arrays."""
-    try:
-        group = zarr.open_group(store, path=group_path.strip("/"), mode="r", zarr_format=3)
-    except (zarr.errors.GroupNotFoundError, FileNotFoundError):
-        return False
-    return any(True for _ in group.array_keys())
 
 
 def open_zarr_group(

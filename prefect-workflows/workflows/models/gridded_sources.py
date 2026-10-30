@@ -28,6 +28,10 @@ class GriddedSource(BaseModel, ABC):
     store_kwargs: ClassVar[dict] = {}
     # Options for the IceChunk virtual chunk container's object store, e.g. region
     virtual_store_kwargs: ClassVar[dict] = {}
+    # Source-specific kwargs for the reference parser, e.g. the HDF5 reader's block size
+    parser_kwargs: ClassVar[dict] = {}
+    # Ingest's write_materialized when a run doesn't set it
+    materialize_by_default: ClassVar[bool] = True
     time_step: ClassVar[pd.Timedelta]
 
     @abstractmethod
