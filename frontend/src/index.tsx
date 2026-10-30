@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom/client';
 
 import { AuthProvider } from '@/shared/auth';
 
-import App from './App';
+import { AppRouter } from './routes/AppRouter';
 
 import '@mantine/core/styles.css';
 
@@ -24,7 +24,7 @@ root.render(
     <MantineProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <App />
+          <AppRouter />
         </AuthProvider>
       </QueryClientProvider>
     </MantineProvider>
