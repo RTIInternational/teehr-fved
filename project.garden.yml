@@ -24,7 +24,7 @@ environments:
         region: us-east-1
       hostname: teehr.local.app.garden
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 0333f73d0e41960abbbae7d5252aff0859dcf3d7
+      devTeehrVersion: 991900deeda31ab60f02aebb45edbd67c9180386
       stableTeehrVersion: place-holder # Needed for sync to work for some reason.
       previousTeehrVersion: place-holder
       polaris:
@@ -74,7 +74,7 @@ environments:
     varfile: deploy-targets/${local.env.DEPLOY_TARGET || "use1"}.yml
     variables:
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 0333f73d0e41960abbbae7d5252aff0859dcf3d7
+      devTeehrVersion: 991900deeda31ab60f02aebb45edbd67c9180386
       stableTeehrVersion: v0.7.0
       previousTeehrVersion: v0.6.6
       polaris:

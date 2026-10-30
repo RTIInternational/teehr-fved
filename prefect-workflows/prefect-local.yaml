@@ -128,7 +128,7 @@ deployments:
       "args": {
         "source": {"type": "ua-swann-4km"},
         "fallback_source_crs": "EPSG:4269",
-        "factors": [1],
+        "overview_factors": [2, 4],
         "write_mode": "upsert",
         "num_lookback_days": 30
       }
@@ -147,7 +147,6 @@ deployments:
         "parser_type": "tiff",
         "x_dim": "x",
         "y_dim": "y",
-        "factors": [1, 2],
         "time_batch_size": 30,
         "ignore_unreadable_file": false
       }
@@ -166,7 +165,6 @@ deployments:
         "parser_type": "tiff",
         "x_dim": "x",
         "y_dim": "y",
-        "factors": [1, 2, 4],
         "time_batch_size": 30,
         "ignore_unreadable_file": false
       }
