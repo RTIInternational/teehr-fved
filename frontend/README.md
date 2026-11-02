@@ -89,6 +89,36 @@ This frontend connects to a FastAPI backend. The Vite development server proxies
 - Backend API: configured by `VITE_API_BASE_URL` or defaults to `http://127.0.0.1:8000`
 - API endpoints are proxied from `/api/*` to the backend
 
+## Local Frontend Against Remote-Dev
+
+You can run the frontend locally while using remote-dev services and data. This avoids deploying the full local stack when iterating on UI changes.
+
+Use the committed mode file `./.env.remote-dev` (already in this repo):
+
+```
+VITE_API_BASE_URL=https://api.dev.low.amzifved.aws.rti.org
+VITE_XPUBLISH_API_BASE_URL=https://xpublish-api.dev.low.amzifved.aws.rti.org
+VITE_KEYCLOAK_URL=https://auth.dev.low.amzifved.aws.rti.org
+VITE_KEYCLOAK_REALM=teehr
+VITE_KEYCLOAK_CLIENT_ID=teehr-frontend-local-dev
+VITE_PREFECT_URL=https://prefect.dev.low.amzifved.aws.rti.org
+VITE_JUPYTERHUB_URL=https://hub.dev.low.amzifved.aws.rti.org/hub/spawn
+```
+
+Then start the dev server:
+
+```
+npm run dev:remote
+```
+
+If you need machine-specific overrides, add `./.env.remote-dev.local` (gitignored).
+
+Notes:
+
+- The local dev server origin must match one of the allowed localhost origins configured in remote-dev CORS.
+- The `teehr-frontend-local-dev` Keycloak client is scoped to localhost redirect URIs and origins.
+- Authentication and API authorization checks remain enforced by remote-dev services.
+
 ## Features
 
 - **Interactive Map**: MapLibre GL JS powered map for forecast and evaluation data

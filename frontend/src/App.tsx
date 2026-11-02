@@ -1,7 +1,6 @@
 import { Container, Alert } from 'react-bootstrap';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
-import { useAuth } from '@/features/auth';
 import { ForecastDashboard, ForecastDashboardProvider } from '@/features/forecast';
 import { GriddedDashboard, GriddedDashboardProvider } from '@/features/gridded';
 import AdminHome from '@/pages/admin/AdminHome';
@@ -10,6 +9,7 @@ import ApiKeysAdmin from '@/pages/admin/ApiKeysAdmin';
 import KeycloakAdmin from '@/pages/admin/KeycloakAdmin';
 import DashboardsHome from '@/pages/DashboardsHome';
 import Home from '@/pages/Home';
+import { useAuth } from '@/shared/auth';
 import Navbar from '@/shared/components/Navbar';
 
 import 'bootstrap/dist/css/bootstrap.min.css';

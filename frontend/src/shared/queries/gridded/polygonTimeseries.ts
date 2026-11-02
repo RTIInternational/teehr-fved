@@ -1,6 +1,6 @@
 import { skipToken, useQuery } from '@tanstack/react-query';
 
-import { apiService } from '@/services/api';
+import { getSecondaryTimeseries } from '@/shared/api/timeseries';
 import type { GriddedTimeseriesFilters } from '@/shared/types/gridded/timeseries';
 import { parseUtcTime } from '@/shared/utils/dates';
 
@@ -39,7 +39,7 @@ export const usePolygonTimeseries = ({
     queryFn:
       locationId && variable && datasets.length > 0 && (!useDefaultSpan || anchor)
         ? () =>
-            apiService.getSecondaryTimeseries(locationId, {
+            getSecondaryTimeseries(locationId, {
               configuration: datasets,
               variable,
               start_date: start ?? undefined,
