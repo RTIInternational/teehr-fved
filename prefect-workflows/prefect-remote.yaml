@@ -227,7 +227,7 @@ deployments:
       "args": {
         "source": {"type": "ua-swann-4km"},
         "fallback_source_crs": "EPSG:4269",
-        "factors": [1],
+        "overview_factors": [2, 4],
         "write_mode": "upsert",
         "num_lookback_days": 30
       }
@@ -250,7 +250,6 @@ deployments:
         "parser_type": "tiff",
         "x_dim": "x",
         "y_dim": "y",
-        "factors": [1, 2],
         "time_batch_size": 30,
         "ignore_unreadable_file": false
       }
@@ -269,23 +268,22 @@ deployments:
         "parser_type": "tiff",
         "x_dim": "x",
         "y_dim": "y",
-        "factors": [1, 2, 4],
         "time_batch_size": 30,
         "ignore_unreadable_file": false
       }
     }
     work_pool: *work_pool
 
-  # Gridded Pyramid Builds
-  - name: build-ua-4km-grids-pyramids
+  # Gridded Overview Builds
+  - name: build-ua-4km-grids-overviews
     version:
     tags: []
-    description: Build multiscale pyramids for the UA 4km SWE/DEPTH IceChunk repository
-    entrypoint: workflows/ingests/build_geozarr_pyramids.py:build_pyramids
+    description: Build map overviews for the UA 4km SWE/DEPTH IceChunk repository
+    entrypoint: workflows/ingests/build_overviews.py:build_overviews
     parameters: {
       "args": {
         "configuration_name": "ua_swann_4km",
-        "factors": [1]
+        "overview_factors": [2, 4]
       }
     }
     work_pool: *work_pool
