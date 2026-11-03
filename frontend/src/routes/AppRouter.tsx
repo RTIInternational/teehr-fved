@@ -11,7 +11,6 @@ import DashboardsHome from '@/pages/DashboardsHome';
 import Home from '@/pages/Home';
 
 import { AdminRoute } from './AdminRoute';
-import { RequireAuth } from './RequireAuth';
 
 export const AppRouter = () => (
   <BrowserRouter>
@@ -22,21 +21,17 @@ export const AppRouter = () => (
         <Route
           path="/forecast"
           element={
-            <RequireAuth>
-              <ForecastDashboardProvider>
-                <ForecastDashboard />
-              </ForecastDashboardProvider>
-            </RequireAuth>
+            <ForecastDashboardProvider>
+              <ForecastDashboard />
+            </ForecastDashboardProvider>
           }
         />
         <Route
           path="/gridded"
           element={
-            <RequireAuth>
-              <GriddedDashboardProvider>
-                <GriddedDashboard />
-              </GriddedDashboardProvider>
-            </RequireAuth>
+            <GriddedDashboardProvider>
+              <GriddedDashboard />
+            </GriddedDashboardProvider>
           }
         />
         <Route
