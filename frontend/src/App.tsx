@@ -4,7 +4,9 @@ import { Outlet } from 'react-router-dom';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
-import classes from './App.module.css';
+import { NavBar } from './features/layout/navbar/NavBar';
+
+import styles from './App.module.css';
 
 export const App = () => {
   const [opened, { toggle }] = useDisclosure();
@@ -12,11 +14,13 @@ export const App = () => {
 
   return (
     <div className="App">
-      <AppShell navbar={{ breakpoint: navBreakpoint, width: 200, collapsed: { mobile: !opened } }}>
-        <Box hiddenFrom={navBreakpoint} className={classes.mobileMenuToggle}>
+      <AppShell navbar={{ breakpoint: navBreakpoint, width: 250, collapsed: { mobile: !opened } }}>
+        <Box hiddenFrom={navBreakpoint} className={styles.mobileMenuToggle}>
           <Burger opened={opened} onClick={toggle} size="sm" aria-label="Toggle navigation" />
         </Box>
-        <AppShell.Navbar>Test Navbar</AppShell.Navbar>
+        <AppShell.Navbar>
+          <NavBar />
+        </AppShell.Navbar>
         <AppShell.Main>
           <Outlet />
         </AppShell.Main>
