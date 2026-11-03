@@ -1,6 +1,8 @@
 import { AppShell, Divider, Image, NavLink, ScrollArea } from '@mantine/core';
 import { NavLink as RouterLink } from 'react-router-dom';
 
+import { UserLogin } from './UserLogin';
+
 import classes from './NavBar.module.css';
 
 export const NavBar = () => {
@@ -10,6 +12,10 @@ export const NavBar = () => {
         <RouterLink to="/">
           <Image src="teehr.png" alt="TEEHR Logo" w="100%" className={classes.logo} />
         </RouterLink>
+        <Divider />
+      </AppShell.Section>
+      <AppShell.Section>
+        <UserLogin />
         <Divider />
       </AppShell.Section>
       <AppShell.Section grow component={ScrollArea}>
