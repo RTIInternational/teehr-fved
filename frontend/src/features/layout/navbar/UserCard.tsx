@@ -1,5 +1,6 @@
 import { Avatar, Box, Group, Menu, Text, UnstyledButton } from '@mantine/core';
 import { IconChevronRight } from '@tabler/icons-react';
+import { NavLink as RouterLink } from 'react-router-dom';
 
 type UserCardProps = {
   username: string | null;
@@ -9,7 +10,8 @@ type UserCardProps = {
 
 export const UserCard = ({ username, roles, logout }: UserCardProps) => {
   const name = username ?? 'Unknown User';
-  const role = roles.includes('admin') ? 'Admin' : 'User';
+  const isAdmin = roles.includes('admin');
+  const role = isAdmin ? 'Admin' : 'User';
 
   return (
     <Menu shadow="md" width={200} position="right-start" zIndex={2000}>
@@ -28,6 +30,14 @@ export const UserCard = ({ username, roles, logout }: UserCardProps) => {
         </UnstyledButton>
       </Menu.Target>
       <Menu.Dropdown>
+        {isAdmin && (
+          <>
+            <Menu.Label>Navigation</Menu.Label>
+            <Menu.Item renderRoot={(props) => <RouterLink to="/admin" {...props} />}>
+              Admin Tools
+            </Menu.Item>
+          </>
+        )}
         <Menu.Label>Actions</Menu.Label>
         <Menu.Item
           onClick={() => {
