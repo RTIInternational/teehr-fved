@@ -14,9 +14,10 @@ from prefect.blocks.system import Secret
 from pydantic import AfterValidator, BaseModel, Field
 from teehr.fetching.utils import REMOTE_RETRY_CONFIG
 
-from workflows.utils.data_status import STATUS_COORD, STATUS_MEANINGS, with_status
+from workflows.utils.data_status import with_status
+from workflows.utils.repo_const import LEAD_TIME, MEMBER, REFERENCE_TIME, STATUS_COORD, STATUS_MEANINGS
 
-# Columns of a source listing, indexed by each file's timestamp
+# Columns of a source listing, indexed by each file's timestamp (or forecast step)
 LISTING_COLUMNS = ["url", STATUS_COORD, "last_modified"]
 
 
@@ -36,7 +37,11 @@ class GriddedSource(BaseModel, ABC):
 
     @abstractmethod
     def list_files(self, start_dt: datetime, end_dt: datetime) -> pd.DataFrame:
-        """Files published for the range, one per step: ``LISTING_COLUMNS`` indexed by time."""
+        """Files published for the range, one per step: ``LISTING_COLUMNS`` indexed by time.
+
+        Forecast sources index by step, (``reference_time``, [``member``], ``lead_time``), selecting
+        cycles by reference time.
+        """
 
     @abstractmethod
     def time_origin(self) -> pd.Timestamp:
@@ -53,6 +58,27 @@ class GriddedSource(BaseModel, ABC):
     def grid_name(self) -> str:
         """Grid (CRS, pixel size, extent) the source's data is on; sources sharing a grid share a name."""
         return self.repository_name()
+
+    def lead_times(self) -> list[int] | None:
+        """Forecast lead times in hours, fixed when the repo is created; None for analysis sources."""
+        return None
+
+    def members(self) -> list[int] | None:
+        """Ensemble members, fixed when the repo is created; None for sources without members."""
+        return None
+
+    def fixed_axes(self) -> dict[str, list[int]]:
+        """The repo's axes after its append axis, in order; empty for analysis sources."""
+        axes = {MEMBER: self.members(), LEAD_TIME: self.lead_times()}
+        return {name: values for name, values in axes.items() if values is not None}
+
+    def append_dim(self) -> str:
+        """The repo's append axis: cycles for forecast sources, valid times otherwise."""
+        return REFERENCE_TIME if self.lead_times() is not None else "time"
+
+    def timeseries_type(self) -> str:
+        """teehr's timeseries table for the source's values."""
+        return "secondary" if self.lead_times() is not None else "primary"
 
     def credentials(self) -> dict:
         """Source access keys, for obstore and the virtual chunk container; empty means anonymous.
@@ -73,9 +99,11 @@ def _water_year(dt: date) -> int:
     return dt.year + 1 if dt.month >= 10 else dt.year
 
 
-def _listing(rows: list[dict]) -> pd.DataFrame:
-    df = pd.DataFrame(rows, columns=["time", *LISTING_COLUMNS])
-    return df.set_index(pd.DatetimeIndex(df.pop("time"), name="time")).sort_index()
+def _listing(rows: list[dict], index: tuple[str, ...] = ("time",)) -> pd.DataFrame:
+    df = pd.DataFrame(rows, columns=[*index, *LISTING_COLUMNS])
+    if len(index) == 1:
+        return df.set_index(pd.DatetimeIndex(df.pop(index[0]), name=index[0])).sort_index()
+    return df.set_index(list(index)).sort_index()
 
 
 def _known_status(v: str) -> str:
