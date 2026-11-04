@@ -224,8 +224,14 @@ def _format_rows(
     columns = _FORECAST_COLUMNS if include_member else _OBSERVED_COLUMNS
     df = pd.DataFrame(rows, columns=columns + ["_element_code"])
 
-    df["reference_time"] = pd.to_datetime(df["reference_time"], errors="coerce")
-    df["value_time"] = pd.to_datetime(df["value_time"], errors="coerce")
+    df["reference_time"] = (
+        pd.to_datetime(df["reference_time"], errors="coerce", utc=True)
+        .dt.tz_convert(None)
+    )
+    df["value_time"] = (
+        pd.to_datetime(df["value_time"], errors="coerce", utc=True)
+        .dt.tz_convert(None)
+    )
     df["value"] = pd.to_numeric(df["value"], errors="coerce").astype(float)
 
     if not df.empty:
