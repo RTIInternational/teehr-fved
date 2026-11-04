@@ -26,7 +26,7 @@ export const UserCard = ({ username, roles, logout }: UserCardProps) => {
       <Menu.Target>
         <UnstyledButton w="100%">
           <Group wrap="nowrap" w="100%" align="center" justify="flex-start" px="md">
-            <Avatar size="md" name={name} alt={name} color="initials" />
+            <Avatar size="md" name={name} alt={name} color="usbrGold" />
             <Box flex={1}>
               <Text fw={500}>{name}</Text>
               <Text c="dimmed" fz="sm">
