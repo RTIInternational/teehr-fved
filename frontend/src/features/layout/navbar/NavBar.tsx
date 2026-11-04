@@ -9,7 +9,13 @@ import {
   Stack,
   Text,
 } from '@mantine/core';
-import { IconExternalLink } from '@tabler/icons-react';
+import {
+  IconBucket,
+  IconDroplet,
+  IconExternalLink,
+  IconRipple,
+  IconSnowflake,
+} from '@tabler/icons-react';
 import { NavLink as RouterLink } from 'react-router-dom';
 
 import { useAuth } from '@/shared/auth';
@@ -49,20 +55,36 @@ export const NavBar = () => {
       <AppShell.Section grow component={ScrollArea}>
         <div>
           <NavLink
+            renderRoot={(props) => <RouterLink to="/hub" {...props} />}
+            label="Dashboard Views"
+            styles={{
+              label: {
+                fontWeight: 'var(--mantine-font-weight-bold)',
+              },
+            }}
+          />
+          <NavLink
             renderRoot={(props) => <RouterLink to="/forecast" {...props} />}
             label="Streamflow"
+            leftSection={<IconRipple size={20} />}
           />
           <NavLink
             renderRoot={(props) => <RouterLink to="/water-supply" {...props} />}
             label="Water Supply"
             disabled
+            leftSection={<IconBucket size={20} />}
           />
           <NavLink
             renderRoot={(props) => <RouterLink to="/crmms" {...props} />}
             label="Colorado River"
             disabled
+            leftSection={<IconDroplet size={20} />}
           />
-          <NavLink renderRoot={(props) => <RouterLink to="/gridded" {...props} />} label="Snow" />
+          <NavLink
+            renderRoot={(props) => <RouterLink to="/gridded" {...props} />}
+            label="Snow"
+            leftSection={<IconSnowflake size={20} />}
+          />
         </div>
       </AppShell.Section>
       {canViewHubDeployment && (
