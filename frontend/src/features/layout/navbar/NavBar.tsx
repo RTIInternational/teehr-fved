@@ -1,4 +1,14 @@
-import { AppShell, Divider, Image, NavLink, ScrollArea } from '@mantine/core';
+import {
+  AppShell,
+  Center,
+  Divider,
+  Group,
+  Image,
+  NavLink,
+  ScrollArea,
+  Stack,
+  Text,
+} from '@mantine/core';
 import { IconExternalLink } from '@tabler/icons-react';
 import { NavLink as RouterLink } from 'react-router-dom';
 
@@ -18,8 +28,17 @@ export const NavBar = () => {
   return (
     <>
       <AppShell.Section>
-        <RouterLink to="/">
-          <Image src="teehr.png" alt="TEEHR Logo" w="100%" className={classes.logo} />
+        <RouterLink to="/" className={classes.logoLink}>
+          <Center p="xs">
+            <Stack gap={0}>
+              <Group align="center" justify="center" gap="xs" wrap="nowrap">
+                <Image src="usbr-seal-white.png" alt="USBR Logo" w={54} />
+                <Text fz={60} fw={800} lh={1.3} className={classes.logoText}>
+                  FVED
+                </Text>
+              </Group>
+            </Stack>
+          </Center>
         </RouterLink>
         <Divider />
       </AppShell.Section>
