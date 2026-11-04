@@ -102,6 +102,17 @@ export const NavBar = () => {
         <Divider />
         <NavLink renderRoot={(props) => <RouterLink to="/" {...props} />} label="About" />
       </AppShell.Section>
+      <AppShell.Section>
+        <Divider />
+        {/* <Text c="dimmed" fs="italic">
+          Developed by
+        </Text> */}
+        <Center>
+          <a href="https://www.rti.org/" target="_blank">
+            <Image src="RTI_logo_rgb_sm.png" w={150} />
+          </a>
+        </Center>
+      </AppShell.Section>
     </>
   );
 };
