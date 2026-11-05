@@ -1,4 +1,5 @@
 import re
+import warnings
 import pandas as pd
 import requests
 from teehr.models.pandera_dataframe_schemas import primary_timeseries_schema
@@ -38,6 +39,12 @@ SEASONAL_PERIODS = {
     ("april", "july"): ("volume_amjj_sum", 4),
     ("january", "june"): ("volume_jfmamj_sum", 1),
     ("january", "may"): ("volume_jfmam_sum", 1),
+}
+
+CBRFC_SEASONAL_VARIABLE_MAPPING: dict[str, str] = {
+    'volume_amjj_sum': 'Seasonal summed water supply volume (Apr-Jul)',
+    'volume_jfmamj_sum': 'Seasonal summed water supply volume (Jan-Jun)',
+    'volume_jfmam_sum': 'Seasonal summed water supply volume (Jan-May)',
 }
 
 
@@ -327,6 +334,41 @@ def _fetch_seasonal_wsup_site_results(
     return results
 
 
+def _filter_unmapped_variables(
+    df: pd.DataFrame,
+    *,
+    variable_mapping: dict[str, str],
+) -> pd.DataFrame:
+    """Filter dataframe to only include variables in the mapping and warn about filtered data.
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with a 'variable_name' column
+    variable_mapping : dict[str, str]
+        Mapping of valid variable names to their descriptions
+        
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with only variables present in variable_mapping
+    """
+    if df.empty:
+        return df
+    
+    unmapped_vars = set(df['variable_name'].unique()) - set(variable_mapping.keys())
+    if unmapped_vars:
+        warnings.warn(
+            f"The following variables were not found in CBRFC_SEASONAL_VARIABLE_MAPPING "
+            f"and will be filtered out: {sorted(unmapped_vars)}",
+            UserWarning,
+            stacklevel=3
+        )
+        df = df[df['variable_name'].isin(variable_mapping.keys())].reset_index(drop=True)
+    
+    return df
+
+
 def _combine_seasonal_wsup_results(
     seasonal_results: dict[str, dict[str, pd.DataFrame]],
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -354,7 +396,14 @@ def _combine_seasonal_wsup_results(
         else pd.DataFrame(columns=OBS_SCHEMA_COLUMNS)
     )
 
-    return sim_df[SIM_SCHEMA_COLUMNS], obs_df[OBS_SCHEMA_COLUMNS]
+    sim_df = sim_df[SIM_SCHEMA_COLUMNS]
+    obs_df = obs_df[OBS_SCHEMA_COLUMNS]
+    
+    # Filter to only include mapped variables
+    sim_df = _filter_unmapped_variables(sim_df, variable_mapping=CBRFC_SEASONAL_VARIABLE_MAPPING)
+    obs_df = _filter_unmapped_variables(obs_df, variable_mapping=CBRFC_SEASONAL_VARIABLE_MAPPING)
+
+    return sim_df, obs_df
 
 
 def fetch_seasonal_wsup_forecasts(
@@ -362,10 +411,17 @@ def fetch_seasonal_wsup_forecasts(
     year: int,
     timeout: int = 30,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Fetch CBRFC seasonal forecasts as simulated and observed DataFrames."""
+    """Fetch CBRFC seasonal forecasts as simulated and observed DataFrames.
+    
+    Data is filtered to only include variables defined in CBRFC_SEASONAL_VARIABLE_MAPPING.
+    A warning is issued for any variables that are filtered out.
+    """
     seasonal_results = _fetch_seasonal_wsup_site_results(
         location_ids,
         year,
         timeout=timeout,
     )
     return _combine_seasonal_wsup_results(seasonal_results)
+
+
+__all__ = ["fetch_seasonal_wsup_forecasts", "CBRFC_SEASONAL_VARIABLE_MAPPING"]
