@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
@@ -36,6 +37,21 @@ ELEMENT_TO_VARIABLE_MAPPING: dict[str, dict[str, Any]] = {
         "conversion": [KAC_FT_TO_M3, AC_FT_TO_M3],
         "target_unit": "m^3",
     },
+}
+
+NRCS_VARIABLE_MAPPING: dict[str, str] = {
+    'volume_amjj_sum': 'Seasonal summed water supply volume (Apr-Jul)',
+    'volume_mjj_sum': 'Seasonal summed water supply volume (May-Jul)',
+    'volume_jj_sum': 'Seasonal summed water supply volume (Jun-Jul)',
+    'volume_amjjas_sum': 'Seasonal summed water supply volume (Apr-Sep)',
+    'volume_mjjas_sum': 'Seasonal summed water supply volume (May-Sep)',
+    'volume_jjas_sum': 'Seasonal summed water supply volume (Jul-Sep)',
+    'volume_mamjj_sum': 'Seasonal summed water supply volume (Mar-Jul)',
+    'volume_fmamjj_sum': 'Seasonal summed water supply volume (Feb-Jul)',
+    'volume_fmamjjas_sum': 'Seasonal summed water supply volume (Feb-Sep)',
+    'volume_mamjjas_sum': 'Seasonal summed water supply volume (Mar-Sep)',
+    'volume_amj_sum': 'Seasonal summed water supply volume (Apr-Jun)',
+    'volume_mj_sum': 'Seasonal summed water supply volume (May-Jun)'
 }
 
 sim_cols_raw = list(secondary_timeseries_schema(type="pandas").columns.keys())
@@ -476,6 +492,41 @@ def _combine_location_frames(
     return _format_rows([], include_member=include_member)
 
 
+def _filter_unmapped_variables(
+    df: pd.DataFrame,
+    *,
+    variable_mapping: dict[str, str],
+) -> pd.DataFrame:
+    """Filter dataframe to only include variables in the mapping and warn about filtered data.
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with a 'variable_name' column
+    variable_mapping : dict[str, str]
+        Mapping of valid variable names to their descriptions
+        
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with only variables present in variable_mapping
+    """
+    if df.empty:
+        return df
+    
+    unmapped_vars = set(df['variable_name'].unique()) - set(variable_mapping.keys())
+    if unmapped_vars:
+        warnings.warn(
+            f"The following variables were not found in NRCS_VARIABLE_MAPPING "
+            f"and will be filtered out: {sorted(unmapped_vars)}",
+            UserWarning,
+            stacklevel=3
+        )
+        df = df[df['variable_name'].isin(variable_mapping.keys())].reset_index(drop=True)
+    
+    return df
+
+
 def fetch_nrcs_forecasts(
     start_date: str,
     end_date: str,
@@ -485,6 +536,9 @@ def fetch_nrcs_forecasts(
 
     Each record supplies its own forecast period. Values are converted to m^3.
     Distinct periods sharing a publication date remain separate.
+    
+    Data is filtered to only include variables defined in NRCS_VARIABLE_MAPPING.
+    A warning is issued for any variables that are filtered out.
     """
     normalized_ids = _validate_fetch_inputs(start_date, end_date, location_ids)
     frames: list[pd.DataFrame] = []
@@ -499,7 +553,8 @@ def fetch_nrcs_forecasts(
         )
         frames.append(_forecasts_to_dataframe(response))
 
-    return _combine_location_frames(frames, include_member=True)
+    df = _combine_location_frames(frames, include_member=True)
+    return _filter_unmapped_variables(df, variable_mapping=NRCS_VARIABLE_MAPPING)
 
 
 def fetch_nrcs_observations(
@@ -511,6 +566,9 @@ def fetch_nrcs_observations(
 
     reference_time is NaT; value_time is the observation month start.
     No forecast requests, seasonal aggregation, or seasonal filtering occur.
+    
+    Data is filtered to only include variables defined in NRCS_VARIABLE_MAPPING.
+    A warning is issued for any variables that are filtered out.
     """
     normalized_ids = _validate_fetch_inputs(start_date, end_date, location_ids)
     frames: list[pd.DataFrame] = []
@@ -533,7 +591,8 @@ def fetch_nrcs_observations(
             )
         )
 
-    return _combine_location_frames(frames, include_member=False)
+    df = _combine_location_frames(frames, include_member=False)
+    return _filter_unmapped_variables(df, variable_mapping=NRCS_VARIABLE_MAPPING)
 
 
-__all__ = ["fetch_nrcs_forecasts", "fetch_nrcs_observations"]
+__all__ = ["fetch_nrcs_forecasts", "fetch_nrcs_observations", "NRCS_VARIABLE_MAPPING"]
