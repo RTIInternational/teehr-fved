@@ -16,23 +16,6 @@ BASE_URL = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1"
 DEFAULT_TIMEOUT = 60
 
 
-class _StationsResponse(list):
-    """List of station metadata payloads with attached query parameters.
-
-    Subclasses `list` so standard list operations, iteration, indexing,
-    and `json.dumps()` continue to work natively.
-    """
-
-    def __init__(
-        self,
-        iterable: Sequence[dict[str, Any]] = (),
-        *,
-        query_params: dict[str, Any] | None = None,
-    ) -> None:
-        super().__init__(iterable)
-        self.query_params = query_params or {}
-
-
 class _DataResponse(list):
     """List of observed data payloads with attached query parameters.
 
@@ -151,41 +134,6 @@ def _water_year_bounds(
         expanded_end = f"{end_wy}-09-30"
 
     return expanded_begin, expanded_end
-
-
-def _get_stations(
-    station_triplets: str | Sequence[str] | None = None,
-    *,
-    station_names: str | Sequence[str] | None = None,
-    dco_codes: str | Sequence[str] | None = None,
-    county_names: str | Sequence[str] | None = None,
-    elements: str | Sequence[str] | None = None,
-    durations: str | Sequence[str] | None = None,
-    hucs: str | Sequence[str] | None = None,
-    return_forecast_point_metadata: bool = False,
-    return_reservoir_metadata: bool = False,
-    return_station_elements: bool = True,
-    active_only: bool = True,
-    timeout: int = DEFAULT_TIMEOUT,
-    **extra_params: Any,
-) -> _StationsResponse:
-    """Get station metadata from `/services/v1/stations`."""
-    params = {
-        "stationTriplets": _to_csv(station_triplets, normalize_station_triplets=True),
-        "stationNames": _to_csv(station_names),
-        "dcoCodes": _to_csv(dco_codes),
-        "countyNames": _to_csv(county_names),
-        "elements": _to_csv(elements),
-        "durations": _to_csv(durations),
-        "hucs": _to_csv(hucs),
-        "returnForecastPointMetadata": return_forecast_point_metadata,
-        "returnReservoirMetadata": return_reservoir_metadata,
-        "returnStationElements": return_station_elements,
-        "activeOnly": active_only,
-    }
-    params.update(extra_params)
-    raw_response = _get("stations", params, timeout=timeout)
-    return _StationsResponse(raw_response or [], query_params=_clean_params(params))
 
 
 def _get_data(
