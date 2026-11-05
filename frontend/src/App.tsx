@@ -1,137 +1,39 @@
-import { Container, Alert } from 'react-bootstrap';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-
-import { ForecastDashboard, ForecastDashboardProvider } from '@/features/forecast';
-import { GriddedDashboard, GriddedDashboardProvider } from '@/features/gridded';
-import AdminHome from '@/pages/admin/AdminHome';
-import AdminLayout from '@/pages/admin/AdminLayout';
-import ApiKeysAdmin from '@/pages/admin/ApiKeysAdmin';
-import KeycloakAdmin from '@/pages/admin/KeycloakAdmin';
-import DashboardsHome from '@/pages/DashboardsHome';
-import Home from '@/pages/Home';
-import { useAuth } from '@/shared/auth';
-import Navbar from '@/shared/components/Navbar';
+import { AppShell, Box, Burger } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { useEffect } from 'react';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
+import { Outlet, useLocation } from 'react-router-dom';
 
-const RequireAuth = ({ children }: React.PropsWithChildren) => {
-  const { ready, authenticated, login, signup } = useAuth();
+import { NAV_BREAKPOINT } from './features/layout/layoutConstants';
+import { NavBar } from './features/layout/navbar/NavBar';
+
+import styles from './App.module.css';
+
+export const App = () => {
+  const [opened, { toggle, close }] = useDisclosure();
   const location = useLocation();
 
-  if (!ready) {
-    return null;
-  }
+  useEffect(() => {
+    close();
+  }, [location.pathname, close]);
 
-  if (!authenticated) {
-    const redirectUri = `${window.location.origin}${location.pathname}${location.search}`;
-
-    return (
-      <Container className="mt-5 text-center">
-        <Alert variant="info">
-          <Alert.Heading>Login Required</Alert.Heading>
-          <p>Please login to access the TEEHR dashboards.</p>
-          <div className="d-flex justify-content-center gap-2 flex-wrap">
-            <button
-              type="button"
-              className="btn btn-success"
-              onClick={() => login({ redirectUri })}
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline-primary"
-              onClick={() => signup(redirectUri)}
-            >
-              Sign Up
-            </button>
-          </div>
-        </Alert>
-      </Container>
-    );
-  }
-
-  return children;
-};
-
-const AdminRoute = ({ children }: React.PropsWithChildren) => {
-  const { ready, authenticated, roles } = useAuth();
-
-  if (!ready) {
-    return null;
-  }
-
-  if (!authenticated) {
-    return <Navigate to="/hub" replace />;
-  }
-
-  if (!roles.includes('admin')) {
-    return (
-      <Container className="mt-5 text-center">
-        <Alert variant="danger">
-          <Alert.Heading>Access Denied</Alert.Heading>
-          <p>Admin role required.</p>
-        </Alert>
-      </Container>
-    );
-  }
-
-  return children;
-};
-
-const AppRoutes = () => {
   return (
     <div className="App">
-      <Navbar />
-      <main>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/hub" element={<DashboardsHome />} />
-          <Route
-            path="/forecast"
-            element={
-              <RequireAuth>
-                <ForecastDashboardProvider>
-                  <ForecastDashboard />
-                </ForecastDashboardProvider>
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/gridded"
-            element={
-              <RequireAuth>
-                <GriddedDashboardProvider>
-                  <GriddedDashboard />
-                </GriddedDashboardProvider>
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <AdminRoute>
-                <AdminLayout />
-              </AdminRoute>
-            }
-          >
-            <Route index element={<AdminHome />} />
-            <Route path="api-keys" element={<ApiKeysAdmin />} />
-            <Route path="keycloak" element={<KeycloakAdmin />} />
-          </Route>
-        </Routes>
-      </main>
+      <AppShell navbar={{ breakpoint: NAV_BREAKPOINT, width: 250, collapsed: { mobile: !opened } }}>
+        <Box hiddenFrom={NAV_BREAKPOINT} className={styles.mobileMenuToggle}>
+          <Burger opened={opened} onClick={toggle} size="sm" aria-label="Toggle navigation" />
+        </Box>
+        <AppShell.Navbar>
+          <NavBar />
+        </AppShell.Navbar>
+        <AppShell.Main>
+          <Outlet />
+        </AppShell.Main>
+      </AppShell>
     </div>
   );
 };
-
-function App() {
-  return (
-    <Router>
-      <AppRoutes />
-    </Router>
-  );
-}
 
 export default App;

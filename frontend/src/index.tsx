@@ -1,10 +1,14 @@
+import { MantineProvider } from '@mantine/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import { AuthProvider } from '@/shared/auth';
 
-import App from './App';
+import { AppRouter } from './routes/AppRouter';
+
+import '@mantine/core/styles.css';
+import { FvedTheme } from './theme';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,10 +22,12 @@ const queryClient = new QueryClient({
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 root.render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </QueryClientProvider>
+    <MantineProvider theme={FvedTheme}>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <AppRouter />
+        </AuthProvider>
+      </QueryClientProvider>
+    </MantineProvider>
   </React.StrictMode>
 );

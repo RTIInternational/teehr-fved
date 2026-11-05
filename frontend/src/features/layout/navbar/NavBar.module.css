@@ -1,0 +1,21 @@
+.logo {
+  padding: var(--mantine-spacing-xs);
+}
+
+.logoLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.logoLink:hover,
+.logoLink:focus,
+.logoLink:visited,
+.logoLink:active {
+  color: inherit;
+  text-decoration: none;
+}
+
+.logoText {
+  transform: translateY(-5px);
+}
