@@ -93,7 +93,8 @@ def monitor_log(log_path: Path, proc: subprocess.Popen, poll_interval: float = 2
                 break
 
             elif _PAT_ERROR.search(line):
-                print(f"  [ERROR] {line}")
+                proc.terminate()
+                raise RuntimeError(f"RiverWare reported an error in run.log: {line}")
 
     if not finished:
         raise RuntimeError("Log monitoring ended without detecting MRM RUN FINISHED.")
