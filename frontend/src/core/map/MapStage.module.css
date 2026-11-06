@@ -1,0 +1,10 @@
+/* Separate from .stage because MapLibre sets position: relative on its container. */
+.container {
+  width: 100%;
+  height: 100%;
+}
+
+/* visibility (not display: none) keeps the container sized, so the map needs no resize when shown. */
+.stage[data-hidden] {
+  visibility: hidden;
+}

@@ -11,6 +11,7 @@ import DashboardsHome from '@/pages/DashboardsHome';
 import Home from '@/pages/Home';
 
 import { AdminRoute } from './AdminRoute';
+import { MapViewPlaceholder } from './MapViewPlaceholder';
 
 export const AppRouter = () => (
   <BrowserRouter>
@@ -18,6 +19,7 @@ export const AppRouter = () => (
       <Route path="/" element={<App />}>
         <Route index element={<Home />} />
         <Route path="/hub" element={<DashboardsHome />} />
+        <Route path="/map/:viewId" element={<MapViewPlaceholder />} />
         <Route
           path="/forecast"
           element={

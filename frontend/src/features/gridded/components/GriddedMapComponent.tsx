@@ -1,8 +1,9 @@
 import maplibregl from 'maplibre-gl';
-import { FetchSource, PMTiles, Protocol } from 'pmtiles';
+import { FetchSource, PMTiles } from 'pmtiles';
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { pmtilesProtocol } from '@/core/map';
 import { GRIDDED_API_BASE_URL } from '@/shared/api/gridded/client';
 import { fetchGriddedEdrPoint } from '@/shared/api/gridded/edr';
 import { buildGriddedTileUrl, buildPmtilesUrl } from '@/shared/api/gridded/tiles';
@@ -14,14 +15,6 @@ import { useDashboard, ActionTypes } from '../DashboardContext';
 import { useCurrentTimestep } from '../hooks/useCurrentTimestep';
 import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 import GriddedColorBar from './GriddedColorBar';
-
-// The pmtiles Protocol issues its own fetches, so maplibre's transformRequest
-// never sees them — the archive's bearer token has to be attached to a
-// FetchSource registered here instead. Protocol.add keys the source by its
-// exact URL and silently falls back to an unauthenticated fetch on a mismatch,
-// so the registered URL and the pmtiles:// source URL must agree byte for byte.
-const pmtilesProtocol = new Protocol();
-maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
 
 type ArcGisLegendEntry = {
   label: string;

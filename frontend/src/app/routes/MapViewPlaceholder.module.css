@@ -1,0 +1,13 @@
+.overlay {
+  position: relative;
+  z-index: 1;
+  height: 100dvh;
+  pointer-events: none;
+}
+
+.badge {
+  position: absolute;
+  top: var(--mantine-spacing-sm);
+  right: var(--mantine-spacing-sm);
+  pointer-events: auto;
+}
