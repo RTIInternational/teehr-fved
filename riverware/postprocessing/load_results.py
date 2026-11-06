@@ -42,6 +42,8 @@ def run_postprocessing(
         variable_name_map=variable_name_map,
     )
 
+    df = _coerce_timestamps(df)
+
     if parquet_path is not None:
         save_parquet(df, parquet_path)
 
