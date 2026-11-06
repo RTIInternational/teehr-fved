@@ -38,7 +38,7 @@ export const NavBar = () => {
           <Center p="xs">
             <Stack gap={0}>
               <Group align="center" justify="center" gap="xs" wrap="nowrap">
-                <Image src="usbr-seal-white.png" alt="USBR Logo" w={54} />
+                <Image src="/usbr-seal-white.png" alt="USBR Logo" w={54} />
                 <Text fz={60} fw={800} lh={1.3} className={classes.logoText}>
                   FVED
                 </Text>
@@ -109,7 +109,7 @@ export const NavBar = () => {
         </Text> */}
         <Center>
           <a href="https://www.rti.org/" target="_blank">
-            <Image src="RTI_logo_rgb_sm.png" w={150} />
+            <Image src="/RTI_logo_rgb_sm.png" w={150} />
           </a>
         </Center>
       </AppShell.Section>
