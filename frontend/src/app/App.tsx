@@ -11,6 +11,7 @@ import { MapProvider, MapStage } from '@/core/map';
 import { NAV_BREAKPOINT } from './layout/layoutConstants';
 import { NavBar } from './layout/navbar/NavBar';
 import { DEFAULT_MAP_BOUNDS, mapTransformRequest } from './mapConfig';
+import { MapViewportUrlSync } from './routes/MapViewportUrlSync';
 
 import styles from './App.module.css';
 
@@ -40,6 +41,7 @@ export const App = () => {
             <NavBar />
           </AppShell.Navbar>
           <AppShell.Main>
+            <MapViewportUrlSync enabled={isMapRoute} />
             {mapRequested && (
               <MapStage
                 className={styles.mapLayer}
