@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
-import { App } from '@/App';
+import { App } from '@/app/App';
 import { ForecastDashboard, ForecastDashboardProvider } from '@/features/forecast';
 import { GriddedDashboard, GriddedDashboardProvider } from '@/features/gridded';
 import AdminHome from '@/pages/admin/AdminHome';

@@ -6,8 +6,8 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import { Outlet, useLocation } from 'react-router-dom';
 
-import { NAV_BREAKPOINT } from './features/layout/layoutConstants';
-import { NavBar } from './features/layout/navbar/NavBar';
+import { NAV_BREAKPOINT } from './layout/layoutConstants';
+import { NavBar } from './layout/navbar/NavBar';
 
 import styles from './App.module.css';
 
