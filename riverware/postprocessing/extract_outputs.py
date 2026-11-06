@@ -7,7 +7,7 @@ import pandas as pd
 from riverware.utils.riverware_utils import parse_rdf, parse_reference_time_from_log
 
 # Preferred TEEHR variable names for common CRMMS slots ({type}_{timestep}_{aggregation}).
-# Slots not listed here fall back to snake_case of the RiverWare slot name.
+# Slots not listed here are skipped (unless provided via variable_name_map).
 CRMMS_VARIABLE_MAP: dict[str, str] = {
     # Reservoir state (end-of-period)
     "Pool Elevation":              "poolelevation_monthly_inst",
