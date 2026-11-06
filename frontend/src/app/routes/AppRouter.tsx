@@ -11,15 +11,17 @@ import DashboardsHome from '@/pages/DashboardsHome';
 import Home from '@/pages/Home';
 
 import { AdminRoute } from './AdminRoute';
-import { MapViewPlaceholder } from './MapViewPlaceholder';
+import { MapRoute } from './MapRoute';
 
 export const AppRouter = () => (
   <BrowserRouter>
     <Routes>
       <Route path="/" element={<App />}>
-        <Route index element={<Home />} />
+        <Route index element={<MapRoute />} />
+        <Route path="/about" element={<Home />} />
         <Route path="/hub" element={<DashboardsHome />} />
-        <Route path="/map/:viewId" element={<MapViewPlaceholder />} />
+        <Route path="/map" element={<MapRoute />} />
+        <Route path="/map/:viewId" element={<MapRoute />} />
         <Route
           path="/forecast"
           element={

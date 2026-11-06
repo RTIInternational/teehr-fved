@@ -1,0 +1,73 @@
+.overlay {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inset-inline-start: var(--app-shell-navbar-offset, 0rem);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mantine-spacing-md);
+  pointer-events: auto;
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  width: min(980px, 100%);
+  max-height: calc(100dvh - var(--mantine-spacing-xl));
+  overflow: auto;
+  background: rgb(248 252 255 / 96%);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.option {
+  text-align: left;
+  width: 100%;
+  border: 1px solid rgb(15 23 42 / 12%);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease;
+}
+
+.option:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgb(15 23 42 / 12%);
+  border-color: var(--mantine-color-usbrBlue-6);
+}
+
+.option[data-disabled] {
+  opacity: 0.68;
+  background: #f8f9fa;
+  cursor: not-allowed;
+}
+
+.option[data-disabled]:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: rgb(15 23 42 / 12%);
+}
+
+.optionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: var(--mantine-spacing-sm);
+  padding-bottom: var(--mantine-spacing-sm);
+}
+
+@media (max-width: 48em) {
+  .overlay {
+    align-items: flex-end;
+    padding: var(--mantine-spacing-sm);
+  }
+
+  .dialog {
+    max-height: min(80dvh, 640px);
+  }
+}
