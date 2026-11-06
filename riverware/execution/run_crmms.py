@@ -99,6 +99,12 @@ def monitor_log(log_path: Path, proc: subprocess.Popen, poll_interval: float = 2
     if not finished:
         raise RuntimeError("Log monitoring ended without detecting MRM RUN FINISHED.")
 
+    proc.wait()
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"RiverWare exited with non-zero code {proc.returncode} after log completion."
+        )
+
 
 def run_crmms(
     model_dir: Path,
