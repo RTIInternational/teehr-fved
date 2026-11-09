@@ -9,16 +9,11 @@ import {
   Stack,
   Text,
 } from '@mantine/core';
-import {
-  IconBucket,
-  IconDroplet,
-  IconExternalLink,
-  IconRipple,
-  IconSnowflake,
-} from '@tabler/icons-react';
+import { IconExternalLink } from '@tabler/icons-react';
 import { NavLink as RouterLink } from 'react-router-dom';
 
 import { useAuth } from '@/shared/auth';
+import { legacyViews, newViews } from '@/views/registry';
 
 import { UserLogin } from './UserLogin';
 
@@ -55,36 +50,48 @@ export const NavBar = () => {
       <AppShell.Section grow component={ScrollArea}>
         <div>
           <NavLink
-            renderRoot={(props) => <RouterLink to="/hub" {...props} />}
-            label="Dashboard Views"
+            renderRoot={(props) => <RouterLink to={`/map/`} end {...props} />}
+            label="Map Views"
             styles={{
               label: {
                 fontWeight: 'var(--mantine-font-weight-bold)',
               },
             }}
           />
+          {newViews.map((view) => {
+            const ViewIcon = view.icon;
+            return (
+              <NavLink
+                key={view.id}
+                renderRoot={(props) => <RouterLink to={view.path} {...props} />}
+                label={view.label}
+                disabled={view.disabled}
+                leftSection={<ViewIcon size={20} />}
+              />
+            );
+          })}
           <NavLink
-            renderRoot={(props) => <RouterLink to="/forecast" {...props} />}
-            label="Streamflow"
-            leftSection={<IconRipple size={20} />}
+            renderRoot={(props) => <RouterLink to={`/hub`} {...props} />}
+            label="Legacy"
+            mt="xs"
+            styles={{
+              label: {
+                fontWeight: 'var(--mantine-font-weight-bold)',
+              },
+            }}
           />
-          <NavLink
-            renderRoot={(props) => <RouterLink to="/water-supply" {...props} />}
-            label="Water Supply"
-            disabled
-            leftSection={<IconBucket size={20} />}
-          />
-          <NavLink
-            renderRoot={(props) => <RouterLink to="/crmms" {...props} />}
-            label="Colorado River"
-            disabled
-            leftSection={<IconDroplet size={20} />}
-          />
-          <NavLink
-            renderRoot={(props) => <RouterLink to="/gridded" {...props} />}
-            label="Snow"
-            leftSection={<IconSnowflake size={20} />}
-          />
+          {legacyViews.map((legacyView) => {
+            const LegacyIcon = legacyView.icon;
+            return (
+              <NavLink
+                key={legacyView.id}
+                renderRoot={(props) => <RouterLink to={legacyView.path} {...props} />}
+                label={legacyView.label}
+                disabled={legacyView.disabled}
+                leftSection={<LegacyIcon size={20} />}
+              />
+            );
+          })}
         </div>
       </AppShell.Section>
       {canViewHubDeployment && (
@@ -100,7 +107,7 @@ export const NavBar = () => {
       )}
       <AppShell.Section>
         <Divider />
-        <NavLink renderRoot={(props) => <RouterLink to="/" {...props} />} label="About" />
+        <NavLink renderRoot={(props) => <RouterLink to="/about" {...props} />} label="About" />
       </AppShell.Section>
       <AppShell.Section>
         <Divider />

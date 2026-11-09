@@ -1,16 +1,19 @@
 import { Paper, Text } from '@mantine/core';
-import { useParams } from 'react-router-dom';
+
+import type { ViewDefinition } from '@/core/views';
 
 import styles from './MapViewPlaceholder.module.css';
 
 /** Temporary /map/:viewId content until the view system replaces it. */
-export const MapViewPlaceholder = () => {
-  const { viewId } = useParams();
+type MapViewPlaceholderProps = {
+  view: ViewDefinition;
+};
 
+export const MapViewPlaceholder = ({ view }: MapViewPlaceholderProps) => {
   return (
     <div className={styles.overlay}>
       <Paper shadow="sm" p="xs" className={styles.badge}>
-        <Text size="sm">View: {viewId}</Text>
+        <Text size="sm">View: {view.id}</Text>
       </Paper>
     </div>
   );

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
-import { Outlet, useLocation, useMatch } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 
 import { MapProvider, MapStage } from '@/core/map';
 
@@ -18,9 +18,9 @@ import styles from './App.module.css';
 export const App = () => {
   const [opened, { toggle, close }] = useDisclosure();
   const location = useLocation();
-  const isMapRoute = useMatch('/map/*') !== null;
-  const [mapRequested, setMapRequested] = useState(isMapRoute);
-  if (isMapRoute && !mapRequested) {
+  const isMapShellRoute = location.pathname === '/' || location.pathname.startsWith('/map');
+  const [mapRequested, setMapRequested] = useState(isMapShellRoute);
+  if (isMapShellRoute && !mapRequested) {
     setMapRequested(true);
   }
 
@@ -41,13 +41,13 @@ export const App = () => {
             <NavBar />
           </AppShell.Navbar>
           <AppShell.Main>
-            <MapViewportUrlSync enabled={isMapRoute} />
+            <MapViewportUrlSync enabled={isMapShellRoute} />
             {mapRequested && (
               <MapStage
                 className={styles.mapLayer}
                 initialBounds={DEFAULT_MAP_BOUNDS}
                 transformRequest={mapTransformRequest}
-                hidden={!isMapRoute}
+                hidden={!isMapShellRoute}
               />
             )}
             <Outlet />
