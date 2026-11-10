@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, ButtonGroup, Spinner } from 'react-bootstrap';
 
 import DashboardPanel from '@/shared/components/DashboardPanel';
+import { usePlotResize } from '@/shared/hooks/usePlotResize';
 import { useEdrTimeseries } from '@/shared/queries/gridded/edr';
 import { usePolygonTimeseries } from '@/shared/queries/gridded/polygonTimeseries';
 import { variableAttrsQueryOptions } from '@/shared/queries/gridded/variableAttrs';
@@ -111,6 +112,8 @@ const GriddedTimeseriesPanel = () => {
         ),
         isLoading: series.some((s) => s.isLoading),
       };
+  usePlotResize(plotRef, viewMode === 'plot' && !!request && !isLoading && plotted.length > 0);
+
   const title = polygonQuery
     ? polygonQuery.name || polygonQuery.location_id
     : clickedPoint && formatPoint(clickedPoint.lat, clickedPoint.lon);
