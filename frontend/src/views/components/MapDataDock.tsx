@@ -96,8 +96,8 @@ export const MapDataDock = ({
       className={styles.dock}
       data-expanded={(expanded && !collapsed) || undefined}
     >
-      <Group justify="space-between" gap="sm" px="md" py="xs" wrap="nowrap">
-        <Group gap="xs" wrap="nowrap" miw={0}>
+      <div className={styles.header}>
+        <Group gap="xs" wrap="nowrap" className={styles.title}>
           {icon}
           {(title || subtitle) && (
             <Box miw={0}>
@@ -115,7 +115,7 @@ export const MapDataDock = ({
           )}
         </Group>
 
-        <Group gap="xs" wrap="nowrap">
+        <Group gap="xs" wrap="nowrap" className={styles.controls}>
           {sections.length > 1 && (
             <SegmentedControl
               size="xs"
@@ -148,7 +148,7 @@ export const MapDataDock = ({
           </Tooltip>
           {onClose && <CloseButton aria-label={closeLabel} onClick={onClose} />}
         </Group>
-      </Group>
+      </div>
 
       <div className={styles.body} hidden={collapsed}>
         {sections.map(({ value, content }) => (

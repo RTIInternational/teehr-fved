@@ -57,6 +57,7 @@ export const LocationSearch = ({ locations, onSelect }: LocationSearchProps) => 
 
   return (
     <Autocomplete
+      w="100%"
       aria-label="Search map locations"
       placeholder="Search by primary ID, secondary ID, or name"
       leftSection={<IconSearch size={16} />}

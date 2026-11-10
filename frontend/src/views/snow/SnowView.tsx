@@ -6,18 +6,19 @@ import GriddedPolygonPanel from '@/features/gridded/components/GriddedPolygonPan
 import GriddedTimeseriesPanel from '@/features/gridded/components/GriddedTimeseriesPanel';
 import { ActionTypes, useDashboard } from '@/features/gridded/DashboardContext';
 import { MapDataDock, type MapDataDockSection } from '@/views/components/MapDataDock';
+import { MapViewLayout } from '@/views/components/MapViewLayout';
 
 import { SnowLayersPopover } from './components/SnowLayersPopover';
 import { SnowLegend } from './components/SnowLegend';
 import { SnowMapLayers } from './components/SnowMapLayers';
 import { useSnowDefaults } from './hooks/useSnowDefaults';
+import { useSnowDockHeader } from './hooks/useSnowDockHeader';
 import { useSnowDockSection } from './hooks/useSnowDockSection';
-
-import styles from './SnowView.module.css';
 
 const SnowContent = () => {
   const { state, dispatch } = useDashboard();
   const { section, setSection, hasAttributes } = useSnowDockSection();
+  const dockHeader = useSnowDockHeader(section);
 
   useSnowDefaults();
 
@@ -33,30 +34,36 @@ const SnowContent = () => {
   }
 
   return (
-    <div className={styles.overlay}>
-      <SnowMapLayers />
-
-      <SnowLegend className={styles.legend} />
-
-      <div className={styles.topRight}>
-        {state.error && (
-          <Alert
-            w="100%"
-            color="red"
-            title="Error"
-            icon={<IconAlertTriangle size={18} />}
-            withCloseButton
-            closeButtonLabel="Dismiss error"
-            onClose={() => dispatch({ type: ActionTypes.CLEAR_ERROR })}
-          >
-            {state.error}
-          </Alert>
-        )}
-        <SnowLayersPopover />
-      </div>
-
-      <MapDataDock sections={sections} section={section} onSectionChange={setSection} />
-    </div>
+    <MapViewLayout
+      mapLayers={<SnowMapLayers />}
+      topLeft={<SnowLegend />}
+      topRight={
+        <>
+          {state.error && (
+            <Alert
+              w="100%"
+              color="red"
+              title="Error"
+              icon={<IconAlertTriangle size={18} />}
+              withCloseButton
+              closeButtonLabel="Dismiss error"
+              onClose={() => dispatch({ type: ActionTypes.CLEAR_ERROR })}
+            >
+              {state.error}
+            </Alert>
+          )}
+          <SnowLayersPopover />
+        </>
+      }
+      bottom={
+        <MapDataDock
+          {...dockHeader}
+          sections={sections}
+          section={section}
+          onSectionChange={setSection}
+        />
+      }
+    />
   );
 };
 

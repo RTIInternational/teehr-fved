@@ -158,3 +158,7 @@ export const formatUnknownValueForDisplay = (
 
   return unserializableText;
 };
+
+/** A coordinate as `39.6402°N, 106.3742°W`. */
+export const formatLatLon = (lat: number, lon: number) =>
+  `${Math.abs(lat).toFixed(4)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(4)}°${lon >= 0 ? 'E' : 'W'}`;

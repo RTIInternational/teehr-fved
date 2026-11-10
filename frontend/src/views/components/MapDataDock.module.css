@@ -9,6 +9,24 @@
   pointer-events: auto;
 }
 
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.controls {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .body {
   height: 40dvh;
   min-height: 0;
@@ -21,4 +39,16 @@
 
 .dock[data-expanded] .body {
   height: calc(90dvh - 4.5rem);
+}
+
+/* Narrow screens: the controls drop below the title instead of squeezing it. */
+@media (max-width: $mantine-breakpoint-sm) {
+  .header {
+    flex-wrap: wrap;
+  }
+
+  /* Leave room for the taller, two-row header. */
+  .dock[data-expanded] .body {
+    height: calc(90dvh - 7rem);
+  }
 }

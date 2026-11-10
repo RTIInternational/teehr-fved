@@ -16,11 +16,10 @@ import TimeseriesComponent from '@/shared/components/TimeseriesComponent';
 import { useMetricLocations } from '@/shared/queries/metrics';
 import type { MapLocation } from '@/shared/types/locations';
 import { MapDataDock } from '@/views/components/MapDataDock';
+import { MapViewLayout } from '@/views/components/MapViewLayout';
 
 import { LocationSearch } from './components/LocationSearch';
 import { StreamflowMapLayers } from './components/StreamflowMapLayers';
-
-import styles from './StreamflowView.module.css';
 
 const TABLES = ['fcst_metrics_by_location', 'fcst_metrics_by_lead_time_bins'];
 
@@ -73,101 +72,104 @@ const StreamflowContent = () => {
   }, [selectedLocation, timeseriesFilters]);
 
   return (
-    <div className={styles.overlay}>
-      <StreamflowMapLayers
-        locations={locations.data}
-        locationsKey={locationsKey}
-        metricName={mapFilters.metricName}
-        selectedLocationId={selectedLocation?.primary_location_id ?? null}
-        onSelect={selectLocation}
-        onError={handleMapError}
-      />
-
-      <div className={styles.topRight}>
-        {state.error && (
-          <Alert
-            color="red"
-            title="Error"
-            icon={<IconAlertTriangle size={18} />}
-            withCloseButton
-            closeButtonLabel="Dismiss error"
-            onClose={() => dispatch({ type: ActionTypes.CLEAR_ERROR })}
-          >
-            {state.error}
-          </Alert>
-        )}
-        <LocationSearch locations={locations.data} onSelect={handleSearchSelect} />
-        <Group justify="flex-end" gap="xs" wrap="nowrap">
-          {locations.isFetching && (
-            <Paper shadow="sm" radius="md" px="sm" py={6}>
-              <Group gap="xs" wrap="nowrap">
-                <Loader size="xs" />
-                <Text size="xs">Loading locations…</Text>
-              </Group>
-            </Paper>
+    <MapViewLayout
+      mapLayers={
+        <StreamflowMapLayers
+          locations={locations.data}
+          locationsKey={locationsKey}
+          metricName={mapFilters.metricName}
+          selectedLocationId={selectedLocation?.primary_location_id ?? null}
+          onSelect={selectLocation}
+          onError={handleMapError}
+        />
+      }
+      topRight={
+        <>
+          {state.error && (
+            <Alert
+              w="100%"
+              color="red"
+              title="Error"
+              icon={<IconAlertTriangle size={18} />}
+              withCloseButton
+              closeButtonLabel="Dismiss error"
+              onClose={() => dispatch({ type: ActionTypes.CLEAR_ERROR })}
+            >
+              {state.error}
+            </Alert>
           )}
-          <MapFilterButton
-            tables={TABLES}
-            mapFilters={mapFilters}
-            updateMapFilters={updateMapFilters}
-            floating={false}
-          />
-        </Group>
-        <Group justify="flex-end">
+          <LocationSearch locations={locations.data} onSelect={handleSearchSelect} />
+          <Group gap="xs" wrap="nowrap">
+            {locations.isFetching && (
+              <Paper shadow="sm" radius="md" px="sm" py={6}>
+                <Group gap="xs" wrap="nowrap">
+                  <Loader size="xs" />
+                  <Text size="xs">Loading locations…</Text>
+                </Group>
+              </Paper>
+            )}
+            <MapFilterButton
+              tables={TABLES}
+              mapFilters={mapFilters}
+              updateMapFilters={updateMapFilters}
+              floating={false}
+            />
+          </Group>
           <MapLegend metric={mapFilters.metricName} floating={false} />
-        </Group>
-      </div>
-
-      <MapDataDock
-        icon={<IconMapPin size={18} style={{ flexShrink: 0 }} />}
-        placeholder={
-          !selectedLocation && 'Select a location on the map to view its time series and metrics.'
-        }
-        title={selectedLocation?.name}
-        subtitle={[selectedLocation?.primary_location_id, selectedLocation?.secondary_location_id]
-          .filter(Boolean)
-          .join(' · ')}
-        onClose={() => selectLocation(null)}
-        closeLabel="Clear selected location"
-        sections={
-          selectedLocation
-            ? [
-                {
-                  value: 'timeseries',
-                  label: 'Time Series',
-                  content: (
-                    <TimeseriesComponent
-                      key={selectedLocation.primary_location_id}
-                      state={state}
-                      Controls={TimeseriesControls}
-                      initialViewMode="plot"
-                      autoRequestFilters={autoRequestFilters}
-                      controlsProps={{
-                        table: TABLES[0],
-                        timeseriesFilters,
-                        updateTimeseriesFilters,
-                        selectedLocation,
-                        mapFilters,
-                      }}
-                    />
-                  ),
-                },
-                {
-                  value: 'metrics',
-                  label: 'Metrics',
-                  content: (
-                    <LocationMetrics
-                      key={selectedLocation.primary_location_id}
-                      selectedLocation={selectedLocation}
-                      tables={TABLES}
-                    />
-                  ),
-                },
-              ]
-            : []
-        }
-      />
-    </div>
+        </>
+      }
+      bottom={
+        <MapDataDock
+          icon={<IconMapPin size={18} style={{ flexShrink: 0 }} />}
+          placeholder={
+            !selectedLocation && 'Select a location on the map to view its time series and metrics.'
+          }
+          title={selectedLocation?.name}
+          subtitle={[selectedLocation?.primary_location_id, selectedLocation?.secondary_location_id]
+            .filter(Boolean)
+            .join(' · ')}
+          onClose={() => selectLocation(null)}
+          closeLabel="Clear selected location"
+          sections={
+            selectedLocation
+              ? [
+                  {
+                    value: 'timeseries',
+                    label: 'Time Series',
+                    content: (
+                      <TimeseriesComponent
+                        key={selectedLocation.primary_location_id}
+                        state={state}
+                        Controls={TimeseriesControls}
+                        initialViewMode="plot"
+                        autoRequestFilters={autoRequestFilters}
+                        controlsProps={{
+                          table: TABLES[0],
+                          timeseriesFilters,
+                          updateTimeseriesFilters,
+                          selectedLocation,
+                          mapFilters,
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    value: 'metrics',
+                    label: 'Metrics',
+                    content: (
+                      <LocationMetrics
+                        key={selectedLocation.primary_location_id}
+                        selectedLocation={selectedLocation}
+                        tables={TABLES}
+                      />
+                    ),
+                  },
+                ]
+              : []
+          }
+        />
+      }
+    />
   );
 };
 

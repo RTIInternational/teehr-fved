@@ -9,14 +9,11 @@ import { useEdrTimeseries } from '@/shared/queries/gridded/edr';
 import { usePolygonTimeseries } from '@/shared/queries/gridded/polygonTimeseries';
 import { variableAttrsQueryOptions } from '@/shared/queries/gridded/variableAttrs';
 import { parseUtcTime, shortestStep } from '@/shared/utils/dates';
-import { formatUnitName, formatVariableName } from '@/shared/utils/formatters';
+import { formatLatLon, formatUnitName, formatVariableName } from '@/shared/utils/formatters';
 import { seriesColor } from '@/shared/utils/plotColors';
 
 import { ActionTypes, timeseriesDatasets, useDashboard } from '../DashboardContext';
 import GriddedTimeseriesControls from './GriddedTimeseriesControls';
-
-const formatPoint = (lat: number, lon: number) =>
-  `(${Math.abs(lat).toFixed(4)}°${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(4)}°${lon >= 0 ? 'E' : 'W'})`;
 
 type PlotSeries = {
   name: string;
@@ -116,7 +113,7 @@ const GriddedTimeseriesPanel = () => {
 
   const title = polygonQuery
     ? polygonQuery.name || polygonQuery.location_id
-    : clickedPoint && formatPoint(clickedPoint.lat, clickedPoint.lon);
+    : clickedPoint && `(${formatLatLon(clickedPoint.lat, clickedPoint.lon)})`;
 
   useEffect(() => {
     if (!plotRef.current || !request || plotted.length === 0) return;

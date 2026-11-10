@@ -6,12 +6,8 @@ import { useTilesLegend } from '@/shared/queries/gridded/tiles';
 
 import { useOverlayLegends } from '../hooks/useOverlayLegends';
 
-type SnowLegendProps = {
-  className?: string;
-};
-
 /** Color bar for the gridded layer plus the legends of active overlays. */
-export const SnowLegend = ({ className }: SnowLegendProps) => {
+export const SnowLegend = () => {
   const { state } = useDashboard();
   const { dataset, variable, colorRamp, colorRampMin, colorRampMax } = state.mapFilters;
 
@@ -22,7 +18,7 @@ export const SnowLegend = ({ className }: SnowLegendProps) => {
   if (!colorLegend && overlayLegends.length === 0) return null;
 
   return (
-    <Paper shadow="sm" radius="md" p="xs" withBorder className={className}>
+    <Paper shadow="sm" radius="md" p="xs" withBorder>
       <ScrollArea.Autosize mah="40dvh">
         <Stack gap="sm">
           {colorLegend && <GriddedColorBar legend={colorLegend} />}
