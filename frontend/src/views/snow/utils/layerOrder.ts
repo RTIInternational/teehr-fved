@@ -1,6 +1,6 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
-import { OVERLAY_LAYERS } from '@/features/gridded/utils/overlayLayers';
+import { OVERLAY_LAYERS } from './overlayLayers';
 
 export const RASTER_SOURCE_ID = 'snow-raster';
 export const RASTER_LAYER_ID = 'snow-raster';

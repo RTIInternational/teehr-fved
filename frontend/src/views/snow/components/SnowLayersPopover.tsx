@@ -2,7 +2,7 @@ import { Button, Popover, ScrollArea } from '@mantine/core';
 import { IconStack2 } from '@tabler/icons-react';
 import { useState } from 'react';
 
-import GriddedControls from '@/features/gridded/components/GriddedControls';
+import GriddedControls from './GriddedControls';
 
 import styles from './SnowLayersPopover.module.css';
 

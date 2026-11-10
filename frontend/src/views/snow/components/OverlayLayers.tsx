@@ -2,10 +2,10 @@ import type { LayerSpecification, SourceSpecification } from 'maplibre-gl';
 import { useEffect } from 'react';
 
 import { useMap } from '@/core/map';
-import { useDashboard } from '@/features/gridded/DashboardContext';
-import { OVERLAY_LAYERS } from '@/features/gridded/utils/overlayLayers';
 
+import { useDashboard } from '../DashboardContext';
 import { removeMapResources, snowBeforeId } from '../utils/layerOrder';
+import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 /** External reference overlays (e.g. NWS outlooks), drawn beneath the gridded data. */
 export const OverlayLayers = () => {

@@ -1,16 +1,15 @@
 import { Alert } from '@mantine/core';
 import { IconAlertTriangle } from '@tabler/icons-react';
 
-import { GriddedDashboardProvider } from '@/features/gridded';
-import GriddedPolygonPanel from '@/features/gridded/components/GriddedPolygonPanel';
-import GriddedTimeseriesPanel from '@/features/gridded/components/GriddedTimeseriesPanel';
-import { ActionTypes, useDashboard } from '@/features/gridded/DashboardContext';
 import { MapDataDock, type MapDataDockSection } from '@/views/components/MapDataDock';
 import { MapViewLayout } from '@/views/components/MapViewLayout';
 
+import GriddedPolygonPanel from './components/GriddedPolygonPanel';
+import GriddedTimeseriesPanel from './components/GriddedTimeseriesPanel';
 import { SnowLayersPopover } from './components/SnowLayersPopover';
 import { SnowLegend } from './components/SnowLegend';
 import { SnowMapLayers } from './components/SnowMapLayers';
+import { ActionTypes, DashboardProvider, useDashboard } from './DashboardContext';
 import { useSnowDefaults } from './hooks/useSnowDefaults';
 import { useSnowDockHeader } from './hooks/useSnowDockHeader';
 import { useSnowDockSection } from './hooks/useSnowDockSection';
@@ -69,7 +68,7 @@ const SnowContent = () => {
 
 /** Gridded snow datasets, reference overlays and polygon attributes on the shared map. */
 export const SnowView = () => (
-  <GriddedDashboardProvider>
+  <DashboardProvider>
     <SnowContent />
-  </GriddedDashboardProvider>
+  </DashboardProvider>
 );

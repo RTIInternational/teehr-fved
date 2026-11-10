@@ -3,12 +3,6 @@ import { IconAlertTriangle, IconMapPin } from '@tabler/icons-react';
 import { useCallback, useMemo } from 'react';
 
 import { useMap } from '@/core/map';
-import { ForecastDashboardProvider } from '@/features/forecast';
-import TimeseriesControls from '@/features/forecast/components/TimeseriesControls';
-import { ActionTypes, useDashboard } from '@/features/forecast/DashboardContext';
-import { useFilters } from '@/features/forecast/hooks/useFilters';
-import { useInitialFilters } from '@/features/forecast/hooks/useInitialFilters';
-import { useLocationSelection } from '@/features/forecast/hooks/useLocationSelection';
 import LocationMetrics from '@/shared/components/LocationMetrics';
 import MapFilterButton from '@/shared/components/MapFilterButton';
 import MapLegend from '@/shared/components/MapLegend';
@@ -20,6 +14,11 @@ import { MapViewLayout } from '@/views/components/MapViewLayout';
 
 import { LocationSearch } from './components/LocationSearch';
 import { StreamflowMapLayers } from './components/StreamflowMapLayers';
+import TimeseriesControls from './components/TimeseriesControls';
+import { ActionTypes, DashboardProvider, useDashboard } from './DashboardContext';
+import { useFilters } from './hooks/useFilters';
+import { useInitialFilters } from './hooks/useInitialFilters';
+import { useLocationSelection } from './hooks/useLocationSelection';
 
 const TABLES = ['fcst_metrics_by_location', 'fcst_metrics_by_lead_time_bins'];
 
@@ -174,7 +173,7 @@ const StreamflowContent = () => {
 
 /** Streamflow forecast locations, time series and metrics on the shared map. */
 export const StreamflowView = () => (
-  <ForecastDashboardProvider>
+  <DashboardProvider>
     <StreamflowContent />
-  </ForecastDashboardProvider>
+  </DashboardProvider>
 );

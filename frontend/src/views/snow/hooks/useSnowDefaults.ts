@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 
 import { SNOW_DASHBOARD_DEFAULTS, selectDefault } from '@/config/dashboardDefaults';
-import { ActionTypes, useDashboard } from '@/features/gridded/DashboardContext';
-import { useGriddedVariableStyles } from '@/features/gridded/hooks/useGriddedVariableStyles';
 import { useDatasets } from '@/shared/queries/gridded/datasets';
 import { useTimesteps } from '@/shared/queries/gridded/timesteps';
 import { useVariables } from '@/shared/queries/gridded/variables';
+
+import { ActionTypes, useDashboard } from '../DashboardContext';
+import { useGriddedVariableStyles } from './useGriddedVariableStyles';
 
 /**
  * Snow view defaults: the preferred SWE dataset when nothing is selected, the

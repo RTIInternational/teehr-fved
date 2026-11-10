@@ -2,8 +2,8 @@ import type { ErrorEvent } from 'maplibre-gl';
 import { useEffect } from 'react';
 
 import { useMap } from '@/core/map';
-import { ActionTypes, useDashboard } from '@/features/gridded/DashboardContext';
 
+import { ActionTypes, useDashboard } from '../DashboardContext';
 import { GriddedRasterLayer } from './GriddedRasterLayer';
 import { OverlayLayers } from './OverlayLayers';
 import { PointValueQuery } from './PointValueQuery';

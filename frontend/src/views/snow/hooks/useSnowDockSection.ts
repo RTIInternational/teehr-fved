@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { useDashboard } from '@/features/gridded/DashboardContext';
+import { useDashboard } from '../DashboardContext';
 
 export type SnowDockSection = 'attributes' | 'timeseries';
 

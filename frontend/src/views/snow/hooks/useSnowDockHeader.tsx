@@ -1,9 +1,9 @@
 import { IconMapPin, IconPolygon } from '@tabler/icons-react';
 import { useCallback, type ReactNode } from 'react';
 
-import { ActionTypes, useDashboard } from '@/features/gridded/DashboardContext';
 import { formatLatLon } from '@/shared/utils/formatters';
 
+import { ActionTypes, useDashboard } from '../DashboardContext';
 import type { SnowDockSection } from './useSnowDockSection';
 
 type SnowDockHeader = {

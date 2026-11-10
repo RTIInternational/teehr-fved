@@ -1,6 +1,6 @@
 import { useQueries } from '@tanstack/react-query';
 
-import { OVERLAY_LAYERS } from '@/features/gridded/utils/overlayLayers';
+import { OVERLAY_LAYERS } from '../utils/overlayLayers';
 
 export type ArcGisLegendEntry = {
   label: string;

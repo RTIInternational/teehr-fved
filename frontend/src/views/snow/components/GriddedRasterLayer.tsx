@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 
 import { useMap } from '@/core/map';
-import { useDashboard } from '@/features/gridded/DashboardContext';
-import { useCurrentTimestep } from '@/features/gridded/hooks/useCurrentTimestep';
 import { buildGriddedTileUrl } from '@/shared/api/gridded/tiles';
 import { ensureFreshToken } from '@/shared/auth/keycloak';
 
+import { useDashboard } from '../DashboardContext';
+import { useCurrentTimestep } from '../hooks/useCurrentTimestep';
 import {
   RASTER_LAYER_ID,
   RASTER_SOURCE_ID,

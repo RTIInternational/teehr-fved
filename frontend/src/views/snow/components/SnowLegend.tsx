@@ -1,10 +1,10 @@
 import { Group, Paper, ScrollArea, Stack, Text } from '@mantine/core';
 
-import GriddedColorBar from '@/features/gridded/components/GriddedColorBar';
-import { useDashboard } from '@/features/gridded/DashboardContext';
 import { useTilesLegend } from '@/shared/queries/gridded/tiles';
 
+import { useDashboard } from '../DashboardContext';
 import { useOverlayLegends } from '../hooks/useOverlayLegends';
+import GriddedColorBar from './GriddedColorBar';
 
 /** Color bar for the gridded layer plus the legends of active overlays. */
 export const SnowLegend = () => {

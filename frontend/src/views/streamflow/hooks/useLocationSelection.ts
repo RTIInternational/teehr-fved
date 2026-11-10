@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 
-import { useDashboard, ActionTypes } from '@/features/forecast/DashboardContext';
 import type { MapLocation } from '@/shared/types/locations';
+
+import { useDashboard, ActionTypes } from '../DashboardContext';
 
 // Custom hook for location selection
 export const useLocationSelection = () => {

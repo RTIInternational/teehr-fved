@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 
 import { FORECAST_DASHBOARD_DEFAULTS, selectDefault } from '@/config/dashboardDefaults';
-import { ActionTypes, useDashboard } from '@/features/forecast/DashboardContext';
 import { useDistinctValues } from '@/shared/queries/distinctValues';
+
+import { ActionTypes, useDashboard } from '../DashboardContext';
 
 /**
  * Load filters from data warehouse API and apply defaults

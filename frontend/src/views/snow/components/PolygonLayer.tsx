@@ -3,13 +3,13 @@ import { FetchSource, PMTiles } from 'pmtiles';
 import { useEffect, useEffectEvent } from 'react';
 
 import { pmtilesProtocol, useMap } from '@/core/map';
-import { ActionTypes, useDashboard } from '@/features/gridded/DashboardContext';
 import { buildPmtilesUrl } from '@/shared/api/gridded/tiles';
 import { ensureFreshToken } from '@/shared/auth/keycloak';
 import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
 import type { PolygonFeatureProps, PolygonFeatures } from '@/shared/types/gridded/tiles';
 import { escapeHtml } from '@/shared/utils/html';
 
+import { ActionTypes, useDashboard } from '../DashboardContext';
 import {
   POLYGON_FILL_LAYER_ID,
   POLYGON_OUTLINE_LAYER_ID,

@@ -2,11 +2,11 @@ import maplibregl, { type MapMouseEvent } from 'maplibre-gl';
 import { useEffect, useEffectEvent, useRef } from 'react';
 
 import { useMap } from '@/core/map';
-import { ActionTypes, useDashboard } from '@/features/gridded/DashboardContext';
-import { useCurrentTimestep } from '@/features/gridded/hooks/useCurrentTimestep';
 import { fetchGriddedEdrPoint } from '@/shared/api/gridded/edr';
 import { escapeHtml } from '@/shared/utils/html';
 
+import { ActionTypes, useDashboard } from '../DashboardContext';
+import { useCurrentTimestep } from '../hooks/useCurrentTimestep';
 import { POLYGON_FILL_LAYER_ID } from '../utils/layerOrder';
 
 const formatValue = (value: unknown) => {
