@@ -3,9 +3,11 @@ import { getMetricDisplay, getMetricLabel, metricDisplay } from '@/shared/utils/
 
 type MapLegendProps = {
   metric?: keyof typeof metricDisplay;
+  /** Absolutely position in the map's bottom-left corner. */
+  floating?: boolean;
 };
 
-const MapLegend = ({ metric }: MapLegendProps) => {
+const MapLegend = ({ metric, floating = true }: MapLegendProps) => {
   if (!metric) return null;
 
   const display = getMetricDisplay(metric);
@@ -15,8 +17,15 @@ const MapLegend = ({ metric }: MapLegendProps) => {
 
   return (
     <div
-      className="card position-absolute bottom-0 start-0 m-3 shadow-sm"
-      style={{ minWidth: '150px', maxWidth: '200px', zIndex: 1000, fontSize: '0.85rem' }}
+      className={
+        floating ? 'card position-absolute bottom-0 start-0 m-3 shadow-sm' : 'card shadow-sm'
+      }
+      style={{
+        minWidth: '150px',
+        maxWidth: '200px',
+        zIndex: floating ? 1000 : undefined,
+        fontSize: '0.85rem',
+      }}
     >
       <div className="card-header py-2">
         <h6 className="card-title mb-0 small">Legend</h6>

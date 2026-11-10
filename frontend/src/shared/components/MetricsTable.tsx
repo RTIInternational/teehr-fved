@@ -6,6 +6,7 @@ import { Button, ButtonGroup } from 'react-bootstrap';
 import type { TableProperties } from '@/shared/api/utils';
 import MultiSelectDropdown from '@/shared/components/MultiSelectDropdown';
 import SharedDataTable from '@/shared/components/SharedDataTable';
+import { usePlotResize } from '@/shared/hooks/usePlotResize';
 import { formatUnknownValueForDisplay } from '@/shared/utils/formatters';
 
 import './MetricsTable.css';
@@ -40,7 +41,7 @@ const MetricsTable = ({
   const currentViewMode = onViewModeChange ? viewMode : internalViewMode;
   const setCurrentViewMode = onViewModeChange ? onViewModeChange : setInternalViewMode;
 
-  const plotRef = useRef(null);
+  const plotRef = useRef<HTMLDivElement>(null);
   const [sortConfig, setSortConfig] = useState<{
     column: number | null;
     direction: 'asc' | 'desc';
@@ -438,6 +439,8 @@ const MetricsTable = ({
     selectedMetrics,
     parseDurationForSort,
   ]);
+
+  usePlotResize(plotRef, currentViewMode === 'plot' && hasLeadTimeBin && !loading);
 
   // Effect to render plot when in plot mode
   useEffect(() => {
