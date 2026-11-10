@@ -1,0 +1,12 @@
+--- a/features/streamflow_deviation.py
++++ b/features/streamflow_deviation.py
+@@ -67,6 +67,9 @@
+                                 (streamflow_deviation['datetime'] < rw['issue_date']) &
+                                 (streamflow_deviation['datetime'] >= f"{rw_year - 1}-10-01")]
+ 
++        # the last `window` rows must be the last `window` days, as in training (sorted by site_id, datetime);
++        # the merge above does not guarantee chronological row order (it differs between pandas versions)
++        sub_df = sub_df.sort_values('datetime', kind='stable')
+         rw[f'streamflow_deviation_{window}_{agg}'] = sub_df[-window:]['discharge_deviation'].agg(agg)
+         rw[f'streamflow_deviation_season_{agg}'] = sub_df['discharge_deviation'].agg(agg)
+ 

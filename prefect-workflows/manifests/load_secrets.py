@@ -21,3 +21,9 @@ print(f"✅ Successfully loaded cu-swe-aws-access-key-id into Prefect Secret blo
 cu_swe_aws_secret_access_key = os.getenv("CU_SWE_AWS_SECRET_ACCESS_KEY")
 Secret(value=cu_swe_aws_secret_access_key).save(name="cu-swe-aws-secret-access-key", overwrite=True)
 print(f"✅ Successfully loaded cu-swe-aws-secret-access-key into Prefect Secret block.")
+for variable in ("CDSAPI_URL", "CDSAPI_KEY"):
+	value = os.getenv(variable)
+	if value:
+		name = variable.lower().replace("_", "-")
+		Secret(value=value).save(name=name, overwrite=True)
+		print(f"Successfully loaded {name} into Prefect Secret block.")

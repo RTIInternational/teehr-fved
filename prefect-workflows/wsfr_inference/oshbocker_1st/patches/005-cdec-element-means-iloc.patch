@@ -1,0 +1,11 @@
+--- a/features/cdec_deviation.py
++++ b/features/cdec_deviation.py
+@@ -65,7 +65,7 @@
+                             ][-window:][element_cols].mean()
+ 
+         for idx, col in enumerate(element_cols):
+-            rw[f'{col}_{window}'] = element_means[idx]
++            rw[f'{col}_{window}'] = element_means.iloc[idx]
+ 
+         return rw
+ 

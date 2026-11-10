@@ -1,0 +1,18 @@
+name: oshbocker_infer
+# Versions of the validated 1st place environment (fved_oshbocker), plus the competition downloader and reader pinned to the
+# runtime-repo commit used for all QC runs (the vendored downloader copy crashes on current SNOTEL responses).
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - patch
+  - pytest
+  - pip:
+      - numpy==1.26.1
+      - pandas==2.1.2
+      - catboost==1.2.2
+      - requests==2.31.0
+      - loguru==0.7.2
+      - wsfr_download@git+https://github.com/drivendataorg/water-supply-forecast-rodeo-runtime.git@6bda07bc8ef91682377d77021a20b30028072771#egg=pkg&subdirectory=data_download
+      - wsfr_read@git+https://github.com/drivendataorg/water-supply-forecast-rodeo-runtime.git@6bda07bc8ef91682377d77021a20b30028072771#egg=pkg2&subdirectory=data_reading

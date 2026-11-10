@@ -1,0 +1,26 @@
+ARG PREFECT_BASE_IMAGE=teehr-prefect:latest
+FROM ${PREFECT_BASE_IMAGE}
+
+USER root
+ARG TARGETARCH
+ARG MICROMAMBA_VERSION=2.3.2
+ENV MAMBA_ROOT_PREFIX=/opt/conda
+
+RUN test "${TARGETARCH}" = "amd64" \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends bzip2 git patch \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -fsSL "https://micro.mamba.pm/api/micromamba/linux-64/${MICROMAMBA_VERSION}" \
+       | tar -xj -C /usr/local/bin --strip-components=1 bin/micromamba
+
+COPY wsfr_inference/environment-py313.yml /tmp/environment-py313.yml
+RUN micromamba create --yes --file /tmp/environment-py313.yml \
+    && micromamba clean --all --yes \
+    && rm /tmp/environment-py313.yml
+
+RUN python -m pip install --no-cache-dir "boto3>=1.35,<2"
+COPY wsfr_inference/ /teehr/wsfr_inference/
+RUN mkdir -p /data/wsf && chown prefect:prefect /data/wsf
+
+USER prefect
+WORKDIR /teehr

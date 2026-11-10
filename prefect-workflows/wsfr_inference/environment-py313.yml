@@ -1,0 +1,48 @@
+name: wsf_py313
+# One environment for all three packages (oshbocker_infer, ckua_infer, rasyidstat_infer) on Python 3.13 with current library
+# versions. The models are NOT retrained: the 1st/2nd/3rd place weights are loaded unchanged, and the few incompatibilities of
+# the competition code with numpy 2 / pandas 3 / current scikit-learn are handled by the patches in each package's patches/.
+# Versions below are the ones the packages were validated with (offline tests + forecasts compared with the per-package
+# environments, see each package's CHANGES.md); they were the latest conda-forge releases at that time. Newer versions are
+# likely fine but untested.
+# The per-package environment.yml files (Python 3.10, competition pins) remain the reference environments.
+# The CDS downloads of the 3rd place need ~/.cdsapirc (or CDSAPI_URL / CDSAPI_KEY) with the ERA5-Land and SEAS5 licences accepted.
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pip
+  - patch
+  - pytest
+  - numpy=2.5.4
+  - pandas=3.1.1
+  - scipy=1.18.1
+  - scikit-learn=1.9.1
+  - joblib=1.6.0
+  - pyarrow=26.0.1
+  - catboost=1.2.10
+  - lightgbm=4.7.0
+  - pytorch=2.14.1=cpu*
+  - pytorch-lightning=2.6.6
+  - tensorboard=2.21.0
+  - xarray=2026.9.0
+  - netcdf4=1.7.4
+  - rioxarray=0.24.0
+  - rasterio=1.5.2
+  - geopandas=1.2.0
+  - fiona=1.10.1
+  - shapely=2.2.0
+  - pyproj=3.8.0
+  - rtree=1.4.1
+  - cdsapi=0.7.7
+  - dataretrieval=1.4.0
+  - requests=2.34.2
+  - loguru=0.7.3
+  - python-dotenv=1.2.4
+  - tqdm=4.70.1
+  - typer=0.28.0
+  - pyyaml=6.0.3
+  - pip:
+      - pytorch-optimizer==4.1.0
+      - wsfr_download@git+https://github.com/drivendataorg/water-supply-forecast-rodeo-runtime.git@6bda07bc8ef91682377d77021a20b30028072771#egg=pkg&subdirectory=data_download
+      - wsfr_read@git+https://github.com/drivendataorg/water-supply-forecast-rodeo-runtime.git@6bda07bc8ef91682377d77021a20b30028072771#egg=pkg2&subdirectory=data_reading

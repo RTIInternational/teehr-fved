@@ -1,0 +1,37 @@
+name: rasyidstat_infer
+# Versions of the validated 3rd place environment (fved_rasyidstat: all pip wheels on python 3.10.13), plus the competition
+# downloader pinned to the runtime-repo commit used for the QC runs of the other packages. (The QC wrapper used a local checkout of
+# the same repository; if a rebuilt environment differs numerically, compare against tests/reference/.)
+# The CDS downloads need ~/.cdsapirc (or CDSAPI_URL / CDSAPI_KEY) with the ERA5-Land and SEAS5 licences accepted.
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - patch
+  - pytest
+  - pip:
+      - numpy==1.22.3
+      - pandas==1.4.3
+      - lightgbm==3.1.1
+      - scikit-learn==1.1.1
+      - scipy==1.11.4
+      - pyarrow==15.0.1
+      - xarray==2023.12.0
+      - netCDF4==1.7.4
+      - rioxarray==0.15.0
+      - rasterio==1.3.11
+      - geopandas==0.13.1
+      - fiona==1.9.5
+      - shapely==1.8.2
+      - rtree==1.2.0  # geopandas 0.13 sjoin (wsfr_download CDEC station selection) needs rtree or pygeos
+      - pyproj==3.7.1
+      - cdsapi==0.7.7
+      - dataretrieval==1.0.6
+      - requests==2.34.2
+      - loguru==0.7.2
+      - python-dotenv==1.2.4
+      - tqdm==4.70.1
+      - typer==0.27.3
+      - pyyaml==6.0.3
+      - wsfr_download@git+https://github.com/drivendataorg/water-supply-forecast-rodeo-runtime.git@6bda07bc8ef91682377d77021a20b30028072771#egg=pkg&subdirectory=data_download

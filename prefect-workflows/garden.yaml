@@ -12,6 +12,22 @@ spec:
   buildArgs:
       TEEHR_VERSION: ${var.devTeehrVersion}
 ---
+kind: Build
+type: container
+name: wsf-prefect-image
+description: Prefect runtime with the shared Python 3.13 Rodeo inference environment
+dependencies:
+  - build.teehr-prefect-image
+environments:
+  - local
+  - remote
+spec:
+  dockerfile: Dockerfile.prefect-wsf
+  localId: wsf-prefect
+  publishId: wsf-prefect:${var.devTeehrVersion}
+  buildArgs:
+    PREFECT_BASE_IMAGE: ${actions.build.teehr-prefect-image.outputs.deploymentImageId}
+---
 kind: Deploy
 type: kubernetes
 name: prefect-workflow-deploy
@@ -22,6 +38,7 @@ dependencies:
   - deploy.update-job-template
   - deploy.load-secrets
   - build.teehr-prefect-image
+  - build.wsf-prefect-image
   - build.teehr-spark-executor-image
 environments:
   - local

@@ -4,6 +4,9 @@ name: teehr-hub
 defaultEnvironment: local
 
 variables:
+  wsf:
+    assetsS3Uri: ""
+    outputS3Uri: ""
   smtp:
     host: smtp.gmail.com
     port: "587"

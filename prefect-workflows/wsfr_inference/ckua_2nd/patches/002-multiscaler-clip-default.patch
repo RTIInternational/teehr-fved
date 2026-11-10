@@ -1,0 +1,13 @@
+--- a/libs/multiscaler.py
++++ b/libs/multiscaler.py
+@@ -20,6 +20,10 @@
+     def from_file(filename: str) -> "MultiScaler":
+         res = MultiScaler()
+         res.scalers = load(filename)
++        # scalers pickled by older sklearn lack MaxAbsScaler.clip, which transform() reads in newer sklearn
++        for scaler in res.scalers.values():
++            if not hasattr(scaler, "clip"):
++                scaler.clip = False
+         return res
+ 
+     def fit(self, df: pd.DataFrame, site_id_column: str = "site_id", value_column: str = "volume") -> "MultiScaler":

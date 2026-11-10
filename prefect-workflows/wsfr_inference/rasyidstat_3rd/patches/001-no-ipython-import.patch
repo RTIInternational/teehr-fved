@@ -1,0 +1,11 @@
+--- a/src/utils.py
++++ b/src/utils.py
+@@ -1,7 +1,7 @@
+ import numpy as np
+ import pandas as pd
+ import random
+-from IPython.display import display
++display = print  # IPython is only needed for notebook rendering in eval_all
+ from sklearn.metrics import (
+     mean_pinball_loss,
+     mean_squared_error,

@@ -1,0 +1,24 @@
+--- a/features/ua_swann_deviation.py	2026-11-03 14:17:19.179185339 -0700
++++ b/features/ua_swann_deviation.py	2026-11-03 14:17:24.758998686 -0700
+@@ -42,14 +42,18 @@
+                                 issue_date: str) -> pd.DataFrame:
+     logger.info("Generating UA Swann deviation features.")
+ 
+-    swann_base_url = 'https://climate.arizona.edu/snowview/csv/Download/Watersheds/'
++    # The service moved from climate.arizona.edu/snowview to snowview.arizona.edu and now returns a '#' comment
++    # header plus the columns date, water_year, overall_cumulative_precip_in, overall_mean_swe_in, ...
++    swann_base_url = 'https://snowview.arizona.edu/csv/Download/Watersheds/'
+     ua_swann = []
+     for site_id in test_features.site_id.unique():
+         logger.info(f"retrieving UA Swann file for {site_id}")
+         site_basin = site_basins[site_id]
+         site_file_name = f'{site_basin}.csv'
+-        s = requests.get(f"{swann_base_url}{site_file_name}", verify=False).text
+-        site_ua_swann = pd.read_csv(StringIO(s))
++        resp = requests.get(f"{swann_base_url}{site_file_name}", timeout=120)
++        resp.raise_for_status()
++        site_ua_swann = pd.read_csv(StringIO(resp.text), comment='#')
++        site_ua_swann = site_ua_swann[['date', 'overall_cumulative_precip_in', 'overall_mean_swe_in']]
+         site_ua_swann.columns = ['date', 'acc_water', 'ua_swe']
+         site_ua_swann['date'] = pd.to_datetime(site_ua_swann['date'])
+         site_ua_swann['site_id'] = site_id
