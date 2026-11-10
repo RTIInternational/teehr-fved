@@ -5,6 +5,7 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 import { useMap } from '@/core/map';
 import type { MapLocation } from '@/shared/types/locations';
 import type { MapMetric } from '@/shared/types/maps';
+import { escapeHtml } from '@/shared/utils/html';
 import { getMetricColorExpression, getMetricLabel, isLngLatTuple } from '@/shared/utils/mapMetrics';
 
 import { sanitizeLocationFeatures, toMapLocation } from '../utils/locationFeatures';
@@ -15,13 +16,6 @@ const SELECTED_LAYER_ID = 'streamflow-locations-selected';
 const DEFAULT_METRIC: MapMetric = 'relative_bias';
 
 const EMPTY_COLLECTION: FeatureCollection<Point> = { type: 'FeatureCollection', features: [] };
-
-const escapeHtml = (value: string | number | null | undefined) =>
-  String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
 
 const selectedFilter = (locationId: string | null): maplibregl.FilterSpecification => [
   '==',

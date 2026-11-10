@@ -1,5 +1,5 @@
 import { Alert, Group, Loader, Paper, Text } from '@mantine/core';
-import { IconAlertTriangle } from '@tabler/icons-react';
+import { IconAlertTriangle, IconMapPin } from '@tabler/icons-react';
 import { useCallback, useMemo } from 'react';
 
 import { useMap } from '@/core/map';
@@ -15,9 +15,9 @@ import MapLegend from '@/shared/components/MapLegend';
 import TimeseriesComponent from '@/shared/components/TimeseriesComponent';
 import { useMetricLocations } from '@/shared/queries/metrics';
 import type { MapLocation } from '@/shared/types/locations';
+import { MapDataDock } from '@/views/components/MapDataDock';
 
 import { LocationSearch } from './components/LocationSearch';
-import { StreamflowDataDock } from './components/StreamflowDataDock';
 import { StreamflowMapLayers } from './components/StreamflowMapLayers';
 
 import styles from './StreamflowView.module.css';
@@ -118,35 +118,53 @@ const StreamflowContent = () => {
         </Group>
       </div>
 
-      <StreamflowDataDock
-        selectedLocation={selectedLocation}
-        onClearSelection={() => selectLocation(null)}
-        timeseries={
-          selectedLocation && (
-            <TimeseriesComponent
-              key={selectedLocation.primary_location_id}
-              state={state}
-              Controls={TimeseriesControls}
-              initialViewMode="plot"
-              autoRequestFilters={autoRequestFilters}
-              controlsProps={{
-                table: TABLES[0],
-                timeseriesFilters,
-                updateTimeseriesFilters,
-                selectedLocation,
-                mapFilters,
-              }}
-            />
-          )
+      <MapDataDock
+        icon={<IconMapPin size={18} style={{ flexShrink: 0 }} />}
+        placeholder={
+          !selectedLocation && 'Select a location on the map to view its time series and metrics.'
         }
-        metrics={
-          selectedLocation && (
-            <LocationMetrics
-              key={selectedLocation.primary_location_id}
-              selectedLocation={selectedLocation}
-              tables={TABLES}
-            />
-          )
+        title={selectedLocation?.name}
+        subtitle={[selectedLocation?.primary_location_id, selectedLocation?.secondary_location_id]
+          .filter(Boolean)
+          .join(' · ')}
+        onClose={() => selectLocation(null)}
+        closeLabel="Clear selected location"
+        sections={
+          selectedLocation
+            ? [
+                {
+                  value: 'timeseries',
+                  label: 'Time Series',
+                  content: (
+                    <TimeseriesComponent
+                      key={selectedLocation.primary_location_id}
+                      state={state}
+                      Controls={TimeseriesControls}
+                      initialViewMode="plot"
+                      autoRequestFilters={autoRequestFilters}
+                      controlsProps={{
+                        table: TABLES[0],
+                        timeseriesFilters,
+                        updateTimeseriesFilters,
+                        selectedLocation,
+                        mapFilters,
+                      }}
+                    />
+                  ),
+                },
+                {
+                  value: 'metrics',
+                  label: 'Metrics',
+                  content: (
+                    <LocationMetrics
+                      key={selectedLocation.primary_location_id}
+                      selectedLocation={selectedLocation}
+                      tables={TABLES}
+                    />
+                  ),
+                },
+              ]
+            : []
         }
       />
     </div>
