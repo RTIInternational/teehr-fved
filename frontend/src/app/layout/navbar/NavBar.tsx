@@ -13,7 +13,7 @@ import { IconExternalLink } from '@tabler/icons-react';
 import { NavLink as RouterLink } from 'react-router-dom';
 
 import { useAuth } from '@/shared/auth';
-import { legacyViews, newViews } from '@/views/registry';
+import { newViews } from '@/views/registry';
 
 import { UserLogin } from './UserLogin';
 
@@ -67,28 +67,6 @@ export const NavBar = () => {
                 label={view.label}
                 disabled={view.disabled}
                 leftSection={<ViewIcon size={20} />}
-              />
-            );
-          })}
-          <NavLink
-            renderRoot={(props) => <RouterLink to={`/hub`} {...props} />}
-            label="Legacy"
-            mt="xs"
-            styles={{
-              label: {
-                fontWeight: 'var(--mantine-font-weight-bold)',
-              },
-            }}
-          />
-          {legacyViews.map((legacyView) => {
-            const LegacyIcon = legacyView.icon;
-            return (
-              <NavLink
-                key={legacyView.id}
-                renderRoot={(props) => <RouterLink to={legacyView.path} {...props} />}
-                label={legacyView.label}
-                disabled={legacyView.disabled}
-                leftSection={<LegacyIcon size={20} />}
               />
             );
           })}

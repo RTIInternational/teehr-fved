@@ -77,39 +77,6 @@ export const newViews: RegisteredView[] = [
   },
 ];
 
-export const legacyViews: RegisteredView[] = [
-  {
-    id: 'streamflow-legacy',
-    label: 'Streamflow (Legacy)',
-    path: '/forecast',
-    icon: IconRipple,
-    description: 'Legacy streamflow dashboard with existing context-backed panels.',
-  },
-  {
-    id: 'water-supply-legacy',
-    label: 'Water Supply',
-    path: '/water-supply',
-    icon: IconBucket,
-    disabled: true,
-    description: 'Legacy water supply dashboards are not currently available.',
-  },
-  {
-    id: 'colorado-river-legacy',
-    label: 'Colorado River',
-    path: '/crmms',
-    icon: IconDroplet,
-    disabled: true,
-    description: 'Legacy Colorado River dashboard is not currently available.',
-  },
-  {
-    id: 'snow-legacy',
-    label: 'Snow (Legacy)',
-    path: '/gridded',
-    icon: IconSnowflake,
-    description: 'Legacy snow dashboard with gridded layers and polygon workflows.',
-  },
-];
-
 type MapView = RegisteredView & { component: ComponentType };
 
 /** Views that can be opened at /map/:viewId. */

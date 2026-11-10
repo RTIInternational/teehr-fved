@@ -11,7 +11,7 @@ export const AdminRoute = ({ children }: React.PropsWithChildren) => {
   }
 
   if (!authenticated) {
-    return <Navigate to="/hub" replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (!roles.includes('admin')) {
