@@ -1,6 +1,8 @@
 import { IconBucket, IconDroplet, IconRipple, IconSnowflake, type Icon } from '@tabler/icons-react';
+import type { ComponentType } from 'react';
 
-import type { ViewDefinition } from '@/core/views';
+import { SnowView } from '@/views/snow/SnowView';
+import { StreamflowView } from '@/views/streamflow/StreamflowView';
 
 export type RegisteredView = {
   id: string;
@@ -11,6 +13,8 @@ export type RegisteredView = {
   icon: Icon;
   disabled?: boolean;
   statusLabel?: string;
+  /** Rendered over the shared map at /map/:viewId. */
+  component?: ComponentType;
 };
 
 export const newViews: RegisteredView[] = [
@@ -25,6 +29,7 @@ export const newViews: RegisteredView[] = [
       'Forecast performance metrics',
     ],
     icon: IconRipple,
+    component: StreamflowView,
   },
   {
     id: 'water-supply',
@@ -68,6 +73,7 @@ export const newViews: RegisteredView[] = [
       'Custom basin-level analysis',
     ],
     icon: IconSnowflake,
+    component: SnowView,
   },
 ];
 
@@ -104,32 +110,26 @@ export const legacyViews: RegisteredView[] = [
   },
 ];
 
-export const mapViewsRegistry: ViewDefinition[] = newViews
-  .filter((view) => !view.disabled)
-  .map((view) => {
-    const ViewIcon = view.icon;
+type MapView = RegisteredView & { component: ComponentType };
 
-    return {
-      id: view.id,
-      label: view.label,
-      description: view.description,
-      leftSection: <ViewIcon size={20} />,
-    };
-  });
+/** Views that can be opened at /map/:viewId. */
+export const mapViews: MapView[] = newViews.filter(
+  (view): view is MapView => !view.disabled && view.component !== undefined
+);
 
 export const LAST_MAP_VIEW_KEY = 'teehr:map:last-view-id';
 
 const isKnownViewId = (viewId: string) => {
-  return mapViewsRegistry.some((view) => view.id === viewId);
+  return mapViews.some((view) => view.id === viewId);
 };
 
 export const getMapViewById = (viewId: string | undefined) => {
   if (!viewId) return null;
-  return mapViewsRegistry.find((view) => view.id === viewId) ?? null;
+  return mapViews.find((view) => view.id === viewId) ?? null;
 };
 
 export const getDefaultMapViewId = () => {
-  return mapViewsRegistry[0]?.id || 'streamflow';
+  return mapViews[0]?.id || 'streamflow';
 };
 
 export const readLastMapViewId = () => {
