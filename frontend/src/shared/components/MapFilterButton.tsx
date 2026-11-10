@@ -10,16 +10,9 @@ type MapFilterButtonProps = {
   tables: string[];
   mapFilters: MapFilters;
   updateMapFilters: (filter: Partial<MapFilters>) => void;
-  /** Absolutely position in the map's top-right corner. */
-  floating?: boolean;
 };
 
-const MapFilterButton = ({
-  tables,
-  mapFilters,
-  updateMapFilters,
-  floating = true,
-}: MapFilterButtonProps) => {
+const MapFilterButton = ({ tables, mapFilters, updateMapFilters }: MapFilterButtonProps) => {
   const [showDropdown, setShowDropdown] = useState(false);
 
   const configurations = useDistinctValues(tables[0], 'configuration_name');
@@ -34,10 +27,7 @@ const MapFilterButton = ({
   };
 
   return (
-    <div
-      className={floating ? 'position-absolute top-0 end-0 m-3' : undefined}
-      style={floating ? { zIndex: 1000 } : undefined}
-    >
+    <div>
       <Dropdown show={showDropdown} onToggle={setShowDropdown}>
         <Dropdown.Toggle variant="light" className="shadow-sm">
           🗺️ Map Display Settings

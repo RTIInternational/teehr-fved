@@ -5,7 +5,7 @@
  *   1. Add an entry to OVERLAY_LAYERS with a unique `id`, display `label`,
  *      a MapLibre `sourceConfig` (raster or geojson), and a `layerConfig`.
  *   2. That's it — the overlay will automatically appear as a checkbox in
- *      GriddedControls and be managed by GriddedMapComponent.
+ *      GriddedControls and be drawn by the snow view's OverlayLayers.
  */
 export const OVERLAY_LAYERS = [
   {

@@ -107,66 +107,6 @@ html {
   background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
 }
 
-/* Dashboard Card Styles */
-.dashboard-card {
-  border: none;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  height: 100%;
-}
-
-.dashboard-card-available:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
-}
-
-.dashboard-card-disabled {
-  opacity: 0.7;
-}
-
-.dashboard-card .card-body {
-  padding: 1.5rem;
-}
-
-.dashboard-card .features-list {
-  flex-grow: 1;
-}
-
-.dashboard-card .features-list ul {
-  margin: 0;
-  padding-left: 1.2rem;
-  font-size: 0.9rem;
-}
-
-.dashboard-card .features-list li {
-  margin-bottom: 0.3rem;
-}
-
-.dashboard-card .card-header {
-  border-bottom: none;
-  padding: 1rem 1.5rem;
-}
-
-.dashboard-card .card-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-/* Navigation Styles */
-.navbar .nav-link {
-  color: rgba(255, 255, 255, 0.85) !important;
-  transition: color 0.2s ease;
-}
-
-.navbar .nav-link:hover {
-  color: white !important;
-}
-
-.navbar .nav-link.active {
-  color: white !important;
-  font-weight: 500;
-}
-
 /* Main content padding when navbar is present */
 main {
   padding-top: 0;
@@ -181,16 +121,6 @@ main {
   .hero-section .display-4 {
     font-size: 2rem;
   }
-
-  .dashboard-card .card-body {
-    padding: 1rem;
-  }
-}
-
-/* Bootstrap card hover effect override for disabled cards */
-.dashboard-card-disabled:hover {
-  transform: none;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .welcome-hero {
@@ -228,20 +158,6 @@ main {
 .welcome-teehr-python-image {
   width: 154px;
   height: auto;
-}
-
-.navbar-usbr-logo {
-  width: auto;
-  height: 32px;
-  border-radius: 6px;
-}
-
-.navbar-teehr-logo {
-  border-radius: 6px;
-}
-
-.navbar-dashboard-toggle {
-  transform: translateY(-1px);
 }
 
 @media (max-width: 768px) {

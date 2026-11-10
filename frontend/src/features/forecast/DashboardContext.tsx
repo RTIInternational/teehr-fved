@@ -21,7 +21,6 @@ export type DashboardState = {
   mapFilters: MapFilters;
   timeseriesFilters: TimeseriesFilters;
   selectedLocation: MapLocation | null;
-  mapLoaded: boolean;
   error: string | null;
 };
 
@@ -41,10 +40,6 @@ type DashboardAction =
   | {
       type: typeof ActionTypes.SELECT_LOCATION;
       payload: MapLocation | null;
-    }
-  | {
-      type: typeof ActionTypes.SET_MAP_LOADED;
-      payload: boolean;
     }
   | {
       type: typeof ActionTypes.SET_ERROR;
@@ -82,9 +77,6 @@ const initialState: DashboardState = {
   // Selected location
   selectedLocation: null,
 
-  // Map state
-  mapLoaded: false,
-
   // Error state
   error: null,
 };
@@ -98,9 +90,6 @@ export const ActionTypes = {
 
   // Location selection
   SELECT_LOCATION: 'SELECT_LOCATION',
-
-  // Map state
-  SET_MAP_LOADED: 'SET_MAP_LOADED',
 
   // Error handling
   SET_ERROR: 'SET_ERROR',
@@ -194,12 +183,6 @@ const reducer = (state: DashboardState, action: DashboardAction) => {
       return {
         ...state,
         selectedLocation: action.payload,
-      };
-
-    case ActionTypes.SET_MAP_LOADED:
-      return {
-        ...state,
-        mapLoaded: action.payload,
       };
 
     case ActionTypes.SET_ERROR:

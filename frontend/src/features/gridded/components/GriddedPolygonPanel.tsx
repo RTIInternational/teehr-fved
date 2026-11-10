@@ -25,8 +25,8 @@ const GriddedPolygonPanel = () => {
     dispatch({
       type: ActionTypes.SELECT_LOCATION,
       payload: {
-        // Named to match the other dashboards so LocationCard and apiService
-        // calls work against this object unchanged.
+        // Named to match the forecast state's selected location, so shared
+        // query helpers work against this object unchanged.
         primary_location_id: props.id,
         name: props.name,
         coordinates: polygonClickLngLat ? [polygonClickLngLat.lon, polygonClickLngLat.lat] : null,

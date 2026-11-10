@@ -112,10 +112,9 @@ const StreamflowContent = () => {
               tables={TABLES}
               mapFilters={mapFilters}
               updateMapFilters={updateMapFilters}
-              floating={false}
             />
           </Group>
-          <MapLegend metric={mapFilters.metricName} floating={false} />
+          <MapLegend metric={mapFilters.metricName} />
         </>
       }
       bottom={
