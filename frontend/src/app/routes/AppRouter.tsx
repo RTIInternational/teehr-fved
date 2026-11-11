@@ -9,7 +9,15 @@ import Home from '@/pages/Home';
 import NotFound from '@/pages/NotFound';
 
 import { AdminRoute } from './AdminRoute';
-import { MapRoute } from './MapRoute';
+import { MapRoute as NonAuthMapRoute } from './MapRoute';
+import { RequireAuth } from './RequireAuth';
+
+/** Temporary auth handler -- remove when API supports non-auth reads */
+const MapRoute = () => (
+  <RequireAuth>
+    <NonAuthMapRoute />
+  </RequireAuth>
+);
 
 export const AppRouter = () => (
   <BrowserRouter>
