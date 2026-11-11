@@ -27,7 +27,7 @@ const MapFilterButton = ({ tables, mapFilters, updateMapFilters }: MapFilterButt
   };
 
   return (
-    <div className="position-absolute top-0 end-0 m-3" style={{ zIndex: 1000 }}>
+    <div>
       <Dropdown show={showDropdown} onToggle={setShowDropdown}>
         <Dropdown.Toggle variant="light" className="shadow-sm">
           🗺️ Map Display Settings

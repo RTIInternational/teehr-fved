@@ -1,0 +1,63 @@
+.overlay {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inset-inline-start: var(--app-shell-navbar-offset, 0rem);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mantine-spacing-md);
+  pointer-events: auto;
+  backdrop-filter: blur(4px);
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  width: min(980px, 100%);
+  max-height: calc(100dvh - var(--mantine-spacing-xl));
+  overflow: auto;
+}
+
+.option {
+  height: 100%;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease;
+}
+
+.option:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--mantine-shadow-md);
+  border-color: var(--mantine-primary-color-filled-hover);
+}
+
+.option[data-disabled] {
+  opacity: 0.68;
+  background: var(--mantine-color-disabled);
+  cursor: not-allowed;
+}
+
+.option[data-disabled]:hover {
+  transform: none;
+  box-shadow: var(--mantine-shadow-sm);
+  border-color: var(--mantine-color-disabled-border);
+}
+
+.optionHeader {
+  padding-top: var(--mantine-spacing-sm);
+  padding-bottom: var(--mantine-spacing-sm);
+}
+
+@media (max-width: 48em) {
+  .overlay {
+    align-items: flex-end;
+    padding: var(--mantine-spacing-sm);
+  }
+
+  .dialog {
+    max-height: min(80dvh, 640px);
+  }
+}

@@ -1,6 +1,0 @@
-.mobileMenuToggle {
-  position: absolute;
-  top: var(--mantine-spacing-sm);
-  left: var(--mantine-spacing-sm);
-  z-index: 300;
-}
