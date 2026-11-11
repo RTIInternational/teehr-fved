@@ -9,6 +9,13 @@ export const POLYGON_FILL_LAYER_ID = 'snow-polygons-fill';
 export const POLYGON_OUTLINE_LAYER_ID = 'snow-polygons-outline';
 export const POLYGON_SELECTED_LAYER_ID = 'snow-polygons-selected';
 
+/** Every source the snow view adds, for tracking when its tiles are loading. */
+export const SNOW_SOURCE_IDS = [
+  ...OVERLAY_LAYERS.map((overlay) => overlay.id),
+  RASTER_SOURCE_ID,
+  POLYGON_SOURCE_ID,
+];
+
 /** Bottom-to-top order of the snow view's layers; overlays use their registry ids. */
 const SNOW_LAYER_ORDER = [
   ...OVERLAY_LAYERS.map((overlay) => overlay.id),

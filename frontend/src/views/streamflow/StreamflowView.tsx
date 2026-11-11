@@ -1,5 +1,5 @@
-import { Alert, Group, Loader, Paper, Text } from '@mantine/core';
-import { IconAlertTriangle, IconMapPin } from '@tabler/icons-react';
+import { Alert } from '@mantine/core';
+import { IconAlertTriangle, IconInfoCircle, IconMapPin } from '@tabler/icons-react';
 import { useCallback, useMemo } from 'react';
 
 import { useMap } from '@/core/map';
@@ -28,7 +28,7 @@ const StreamflowContent = () => {
   const { selectLocation, selectedLocation } = useLocationSelection();
   const { mapFilters, updateMapFilters, timeseriesFilters, updateTimeseriesFilters } = useFilters();
 
-  useInitialFilters(TABLES[0]);
+  const filterOptions = useInitialFilters(TABLES[0]);
 
   const { configuration, variable } = mapFilters;
   const locationFilters = useMemo(
@@ -37,6 +37,15 @@ const StreamflowContent = () => {
   );
   const locations = useMetricLocations(locationFilters);
   const locationsKey = locationFilters ? `${configuration}|${variable}` : null;
+
+  // Filter options come first: the locations query waits for their defaults.
+  const loading =
+    filterOptions.configurations.isLoading || filterOptions.variables.isLoading
+      ? 'Loading filters…'
+      : locations.isFetching
+        ? 'Loading locations…'
+        : null;
+  const noLocations = locations.isSuccess && locations.data.features.length === 0;
 
   const handleMapError = useCallback(
     (message: string) => dispatch({ type: ActionTypes.SET_ERROR, payload: message }),
@@ -72,6 +81,7 @@ const StreamflowContent = () => {
 
   return (
     <MapViewLayout
+      loading={loading}
       mapLayers={
         <StreamflowMapLayers
           locations={locations.data}
@@ -97,22 +107,27 @@ const StreamflowContent = () => {
               {state.error}
             </Alert>
           )}
+          {locations.isError && (
+            <Alert
+              w="100%"
+              color="red"
+              title="Couldn't load locations"
+              icon={<IconAlertTriangle size={18} />}
+            >
+              {locations.error.message}
+            </Alert>
+          )}
+          {noLocations && (
+            <Alert w="100%" color="gray" icon={<IconInfoCircle size={18} />}>
+              No locations for {configuration} / {variable}. Try other map display settings.
+            </Alert>
+          )}
           <LocationSearch locations={locations.data} onSelect={handleSearchSelect} />
-          <Group gap="xs" wrap="nowrap">
-            {locations.isFetching && (
-              <Paper shadow="sm" radius="md" px="sm" py={6}>
-                <Group gap="xs" wrap="nowrap">
-                  <Loader size="xs" />
-                  <Text size="xs">Loading locations…</Text>
-                </Group>
-              </Paper>
-            )}
-            <MapFilterButton
-              tables={TABLES}
-              mapFilters={mapFilters}
-              updateMapFilters={updateMapFilters}
-            />
-          </Group>
+          <MapFilterButton
+            tables={TABLES}
+            mapFilters={mapFilters}
+            updateMapFilters={updateMapFilters}
+          />
           <MapLegend metric={mapFilters.metricName} />
         </>
       }

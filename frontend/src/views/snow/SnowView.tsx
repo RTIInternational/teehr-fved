@@ -13,6 +13,7 @@ import { ActionTypes, DashboardProvider, useDashboard } from './DashboardContext
 import { useSnowDefaults } from './hooks/useSnowDefaults';
 import { useSnowDockHeader } from './hooks/useSnowDockHeader';
 import { useSnowDockSection } from './hooks/useSnowDockSection';
+import { useSnowLoading } from './hooks/useSnowLoading';
 
 const SnowContent = () => {
   const { state, dispatch } = useDashboard();
@@ -20,6 +21,7 @@ const SnowContent = () => {
   const dockHeader = useSnowDockHeader(section);
 
   useSnowDefaults();
+  const loading = useSnowLoading();
 
   const sections: MapDataDockSection[] = [
     { value: 'timeseries', label: 'Time Series', content: <GriddedTimeseriesPanel /> },
@@ -34,6 +36,7 @@ const SnowContent = () => {
 
   return (
     <MapViewLayout
+      loading={loading}
       mapLayers={<SnowMapLayers />}
       topLeft={<SnowLegend />}
       topRight={
