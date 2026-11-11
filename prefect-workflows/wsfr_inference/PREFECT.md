@@ -149,6 +149,29 @@ the Kubernetes deadline/watch window is longer. Timeout cleanup terminates the
 model process group. Model scientific failures are not automatically retried;
 inspect diagnostics before triggering a rerun.
 
+## Firewall Probe Handoff
+
+`check_data_sources.py` is independent of the model packages, trained assets and
+the `wsf_py313` environment. Give the backend team this script and a Python
+installation with `requests` available. Run it from any directory:
+
+```bash
+python -m pip install requests
+python check_data_sources.py
+```
+
+It probes all unique runtime data-source endpoints used by the three models,
+follows HTTP redirects, and prints an exit code of 1 if any request or basic
+response-shape check fails. `--timeout` changes the per-request timeout in
+seconds. An HTTP response with a non-2xx status still means the host was
+reached; inspect the reported status separately from firewall connectivity.
+The CDS probes check public catalogues only. They do not test CDS credentials,
+dataset entitlements or file-download redirect hosts.
+
+The probe makes small read-only requests. NetCDF probes request a byte range to
+avoid downloading large products. Endpoint response shape and current data
+availability can change independently of firewall access.
+
 ## Local Verification
 
 Create the shared model environment using any compatible conda/mamba installer.
