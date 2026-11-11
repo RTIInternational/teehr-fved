@@ -9,6 +9,8 @@ from prefect import task, get_run_logger
 
 import teehr
 
+from utils.water_supply_utils import AF_TO_CUBIC_METERS
+
 
 CDEC_CSV_URL = "https://cdec.water.ca.gov/dynamicapp/req/CSVDataServlet"
 LOCATION_ID_PREFIX = "cdec"
@@ -18,7 +20,7 @@ CDEC_TIME_ZONE = "America/Los_Angeles"
 
 # CDEC units -> (TEEHR unit, conversion factor)
 UNIT_CONVERSIONS = {
-    "AF": ("m^3", 1233.48184),
+    "AF": ("m^3", AF_TO_CUBIC_METERS),
 }
 
 
@@ -73,16 +75,6 @@ def fetch_cdec_csv(
     df = df.dropna(subset=["value"])
     logger.info(f"Fetched {len(df)} CDEC values")
     return df
-
-
-def cdec_time_to_utc(times: pd.Series) -> pd.Series:
-    """Convert naive local Pacific times to naive UTC."""
-    return (
-        pd.to_datetime(times)
-        .dt.tz_localize(CDEC_TIME_ZONE)
-        .dt.tz_convert("UTC")
-        .dt.tz_localize(None)
-    )
 
 
 def convert_cdec_units(df: pd.DataFrame) -> pd.DataFrame:

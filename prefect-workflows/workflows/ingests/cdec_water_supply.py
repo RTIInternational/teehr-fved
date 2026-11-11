@@ -10,16 +10,18 @@ from teehr.fetching.utils import write_timeseries_parquet_file
 from teehr.utils.utils import remove_dir_if_exists
 
 from utils.cdec_utils import (
+    CDEC_TIME_ZONE,
     LOCATION_ID_PREFIX,
-    cdec_time_to_utc,
     convert_cdec_units,
     fetch_cdec_csv,
     get_cdec_station_ids,
 )
+from utils import water_supply_utils
 from workflows.utils.common_utils import (
     initialize_evaluation,
     load_to_warehouse,
 )
+from workflows.utils.time_utils import local_time_to_utc
 
 
 logging.getLogger("teehr").setLevel(logging.INFO)
@@ -31,12 +33,6 @@ AJ_VOLUME = "volume_0407_sum"
 WY_VOLUME = "volume_1009_sum"
 AJ_CUMULATIVE_VOLUME = "volume_0407_cumsum"
 MONTHLY_VOLUME = "volume_monthly_sum"
-
-# Seasonal volume -> (start month, number of months)
-SEASONS = {
-    AJ_VOLUME: (4, 4),
-    WY_VOLUME: (10, 12),
-}
 
 # Forecast sensor -> (variable_name, member)
 FORECAST_SENSORS = {
@@ -56,18 +52,6 @@ SECONDARY_COLUMNS = [
 PRIMARY_COLUMNS = SECONDARY_COLUMNS[:-1]
 
 
-def _water_year(timestamp: Union[date, pd.Timestamp]) -> int:
-    """Water year (Oct-Sep), named for the year it ends in."""
-    return timestamp.year + 1 if timestamp.month >= 10 else timestamp.year
-
-
-def _season_months(variable_name: str, water_year: int) -> pd.DatetimeIndex:
-    """Month starts of a seasonal volume window in a water year."""
-    start_month, num_months = SEASONS[variable_name]
-    start_year = water_year - 1 if start_month >= 10 else water_year
-    return pd.date_range(pd.Timestamp(start_year, start_month, 1), periods=num_months, freq="MS")
-
-
 def format_forecasts(df: pd.DataFrame) -> pd.DataFrame:
     """Format forecast sensors as secondary timeseries.
 
@@ -83,34 +67,14 @@ def format_forecasts(df: pd.DataFrame) -> pd.DataFrame:
     df["variable_name"] = df["sensor_number"].map(lambda num: FORECAST_SENSORS[num][0])
     df["member"] = df["sensor_number"].map(lambda num: FORECAST_SENSORS[num][1])
     df["value_time"] = [
-        _season_months(variable_name, _water_year(reference_time))[0]
+        water_supply_utils.window_months(variable_name, water_supply_utils.water_year(reference_time))[0]
         for variable_name, reference_time in zip(df["variable_name"], df["reference_time"])
     ]
-    df["reference_time"] = cdec_time_to_utc(df["reference_time"])
-    df["value_time"] = cdec_time_to_utc(df["value_time"])
+    df["reference_time"] = local_time_to_utc(df["reference_time"], CDEC_TIME_ZONE)
+    df["value_time"] = local_time_to_utc(df["value_time"], CDEC_TIME_ZONE)
     df["configuration_name"] = FORECAST_CONFIGURATION_NAME
     df["location_id"] = f"{LOCATION_ID_PREFIX}-" + df["station_id"]
     return convert_cdec_units(df)[SECONDARY_COLUMNS]
-
-
-def _seasonal_volumes(monthly_df: pd.DataFrame, water_year: int) -> pd.DataFrame:
-    """Seasonal sums for complete seasons, and the Apr-Jul running total for completed months."""
-    rows = []
-    for location_id, location_volumes in monthly_df.groupby("location_id"):
-        by_month = location_volumes.set_index("value_time")["value"]
-        for variable_name in SEASONS:
-            months = _season_months(variable_name, water_year)
-            if months.isin(by_month.index).all():
-                rows.append((location_id, months[0], by_month[months].sum(), variable_name))
-        running_total = 0.0
-        for month in _season_months(AJ_VOLUME, water_year):
-            if month not in by_month.index:
-                break
-            running_total += by_month[month]
-            rows.append((location_id, month + pd.offsets.MonthBegin(1), running_total, AJ_CUMULATIVE_VOLUME))
-    return pd.DataFrame(
-        rows, columns=["location_id", "value_time", "value", "variable_name"]
-    ).astype({"value_time": "datetime64[ns]", "value": float}).assign(unit_name="m^3")
 
 
 def format_observations(df: pd.DataFrame, water_year: int) -> pd.DataFrame:
@@ -120,8 +84,11 @@ def format_observations(df: pd.DataFrame, water_year: int) -> pd.DataFrame:
         value_time=df["date_time"].dt.normalize(),
         variable_name=MONTHLY_VOLUME,
     )
-    df = pd.concat([monthly_df, _seasonal_volumes(monthly_df, water_year)], ignore_index=True)
-    df["value_time"] = cdec_time_to_utc(df["value_time"])
+    seasonal_df = water_supply_utils.seasonal_volumes(
+        monthly_df, [AJ_VOLUME, WY_VOLUME], [AJ_CUMULATIVE_VOLUME], water_year
+    )
+    df = pd.concat([monthly_df, seasonal_df], ignore_index=True)
+    df["value_time"] = local_time_to_utc(df["value_time"], CDEC_TIME_ZONE)
     df["reference_time"] = None
     df["configuration_name"] = OBSERVED_CONFIGURATION_NAME
     return df[PRIMARY_COLUMNS]
@@ -146,11 +113,11 @@ def ingest_cdec_water_supply(
     logger = get_run_logger()
 
     # Evaluated at flow run time, not deployment time
-    last_water_year = _water_year(pd.Timestamp(end_date or date.today()))
+    last_water_year = water_supply_utils.water_year(pd.Timestamp(end_date or date.today()))
     if start_date is None:
         first_water_year = last_water_year - 1
     else:
-        first_water_year = _water_year(pd.Timestamp(start_date))
+        first_water_year = water_supply_utils.water_year(pd.Timestamp(start_date))
     logger.info(f"Processing CDEC water years {first_water_year}-{last_water_year}")
 
     ev = initialize_evaluation(

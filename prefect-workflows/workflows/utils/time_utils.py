@@ -33,3 +33,13 @@ def to_naive_utc(
     if ts.tz is not None:
         ts = ts.tz_convert("UTC").tz_localize(None)
     return ts.to_pydatetime()
+
+
+def local_time_to_utc(times: pd.Series, time_zone: str) -> pd.Series:
+    """Convert naive local times in ``time_zone`` to naive UTC."""
+    return (
+        pd.to_datetime(times)
+        .dt.tz_localize(time_zone)
+        .dt.tz_convert("UTC")
+        .dt.tz_localize(None)
+    )
