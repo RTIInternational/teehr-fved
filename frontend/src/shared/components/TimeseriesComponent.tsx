@@ -15,17 +15,31 @@ type TimeseriesComponentProps<TControlsProps extends object> = {
   state: TimeseriesState;
   Controls: React.ComponentType<TControlsProps & TimeseriesControlInjectedProps>;
   controlsProps: TControlsProps;
+  initialViewMode?: 'filters' | 'plot';
+  /**
+   * Request issued without submitting the filters form. The first non-null value
+   * is kept until the user submits the form; key the component by location to
+   * reset it.
+   */
+  autoRequestFilters?: TimeseriesRequestFilters | null;
 };
 
 const TimeseriesComponent = <TControlsProps extends object>({
   state,
   Controls,
   controlsProps,
+  initialViewMode = 'filters',
+  autoRequestFilters = null,
 }: TimeseriesComponentProps<TControlsProps>) => {
-  const [viewMode, setViewMode] = useState('filters');
+  const [viewMode, setViewMode] = useState<string>(initialViewMode);
   const [requestFilters, setRequestFilters] = useState<TimeseriesRequestFilters>();
-  const primary = usePrimaryTimeseries(requestFilters);
-  const secondary = useSecondaryTimeseries(requestFilters);
+  const [autoFilters, setAutoFilters] = useState(autoRequestFilters ?? undefined);
+  if (!autoFilters && autoRequestFilters) {
+    setAutoFilters(autoRequestFilters);
+  }
+  const activeFilters = requestFilters ?? autoFilters;
+  const primary = usePrimaryTimeseries(activeFilters);
+  const secondary = useSecondaryTimeseries(activeFilters);
 
   const primaryData = primary.data ?? [];
   const secondaryData = secondary.data ?? [];

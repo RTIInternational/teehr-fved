@@ -22,7 +22,8 @@
     "react-bootstrap": "^2.10.5",
     "react-dom": "^19.2.0",
     "react-router-dom": "^6.28.0",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "zustand": "^5.0.16"
   },
   "scripts": {
     "dev": "vite",

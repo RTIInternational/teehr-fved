@@ -5,7 +5,7 @@ import ReactDOM from 'react-dom/client';
 
 import { AuthProvider } from '@/shared/auth';
 
-import { AppRouter } from './routes/AppRouter';
+import { AppRouter } from './app/routes/AppRouter';
 
 import '@mantine/core/styles.css';
 import { FvedTheme } from './theme';

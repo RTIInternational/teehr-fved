@@ -15,8 +15,8 @@ const MapLegend = ({ metric }: MapLegendProps) => {
 
   return (
     <div
-      className="card position-absolute bottom-0 start-0 m-3 shadow-sm"
-      style={{ minWidth: '150px', maxWidth: '200px', zIndex: 1000, fontSize: '0.85rem' }}
+      className="card shadow-sm"
+      style={{ minWidth: '150px', maxWidth: '200px', fontSize: '0.85rem' }}
     >
       <div className="card-header py-2">
         <h6 className="card-title mb-0 small">Legend</h6>
