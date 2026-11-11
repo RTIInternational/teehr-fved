@@ -19,7 +19,9 @@ const isApiUrl = (url: string, baseUrl: string) => {
 /**
  * Adds credentials to map requests aimed at our APIs, mirroring apiCallJson and
  * griddedApiCall. transformRequest is synchronous, so this uses the current
- * token without refreshing it.
+ * token without refreshing it, or waiting for Keycloak init. Any layer whose
+ * source points at our APIs must `await ensureFreshToken()` before adding the
+ * source, or its first requests go out without a token and fail with a 401.
  */
 export const mapTransformRequest = (url: string): RequestParameters => {
   const token = getKeycloak().token;
