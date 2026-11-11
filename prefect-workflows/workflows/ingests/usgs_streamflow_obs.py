@@ -94,7 +94,7 @@ def ingest_usgs_streamflow_obs(
         )
 
     # get usgs sites from alias table
-    df = ev.location_id_aliases.filter("location_id_alias LIKE 'usgs%'").to_pandas()
+    df = ev.location_id_aliases.filter("location_id_alias LIKE 'usgs-%'").to_pandas()
     usgs_sites = df['location_id_alias'].str.upper().to_list()
 
     # Break usgs_sites into chunks
