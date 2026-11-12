@@ -1,4 +1,4 @@
-import { Col, Form } from 'react-bootstrap';
+import { SimpleGrid, TextInput } from '@mantine/core';
 
 type DateRangeInputsProps = {
   start: string | null;
@@ -7,8 +7,11 @@ type DateRangeInputsProps = {
   onEndChange: (value: string | null) => void;
   startLabel?: string;
   endLabel?: string;
+  /** Validation message shown on the end input (e.g. when start is after end). */
+  error?: string | null;
 };
 
+/** Start/end `datetime-local` inputs, side by side from the `sm` breakpoint up. */
 const DateRangeInputs = ({
   start,
   end,
@@ -16,32 +19,23 @@ const DateRangeInputs = ({
   onEndChange,
   startLabel = 'Start Date',
   endLabel = 'End Date',
+  error,
 }: DateRangeInputsProps) => (
-  <>
-    <Col md={6}>
-      <Form.Group>
-        <Form.Label className="small fw-bold">{startLabel}</Form.Label>
-        <Form.Control
-          type="datetime-local"
-          size="sm"
-          value={start || ''}
-          onChange={(e) => onStartChange(e.target.value || null)}
-        />
-      </Form.Group>
-    </Col>
-
-    <Col md={6}>
-      <Form.Group>
-        <Form.Label className="small fw-bold">{endLabel}</Form.Label>
-        <Form.Control
-          type="datetime-local"
-          size="sm"
-          value={end || ''}
-          onChange={(e) => onEndChange(e.target.value || null)}
-        />
-      </Form.Group>
-    </Col>
-  </>
+  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm" verticalSpacing="sm">
+    <TextInput
+      type="datetime-local"
+      label={startLabel}
+      value={start || ''}
+      onChange={(e) => onStartChange(e.target.value || null)}
+    />
+    <TextInput
+      type="datetime-local"
+      label={endLabel}
+      value={end || ''}
+      error={error}
+      onChange={(e) => onEndChange(e.target.value || null)}
+    />
+  </SimpleGrid>
 );
 
 export default DateRangeInputs;
