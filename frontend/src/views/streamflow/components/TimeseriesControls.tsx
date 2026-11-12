@@ -94,21 +94,19 @@ const TimeseriesControls = ({
             <Row className="g-2">
               <Col md={6}>
                 <Form.Group>
-                  <Form.Label className="small fw-bold">Variable</Form.Label>
                   <MultiSelectDropdown
-                    options={(Array.isArray(primaryVariables.data)
-                      ? primaryVariables.data
-                      : []
-                    ).map(toDisplayVariableName)}
-                    selected={(primaryFilters.variables || []).map(toDisplayVariableName)}
+                    label="Variable"
+                    data={(Array.isArray(primaryVariables.data) ? primaryVariables.data : []).map(
+                      toDisplayVariableName
+                    )}
+                    value={(primaryFilters.variables || []).map(toDisplayVariableName)}
                     onChange={(displaySelected) =>
                       handlePrimaryFilterChange(
                         'variables',
                         displaySelected.map(fromDisplayVariableName)
                       )
                     }
-                    allSelectedText="All variables"
-                    noneSelectedText="Select variables..."
+                    placeholder="Select variables..."
                   />
                 </Form.Group>
               </Col>
@@ -162,26 +160,24 @@ const TimeseriesControls = ({
             <Row className="g-2">
               <Col md={12}>
                 <Form.Group>
-                  <Form.Label className="small fw-bold">Configurations</Form.Label>
                   <MultiSelectDropdown
-                    options={Array.isArray(configurations.data) ? configurations.data : []}
-                    selected={secondaryFilters.configurations}
+                    label="Configurations"
+                    data={Array.isArray(configurations.data) ? configurations.data : []}
+                    value={secondaryFilters.configurations}
                     onChange={(selected) => handleSecondaryFilterChange('configurations', selected)}
-                    allSelectedText="All configurations"
-                    noneSelectedText="Select configurations..."
+                    placeholder="Select configurations..."
                   />
                 </Form.Group>
               </Col>
 
               <Col md={12}>
                 <Form.Group>
-                  <Form.Label className="small fw-bold">Variable</Form.Label>
                   <MultiSelectDropdown
-                    options={Array.isArray(variables.data) ? variables.data : []}
-                    selected={secondaryFilters.variables}
+                    label="Variable"
+                    data={Array.isArray(variables.data) ? variables.data : []}
+                    value={secondaryFilters.variables}
                     onChange={(selected) => handleSecondaryFilterChange('variables', selected)}
-                    allSelectedText="All variables"
-                    noneSelectedText="Select variables..."
+                    placeholder="Select variables..."
                   />
                 </Form.Group>
               </Col>

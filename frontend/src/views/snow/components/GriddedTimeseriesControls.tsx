@@ -31,17 +31,15 @@ const GriddedTimeseriesControls = ({
       <Form className="flex-grow-1 d-flex flex-column">
         <Row className="g-2">
           <Col md={12}>
-            <Form.Group>
-              <Form.Label className="small fw-bold">Datasets</Form.Label>
-              <MultiSelectDropdown
-                isLoading={datasets.isLoading}
-                options={datasets.data}
-                selected={timeseriesDatasets(timeseriesFilters, activeDataset)}
-                onChange={(selected) => updateTimeseriesFilters({ datasets: selected })}
-                allSelectedText="All datasets"
-                noneSelectedText="Select datasets..."
-              />
-            </Form.Group>
+            <MultiSelectDropdown
+              label="Datasets"
+              loading={datasets.isLoading}
+              disabled={datasets.isLoading}
+              data={datasets.data}
+              value={timeseriesDatasets(timeseriesFilters, activeDataset)}
+              onChange={(selected) => updateTimeseriesFilters({ datasets: selected })}
+              placeholder="Select datasets..."
+            />
           </Col>
 
           <DateRangeInputs

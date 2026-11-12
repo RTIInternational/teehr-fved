@@ -591,16 +591,12 @@ const MetricsTable = ({
             {/* Metrics filter section - moved to top */}
             {tableProperties?.metrics?.length > 0 && (
               <div className="col-12 mb-2">
-                <div id="metrics-filter-label" className="form-label fw-bold mb-1">
-                  Select Metrics
-                </div>
                 <MultiSelectDropdown
-                  options={tableProperties.metrics}
-                  selected={selectedMetrics}
+                  label="Select Metrics"
+                  data={tableProperties.metrics}
+                  value={selectedMetrics}
                   onChange={setUserSelectedMetrics}
-                  allSelectedText="All metrics"
-                  noneSelectedText="No metrics"
-                  labelledBy="metrics-filter-label"
+                  placeholder="No metrics"
                 />
               </div>
             )}
@@ -612,22 +608,17 @@ const MetricsTable = ({
             {headers.slice(0, tableProperties.group_by.length).map((header, index) => {
               const uniqueValues = uniqueValuesByColumn[index] || [];
               const selectedValues = filters[index] || [];
-              const filterLabelId = `group-by-filter-${index}-label`;
 
               return (
                 <div key={index} className="col-lg-4 col-md-6 mb-2">
-                  <div id={filterLabelId} className="form-label fw-bold small mb-1">
-                    {header}
-                  </div>
                   <MultiSelectDropdown
-                    options={uniqueValues}
-                    selected={selectedValues}
+                    label={header}
+                    data={uniqueValues}
+                    value={selectedValues}
                     onChange={(newSelected) =>
                       setFilters((prev) => ({ ...prev, [index]: newSelected }))
                     }
-                    allSelectedText="All"
-                    noneSelectedText="All"
-                    labelledBy={filterLabelId}
+                    placeholder="All"
                   />
                 </div>
               );
