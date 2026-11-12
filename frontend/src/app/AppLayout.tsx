@@ -13,9 +13,9 @@ import { NavBar } from './layout/navbar/NavBar';
 import { DEFAULT_MAP_BOUNDS, mapTransformRequest } from './mapConfig';
 import { MapViewportUrlSync } from './routes/MapViewportUrlSync';
 
-import styles from './App.module.css';
+import styles from './AppLayout.module.css';
 
-export const App = () => {
+export const AppLayout = () => {
   const [opened, { toggle, close }] = useDisclosure();
   const location = useLocation();
   const isMapShellRoute = location.pathname === '/' || location.pathname.startsWith('/map');
@@ -58,4 +58,4 @@ export const App = () => {
   );
 };
 
-export default App;
+export default AppLayout;
