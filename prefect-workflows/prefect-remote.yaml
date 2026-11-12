@@ -234,6 +234,23 @@ deployments:
       cron: "0 15 * * 3"
       active: false
 
+  # CNRFC Ingest
+  - name: ingest-cnrfc-water-supply
+    version:
+    tags: []
+    concurrency_limit:
+      limit: 1
+      collision_strategy: "CANCEL_NEW"
+    description: Ingest CNRFC water supply forecasts and observations; upserts the previous and current water years
+    entrypoint: workflows/ingests/cnrfc_water_supply.py:ingest_cnrfc_water_supply
+    parameters: {
+      "temp_dir_path": *temp_dir_path
+    }
+    work_pool: *work_pool_small
+    schedule:
+      cron: "0 17 * * *"
+      active: false
+
   # Gridded Data Ingests
   - name: ingest-ua-4km-grids
     version:

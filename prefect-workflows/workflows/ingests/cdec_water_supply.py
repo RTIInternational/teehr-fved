@@ -6,7 +6,6 @@ import logging
 
 import pandas as pd
 from prefect import flow, get_run_logger
-from teehr.fetching.utils import write_timeseries_parquet_file
 from teehr.utils.utils import remove_dir_if_exists
 
 from utils.cdec_utils import (
@@ -16,11 +15,11 @@ from utils.cdec_utils import (
     fetch_cdec_csv,
 )
 from utils import water_supply_utils
+from utils.water_supply_utils import PRIMARY_COLUMNS, SECONDARY_COLUMNS
 from workflows.utils.common_utils import (
     get_primary_location_ids,
     get_secondary_location_ids,
     initialize_evaluation,
-    load_to_warehouse,
 )
 from workflows.utils.time_utils import local_time_to_utc
 
@@ -45,12 +44,6 @@ FORECAST_SENSORS = {
     265: (WY_VOLUME, "p90"),
 }
 MONTHLY_FNF_SENSOR = 65  # Monthly full natural flow (AF)
-
-SECONDARY_COLUMNS = [
-    "reference_time", "value_time", "value", "variable_name",
-    "configuration_name", "unit_name", "location_id", "member",
-]
-PRIMARY_COLUMNS = SECONDARY_COLUMNS[:-1]
 
 
 def format_forecasts(df: pd.DataFrame) -> pd.DataFrame:
@@ -113,13 +106,8 @@ def ingest_cdec_water_supply(
     """
     logger = get_run_logger()
 
-    # Evaluated at flow run time, not deployment time
-    last_water_year = water_supply_utils.water_year(pd.Timestamp(end_date or date.today()))
-    if start_date is None:
-        first_water_year = last_water_year - 1
-    else:
-        first_water_year = water_supply_utils.water_year(pd.Timestamp(start_date))
-    logger.info(f"Processing CDEC water years {first_water_year}-{last_water_year}")
+    water_years = water_supply_utils.water_year_range(start_date, end_date)
+    logger.info(f"Processing CDEC water years {water_years[0]}-{water_years[-1]}")
 
     ev = initialize_evaluation(
         temp_dir_path=temp_dir_path,
@@ -145,7 +133,7 @@ def ingest_cdec_water_supply(
 
     # One water year at a time bounds memory and request size for long backfills.
     # Stations without a sensor (e.g. POH has no monthly full natural flow) return no rows.
-    for water_year in range(first_water_year, last_water_year + 1):
+    for water_year in water_years:
         start = date(water_year - 1, 10, 1)
         end = date(water_year, 9, 30)
         timeseries = {}
@@ -158,31 +146,11 @@ def ingest_cdec_water_supply(
                 fetch_cdec_csv(observed_station_ids, [MONTHLY_FNF_SENSOR], "M", start, end),
                 water_year=water_year,
             )
-        for table_name, df in timeseries.items():
-            if df.empty:
-                continue
-            table_dir = Path(cache_dir, table_name)
-            table_dir.mkdir(parents=True, exist_ok=True)
-            write_timeseries_parquet_file(
-                filepath=Path(table_dir, f"wy{water_year}.parquet"),
-                overwrite_output=True,
-                data=df,
-                timeseries_type=table_name.split("_")[0],
-            )
+        water_supply_utils.cache_water_year(cache_dir, water_year, timeseries)
         logger.info(f"✅ Cached CDEC water year {water_year}")
 
     # Configurations and variables are added by warehouse/local/01_setup_local_warehouse.ipynb
-    for table_name in ("secondary_timeseries", "primary_timeseries"):
-        table_dir = Path(cache_dir, table_name)
-        if not any(table_dir.glob("*.parquet")):
-            logger.info(f"No {table_name} data cached. Skipping load.")
-            continue
-        load_to_warehouse(
-            ev=ev,
-            in_path=table_dir,
-            table_name=table_name,
-            write_mode="upsert",
-        )
+    water_supply_utils.load_cached_timeseries(ev, cache_dir)
     logger.info("✅ Completed loading CDEC water supply data into the warehouse")
 
     ev.spark.stop()

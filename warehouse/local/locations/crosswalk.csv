@@ -1,5 +1,7 @@
 primary_location_id,secondary_location_id
 fved-0001,cdec-SBF
+fved-0001,cnrfc-FRAC1
+fved-0002,cnrfc-HIDC1
 fved-0003,cnrfc-POHC1
 fved-0003,nwm12-21609641
 fved-0003,nwm20-21609641
@@ -8,6 +10,7 @@ fved-0003,nwm30-21609641
 fved-0003,nwm31-21609641
 fved-0003,cdec-POH
 fved-0004,cdec-AMF
+fved-0004,cnrfc-FOLC1
 fved-0005,nrcs-12362500:MT:USGS
 fved-0005,nwrfc-HHWM8
 fved-0005,nwm12-22964998
@@ -154,7 +157,9 @@ fved-0056,wgrfc-TBCN5
 fved-0057,nrcs-08247500:NM:USGS
 fved-0057,wgrfc-SAOC2
 fved-0058,nrcs-08316000:NM:USGS
+fved-0059,cnrfc-KLAO3
 fved-0060,cdec-TNL
+fved-0060,cnrfc-CEGC1
 fved-0071,nwrfc-MYKO3
 fved-0088,cbrfc-DLAC2
 fved-0089,nrcs-09152500:CO:USGS
