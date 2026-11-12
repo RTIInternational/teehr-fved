@@ -1,5 +1,5 @@
+import { Button, Grid, Group, Select, Stack, Tabs, Text, TextInput } from '@mantine/core';
 import { useState } from 'react';
-import { Form, Row, Col, Button, Tabs, Tab } from 'react-bootstrap';
 
 import type { TimeseriesRequestFilters } from '@/shared/api/timeseries';
 import MultiSelectDropdown from '@/shared/components/MultiSelectDropdown';
@@ -13,6 +13,8 @@ import {
   isTimestepVariable,
   DURATION_NAME_TO_ISO,
 } from '@/shared/utils/durationUtils';
+
+import styles from './TimeseriesControls.module.css';
 
 export type TimeseriesControlsProps = {
   table: string;
@@ -32,7 +34,7 @@ const TimeseriesControls = ({
   selectedLocation,
   onViewModeChange,
 }: TimeseriesControlsProps) => {
-  const [activeTab, setActiveTab] = useState('observations');
+  const [activeTab, setActiveTab] = useState<string | null>('observations');
 
   const configurations = useDistinctValues(table, 'configuration_name');
   const variables = useDistinctValues(table, 'variable_name');
@@ -81,153 +83,121 @@ const TimeseriesControls = ({
   };
 
   return (
-    <div className="h-100 d-flex flex-column">
-      <Form className="flex-grow-1 d-flex flex-column">
-        <Tabs
-          id="forecast-timeseries-filter-tabs"
-          activeKey={activeTab}
-          onSelect={(key) => setActiveTab(key || 'observations')}
-          className="mb-3"
-          justify
-        >
-          <Tab eventKey="observations" title="Observations (Primary)">
-            <Row className="g-2">
-              <Col md={6}>
-                <Form.Group>
-                  <MultiSelectDropdown
-                    label="Variable"
-                    data={(Array.isArray(primaryVariables.data) ? primaryVariables.data : []).map(
-                      toDisplayVariableName
-                    )}
-                    value={(primaryFilters.variables || []).map(toDisplayVariableName)}
-                    onChange={(displaySelected) =>
-                      handlePrimaryFilterChange(
-                        'variables',
-                        displaySelected.map(fromDisplayVariableName)
-                      )
-                    }
-                    placeholder="Select variables..."
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="small fw-bold">Obs timestep (if available)</Form.Label>
-                  <Form.Select
-                    size="sm"
-                    value={primaryFilters.duration || ''}
-                    disabled={!(primaryFilters.variables || []).some(isTimestepVariable)}
-                    onChange={(e) => handlePrimaryFilterChange('duration', e.target.value)}
-                  >
-                    {Object.entries(DURATION_NAME_TO_ISO).map(([label, iso]) => (
-                      <option key={iso} value={iso}>
-                        {label}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
+    <Stack h="100%" justify="space-between">
+      <Tabs value={activeTab} onChange={setActiveTab}>
+        <Tabs.List grow mb="md">
+          <Tabs.Tab value="observations">Observations (Primary)</Tabs.Tab>
+          <Tabs.Tab value="forecast">Forecast (Secondary)</Tabs.Tab>
+        </Tabs.List>
 
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="small fw-bold">Start Date</Form.Label>
-                  <Form.Control
-                    type="datetime-local"
-                    size="sm"
-                    value={primaryFilters.start_date || ''}
-                    onChange={(e) =>
-                      handlePrimaryFilterChange('start_date', e.target.value || null)
-                    }
-                  />
-                </Form.Group>
-              </Col>
+        <Tabs.Panel value="observations">
+          <Grid gap="sm">
+            <Grid.Col span={6}>
+              <MultiSelectDropdown
+                label="Variable"
+                data={(Array.isArray(primaryVariables.data) ? primaryVariables.data : []).map(
+                  toDisplayVariableName
+                )}
+                value={(primaryFilters.variables || []).map(toDisplayVariableName)}
+                onChange={(displaySelected) =>
+                  handlePrimaryFilterChange(
+                    'variables',
+                    displaySelected.map(fromDisplayVariableName)
+                  )
+                }
+                placeholder="Select variables..."
+              />
+            </Grid.Col>
+            <Grid.Col span={6}>
+              <Select
+                label="Obs timestep (if available)"
+                data={Object.entries(DURATION_NAME_TO_ISO).map(([label, value]) => ({
+                  label,
+                  value,
+                }))}
+                value={primaryFilters.duration || null}
+                allowDeselect={false}
+                disabled={!(primaryFilters.variables || []).some(isTimestepVariable)}
+                onChange={(value) => value && handlePrimaryFilterChange('duration', value)}
+              />
+            </Grid.Col>
 
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="small fw-bold">End Date</Form.Label>
-                  <Form.Control
-                    type="datetime-local"
-                    size="sm"
-                    value={primaryFilters.end_date || ''}
-                    onChange={(e) => handlePrimaryFilterChange('end_date', e.target.value || null)}
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-          </Tab>
+            <Grid.Col span={6}>
+              <TextInput
+                type="datetime-local"
+                label="Start Date"
+                value={primaryFilters.start_date || ''}
+                onChange={(e) => handlePrimaryFilterChange('start_date', e.target.value || null)}
+              />
+            </Grid.Col>
 
-          <Tab eventKey="forecast" title="Forecast (Secondary)">
-            <Row className="g-2">
-              <Col md={12}>
-                <Form.Group>
-                  <MultiSelectDropdown
-                    label="Configurations"
-                    data={Array.isArray(configurations.data) ? configurations.data : []}
-                    value={secondaryFilters.configurations}
-                    onChange={(selected) => handleSecondaryFilterChange('configurations', selected)}
-                    placeholder="Select configurations..."
-                  />
-                </Form.Group>
-              </Col>
+            <Grid.Col span={6}>
+              <TextInput
+                type="datetime-local"
+                label="End Date"
+                value={primaryFilters.end_date || ''}
+                onChange={(e) => handlePrimaryFilterChange('end_date', e.target.value || null)}
+              />
+            </Grid.Col>
+          </Grid>
+        </Tabs.Panel>
 
-              <Col md={12}>
-                <Form.Group>
-                  <MultiSelectDropdown
-                    label="Variable"
-                    data={Array.isArray(variables.data) ? variables.data : []}
-                    value={secondaryFilters.variables}
-                    onChange={(selected) => handleSecondaryFilterChange('variables', selected)}
-                    placeholder="Select variables..."
-                  />
-                </Form.Group>
-              </Col>
+        <Tabs.Panel value="forecast">
+          <Grid gap="sm">
+            <Grid.Col span={12}>
+              <MultiSelectDropdown
+                label="Configurations"
+                data={Array.isArray(configurations.data) ? configurations.data : []}
+                value={secondaryFilters.configurations}
+                onChange={(selected) => handleSecondaryFilterChange('configurations', selected)}
+                placeholder="Select configurations..."
+              />
+            </Grid.Col>
 
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="small fw-bold">Reference Start Date</Form.Label>
-                  <Form.Control
-                    type="datetime-local"
-                    size="sm"
-                    value={secondaryFilters.reference_start_date || ''}
-                    onChange={(e) =>
-                      handleSecondaryFilterChange('reference_start_date', e.target.value || null)
-                    }
-                  />
-                </Form.Group>
-              </Col>
+            <Grid.Col span={12}>
+              <MultiSelectDropdown
+                label="Variable"
+                data={Array.isArray(variables.data) ? variables.data : []}
+                value={secondaryFilters.variables}
+                onChange={(selected) => handleSecondaryFilterChange('variables', selected)}
+                placeholder="Select variables..."
+              />
+            </Grid.Col>
 
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="small fw-bold">Reference End Date</Form.Label>
-                  <Form.Control
-                    type="datetime-local"
-                    size="sm"
-                    value={secondaryFilters.reference_end_date || ''}
-                    onChange={(e) =>
-                      handleSecondaryFilterChange('reference_end_date', e.target.value || null)
-                    }
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-          </Tab>
-        </Tabs>
+            <Grid.Col span={6}>
+              <TextInput
+                type="datetime-local"
+                label="Reference Start Date"
+                value={secondaryFilters.reference_start_date || ''}
+                onChange={(e) =>
+                  handleSecondaryFilterChange('reference_start_date', e.target.value || null)
+                }
+              />
+            </Grid.Col>
 
-        <div className="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
-          <div className="small text-muted">
-            Configure observations and forecast independently, then load.
-          </div>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleLoadData}
-            disabled={!canLoadTimeseries}
-          >
-            Load Timeseries Data
-          </Button>
-        </div>
-      </Form>
-    </div>
+            <Grid.Col span={6}>
+              <TextInput
+                type="datetime-local"
+                label="Reference End Date"
+                value={secondaryFilters.reference_end_date || ''}
+                onChange={(e) =>
+                  handleSecondaryFilterChange('reference_end_date', e.target.value || null)
+                }
+              />
+            </Grid.Col>
+          </Grid>
+        </Tabs.Panel>
+      </Tabs>
+
+      <Group justify="space-between" pt="xs" className={styles.footer}>
+        <Text size="sm" c="dimmed">
+          Configure observations and forecast independently, then load.
+        </Text>
+        <Button size="sm" onClick={handleLoadData} disabled={!canLoadTimeseries}>
+          Load Timeseries Data
+        </Button>
+      </Group>
+    </Stack>
   );
 };
 
