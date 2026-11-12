@@ -7,8 +7,6 @@ import pandas as pd
 import requests
 from prefect import task, get_run_logger
 
-import teehr
-
 from utils.water_supply_utils import AF_TO_CUBIC_METERS
 
 
@@ -22,20 +20,6 @@ CDEC_TIME_ZONE = "America/Los_Angeles"
 UNIT_CONVERSIONS = {
     "AF": ("m^3", AF_TO_CUBIC_METERS),
 }
-
-
-def get_cdec_station_ids(ev: teehr.Evaluation) -> List[str]:
-    """CDEC station IDs crosswalked to a location, without the ``cdec-`` prefix."""
-    crosswalks_df = ev.location_crosswalks.filter(
-        {
-            "column": "secondary_location_id",
-            "operator": "like",
-            "value": f"{LOCATION_ID_PREFIX}-%"
-        }
-    ).to_pandas()
-    return sorted(
-        crosswalks_df["secondary_location_id"].str.split("-", n=1).str[1].unique()
-    )
 
 
 @task(retries=2, retry_delay_seconds=30)

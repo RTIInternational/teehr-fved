@@ -1,4 +1,4 @@
-from typing import Union, Dict
+from typing import Union, Dict, List
 from pathlib import Path
 import os
 import shutil
@@ -66,6 +66,40 @@ def initialize_evaluation(
         temp_dir_path=temp_dir_path,
     )
     return ev
+
+
+def _source_ids(table, column: str, prefix: str) -> set:
+    """IDs in ``column`` starting with ``{prefix}-``, without the prefix."""
+    if table.to_sdf() is None:
+        raise ValueError(
+            f"The {table.table_name} table does not exist. "
+            "Apply the warehouse migrations before running this flow."
+        )
+    df = table.filter(
+        {"column": column, "operator": "like", "value": f"{prefix}-%"}
+    ).to_pandas()
+    return set(df[column].str.split("-", n=1).str[1])
+
+
+def get_primary_location_ids(ev: teehr.Evaluation, prefix: str) -> List[str]:
+    """Source IDs that primary timeseries can be loaded for.
+
+    Primary location IDs must be in ``locations`` or ``location_id_aliases``.
+    """
+    return sorted(
+        _source_ids(ev.locations, "id", prefix)
+        | _source_ids(ev.location_id_aliases, "location_id_alias", prefix)
+    )
+
+
+def get_secondary_location_ids(ev: teehr.Evaluation, prefix: str) -> List[str]:
+    """Source IDs that secondary timeseries can be loaded for.
+
+    Secondary location IDs must be in ``location_crosswalks``.
+    """
+    return sorted(
+        _source_ids(ev.location_crosswalks, "secondary_location_id", prefix)
+    )
 
 
 @task(cache_policy=NO_CACHE)

@@ -14,10 +14,11 @@ from utils.cdec_utils import (
     LOCATION_ID_PREFIX,
     convert_cdec_units,
     fetch_cdec_csv,
-    get_cdec_station_ids,
 )
 from utils import water_supply_utils
 from workflows.utils.common_utils import (
+    get_primary_location_ids,
+    get_secondary_location_ids,
     initialize_evaluation,
     load_to_warehouse,
 )
@@ -128,12 +129,16 @@ def ingest_cdec_water_supply(
         }
     )
 
-    station_ids = get_cdec_station_ids(ev)
-    if not station_ids:
-        logger.warning("No CDEC stations found in the location crosswalks. Skipping.")
+    # Forecasts only for crosswalked stations, observations only for aliased
+    # ones, so every row passes the warehouse location checks
+    forecast_station_ids = get_secondary_location_ids(ev, LOCATION_ID_PREFIX)
+    observed_station_ids = get_primary_location_ids(ev, LOCATION_ID_PREFIX)
+    if not forecast_station_ids and not observed_station_ids:
+        logger.warning("No CDEC stations found in the location tables. Skipping.")
         ev.spark.stop()
         return
-    logger.info(f"CDEC stations: {station_ids}")
+    logger.info(f"CDEC forecast stations: {forecast_station_ids}")
+    logger.info(f"CDEC observation stations: {observed_station_ids}")
 
     cache_dir = Path(ev.cache_dir, "fetching", "cdec_water_supply")
     remove_dir_if_exists(cache_dir)
@@ -143,15 +148,16 @@ def ingest_cdec_water_supply(
     for water_year in range(first_water_year, last_water_year + 1):
         start = date(water_year - 1, 10, 1)
         end = date(water_year, 9, 30)
-        timeseries = {
-            "secondary_timeseries": format_forecasts(
-                fetch_cdec_csv(station_ids, list(FORECAST_SENSORS), "E", start, end)
-            ),
-            "primary_timeseries": format_observations(
-                fetch_cdec_csv(station_ids, [MONTHLY_FNF_SENSOR], "M", start, end),
+        timeseries = {}
+        if forecast_station_ids:
+            timeseries["secondary_timeseries"] = format_forecasts(
+                fetch_cdec_csv(forecast_station_ids, list(FORECAST_SENSORS), "E", start, end)
+            )
+        if observed_station_ids:
+            timeseries["primary_timeseries"] = format_observations(
+                fetch_cdec_csv(observed_station_ids, [MONTHLY_FNF_SENSOR], "M", start, end),
                 water_year=water_year,
-            ),
-        }
+            )
         for table_name, df in timeseries.items():
             if df.empty:
                 continue
