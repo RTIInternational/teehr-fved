@@ -2,7 +2,6 @@ import { AppShell, Box, Burger } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useEffect, useState } from 'react';
 
-import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import { Outlet, useLocation } from 'react-router-dom';
 
