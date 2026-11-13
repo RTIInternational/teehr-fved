@@ -93,6 +93,7 @@ const StreamflowContent = () => {
           onError={handleMapError}
         />
       }
+      topLeft={<MapLegend metric={mapFilters.metricName} />}
       topRight={
         <>
           {state.error && (
@@ -129,7 +130,6 @@ const StreamflowContent = () => {
             mapFilters={mapFilters}
             updateMapFilters={updateMapFilters}
           />
-          <MapLegend metric={mapFilters.metricName} />
         </>
       }
       bottom={
