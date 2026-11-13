@@ -29,9 +29,7 @@ export const AppLayout = () => {
 
   return (
     <MapProvider>
-      <AppShell
-        navbar={{ breakpoint: NAV_BREAKPOINT, width: 250, collapsed: { mobile: !opened } }}
-      >
+      <AppShell navbar={{ breakpoint: NAV_BREAKPOINT, width: 250, collapsed: { mobile: !opened } }}>
         <Box hiddenFrom={NAV_BREAKPOINT} className={styles.mobileMenuToggle}>
           <Burger opened={opened} onClick={toggle} size="sm" aria-label="Toggle navigation" />
         </Box>

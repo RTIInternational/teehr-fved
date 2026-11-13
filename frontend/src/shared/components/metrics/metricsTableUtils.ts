@@ -74,7 +74,9 @@ export const pivotMetrics = (
 
   const metricFields = tableProperties.metrics.filter((field) => selectedMetrics.includes(field));
   const headers = [...groupByFields, ...metricFields];
-  const rows = ordered.map((item) => headers.map((header) => formatCellValue(header, item[header])));
+  const rows = ordered.map((item) =>
+    headers.map((header) => formatCellValue(header, item[header]))
+  );
 
   return { headers, rows, groupByCount: groupByFields.length };
 };

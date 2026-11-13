@@ -33,7 +33,11 @@ export const useMetricsTableData = (
     return userSelectedMetrics.filter((metric) => current.includes(metric));
   }, [userSelectedMetrics, availableMetrics]);
 
-  const { headers, rows: allRows, groupByCount } = useMemo(
+  const {
+    headers,
+    rows: allRows,
+    groupByCount,
+  } = useMemo(
     () => pivotMetrics(metrics, tableProperties, selectedMetrics),
     [metrics, tableProperties, selectedMetrics]
   );

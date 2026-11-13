@@ -1,4 +1,14 @@
-import { Accordion, Anchor, Container, Group, List, Paper, Stack, Text, Title } from '@mantine/core';
+import {
+  Accordion,
+  Anchor,
+  Container,
+  Group,
+  List,
+  Paper,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import type { ReactNode } from 'react';
 
 import teehrCloudServicesDiagram from '@/assets/cloud-services-image.png';
@@ -10,7 +20,8 @@ import styles from './Home.module.css';
 
 const DASHBOARDS_URL = 'https://dashboards.teehr.rtiamanzi.org/';
 const GITHUB_MARK = 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
-const TEEHR_README_IMAGES = 'https://github.com/RTIInternational/teehr/blob/main/docs/images/readme';
+const TEEHR_README_IMAGES =
+  'https://github.com/RTIInternational/teehr/blob/main/docs/images/readme';
 
 const TEEHR_PYTHON_FEATURES = [
   {
@@ -143,10 +154,10 @@ const Home = () => {
               <Accordion.Control>Data Warehouse</Accordion.Control>
               <Accordion.Panel>
                 <Text>
-                  The TEEHR data warehouse is the core data layer for model, observation, and derived
-                  "Evaluation-Ready" products. Built on Apache Iceberg, it enables scalable storage,
-                  query performance for continental datasets, and standardized access patterns used
-                  across notebooks, services, and dashboards.
+                  The TEEHR data warehouse is the core data layer for model, observation, and
+                  derived "Evaluation-Ready" products. Built on Apache Iceberg, it enables scalable
+                  storage, query performance for continental datasets, and standardized access
+                  patterns used across notebooks, services, and dashboards.
                 </Text>
                 <img
                   src={teehrIcebergDiagram}
@@ -191,7 +202,8 @@ const Home = () => {
                 <Text>
                   In addition to simulated and observed hydrologic data, the warehouse also contains
                   tables storing historical and regularly-updated performance metrics and other
-                  tables supporting the <ExternalLink href={DASHBOARDS_URL}>TEEHR Dashboards</ExternalLink>.
+                  tables supporting the{' '}
+                  <ExternalLink href={DASHBOARDS_URL}>TEEHR Dashboards</ExternalLink>.
                 </Text>
               </Accordion.Panel>
             </Accordion.Item>
@@ -245,9 +257,9 @@ const Home = () => {
           />
           <Text>
             Funding for this project was provided by the National Oceanic & Atmospheric
-            Administration (NOAA), awarded to the Cooperative Institute for Research to Operations in
-            Hydrology (CIROH) through the NOAA Cooperative Agreement with The University of Alabama
-            (NA22NWS4320003).
+            Administration (NOAA), awarded to the Cooperative Institute for Research to Operations
+            in Hydrology (CIROH) through the NOAA Cooperative Agreement with The University of
+            Alabama (NA22NWS4320003).
           </Text>
         </Group>
 
