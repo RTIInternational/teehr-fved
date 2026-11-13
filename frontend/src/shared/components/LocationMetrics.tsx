@@ -1,101 +1,98 @@
-import { useState } from 'react';
-import { Card, Form, ButtonGroup, Button } from 'react-bootstrap';
+import { Group, SegmentedControl, Select } from '@mantine/core';
+import { IconChartLine, IconFilter, IconTable } from '@tabler/icons-react';
+import { useState, type ReactNode } from 'react';
 
 import MetricsTable from '@/shared/components/MetricsTable';
 import { useMetricsByLocation } from '@/shared/queries/metrics';
 import { useTableProperties } from '@/shared/queries/queryables';
 import type { MapLocation } from '@/shared/types/locations';
 
+import styles from './LocationMetrics.module.css';
+
+type ViewMode = 'filters' | 'plot' | 'table';
+
 type LocationMetricsProps = {
   selectedLocation: MapLocation;
   tables: string[];
 };
 
+const viewOption = (value: ViewMode, icon: ReactNode, label: string) => ({
+  value,
+  label: (
+    <Group gap={6} wrap="nowrap">
+      {icon}
+      <span>{label}</span>
+    </Group>
+  ),
+});
+
 const LocationMetrics = ({ selectedLocation, tables }: LocationMetricsProps) => {
   const { data: tableProperties = {} } = useTableProperties(tables);
 
-  // State for selected table and view mode
   const [selectedTable, setSelectedTable] = useState(tables[0] || null);
-  const [viewMode, setViewMode] = useState<'filters' | 'plot' | 'table'>('table');
+  const [requestedViewMode, setViewMode] = useState<ViewMode>('table');
 
   const metrics = useMetricsByLocation(selectedLocation?.primary_location_id, selectedTable);
 
   // Check if current table has group_by fields for filter capability
-  const hasFilters = selectedTable && tableProperties[selectedTable]?.group_by?.length > 0;
+  const hasFilters = Boolean(selectedTable && tableProperties[selectedTable]?.group_by?.length > 0);
 
   // Check if current table has lead time bins for plot capability
-  const hasLeadTimeBin =
+  const hasLeadTimeBin = Boolean(
     selectedTable &&
     tableProperties[selectedTable]?.group_by?.some(
       (field: string) =>
         field.toLowerCase().includes('lead_time_bin') ||
         field.toLowerCase().includes('forecast_lead_time_bin')
-    );
+    )
+  );
+
+  // A view the selected table doesn't support (e.g. Plot after switching to a table
+  // without lead time bins) falls back to the table
+  const viewMode =
+    (requestedViewMode === 'filters' && !hasFilters) ||
+    (requestedViewMode === 'plot' && !hasLeadTimeBin)
+      ? 'table'
+      : requestedViewMode;
 
   if (!selectedLocation) {
     return null;
   }
 
+  const viewOptions = [
+    ...(hasFilters ? [viewOption('filters', <IconFilter size={14} />, 'Filters')] : []),
+    viewOption('table', <IconTable size={14} />, 'Table'),
+    ...(hasLeadTimeBin ? [viewOption('plot', <IconChartLine size={14} />, 'Plot')] : []),
+  ];
+
   return (
-    <Card
-      className="shadow-lg h-100"
-      style={{ borderRadius: '8px', display: 'flex', flexDirection: 'column' }}
-    >
-      <Card.Header className="py-2 d-flex justify-content-between align-items-center">
-        <div className="d-flex align-items-center gap-2">
-          <Card.Title as="h6" className="mb-0">
-            📊 Metrics
-          </Card.Title>
-          {tables.length > 1 && (
-            <Form.Select
-              size="sm"
-              value={selectedTable || ''}
-              onChange={(e) => setSelectedTable(e.target.value)}
-              style={{ width: 'auto', minWidth: '200px' }}
-            >
-              <option value="">Select Table...</option>
-              {tables.map((tableName) => {
-                const description = tableProperties[tableName]?.description || tableName;
-                return (
-                  <option key={tableName} value={tableName}>
-                    {description}
-                  </option>
-                );
-              })}
-            </Form.Select>
-          )}
-          {(hasLeadTimeBin || hasFilters) && (
-            <ButtonGroup size="sm">
-              {hasFilters && (
-                <Button
-                  variant={viewMode === 'filters' ? 'primary' : 'outline-primary'}
-                  onClick={() => setViewMode('filters')}
-                  style={{ fontSize: '11px' }}
-                >
-                  🔍 Filters
-                </Button>
-              )}
-              <Button
-                variant={viewMode === 'table' ? 'primary' : 'outline-primary'}
-                onClick={() => setViewMode('table')}
-                style={{ fontSize: '11px' }}
-              >
-                📊 Table
-              </Button>
-              {hasLeadTimeBin && (
-                <Button
-                  variant={viewMode === 'plot' ? 'primary' : 'outline-primary'}
-                  onClick={() => setViewMode('plot')}
-                  style={{ fontSize: '11px' }}
-                >
-                  📈 Plot
-                </Button>
-              )}
-            </ButtonGroup>
-          )}
-        </div>
-      </Card.Header>
-      <Card.Body className="p-0 flex-grow-1" style={{ overflow: 'hidden', minHeight: 0 }}>
+    <div className={styles.panel}>
+      <Group justify="space-between" wrap="nowrap" gap="xs" className={styles.toolbar}>
+        {tables.length > 1 && (
+          <Select
+            aria-label="Metrics table"
+            size="xs"
+            data={tables.map((tableName) => ({
+              value: tableName,
+              label: tableProperties[tableName]?.description || tableName,
+            }))}
+            value={selectedTable}
+            onChange={(value) => value && setSelectedTable(value)}
+            allowDeselect={false}
+            className={styles.tableSelect}
+          />
+        )}
+        {(hasLeadTimeBin || hasFilters) && (
+          <SegmentedControl
+            size="xs"
+            value={viewMode}
+            onChange={(value) => setViewMode(value as ViewMode)}
+            data={viewOptions}
+            className={styles.viewToggle}
+          />
+        )}
+      </Group>
+      <div className={styles.body}>
         <MetricsTable
           metrics={metrics.data}
           loading={metrics.isLoading}
@@ -111,8 +108,8 @@ const LocationMetrics = ({ selectedLocation, tables }: LocationMetricsProps) => 
           viewMode={viewMode}
           onViewModeChange={setViewMode}
         />
-      </Card.Body>
-    </Card>
+      </div>
+    </div>
   );
 };
 
