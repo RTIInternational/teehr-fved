@@ -217,6 +217,23 @@ deployments:
       cron: "29 * * * *"
       active: false
 
+  # NRCS Ingest
+  - name: ingest-nrcs-streamflow-forecasts-observations
+    version:
+    tags: []
+    concurrency_limit:
+      limit: 1
+      collision_strategy: "CANCEL_NEW"
+    description: Ingest NRCS AWDB streamflow forecasts and observations
+    entrypoint: workflows/ingests/nrcs_streamflow_forecasts_observations.py:ingest_nrcs_streamflow_forecasts_observations
+    parameters: {
+      "temp_dir_path": *temp_dir_path
+    }
+    work_pool: *work_pool_medium
+    # schedule: 
+    #   cron: "0 9 1,15 * *"
+    #   active: false
+
   # Gridded Data Ingests
   - name: ingest-ua-4km-grids
     version:

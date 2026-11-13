@@ -118,6 +118,18 @@ deployments:
     }
     work_pool: *work_pool
 
+  # NRCS Ingest
+  - name: ingest-nrcs-streamflow-forecasts-observations
+    version:
+    tags: []
+    description: Ingest NRCS AWDB streamflow forecasts and observations
+    entrypoint: workflows/ingests/nrcs_streamflow_forecasts_observations.py:ingest_nrcs_streamflow_forecasts_observations
+    parameters: {
+      "temp_dir_path": *temp_dir_path, 
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
   # Gridded Data Ingests
   - name: ingest-ua-4km-grids
     version:
