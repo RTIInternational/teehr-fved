@@ -1,0 +1,53 @@
+[project]
+name = "wsf-inference"
+version = "0.1.0"
+description = "Shared environment for the three water supply forecast inference packages"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pip",
+    "pytest",
+    "numpy<=2.5.4",
+    "pandas<=3.1.1",
+    "scipy<=1.18.1",
+    "scikit-learn<=1.9.1",
+    "joblib<=1.6.0",
+    "pyarrow<=26.0.1",
+    "catboost<=1.2.10",
+    "lightgbm<=4.7.0",
+    "torch<=2.14.1",
+    "pytorch-lightning<=2.6.6",
+    "tensorboard<=2.21.0",
+    "xarray<=2026.9.0",
+    "netcdf4<=1.7.4",
+    "rioxarray<=0.24.0",
+    "rasterio<=1.5.2",
+    "geopandas<=1.2.0",
+    "fiona<=1.10.1",
+    "shapely<=2.2.0",
+    "pyproj<=3.8.0",
+    "rtree<=1.4.1",
+    "cdsapi<=0.7.7",
+    "dataretrieval<=1.4.0",
+    "requests<=2.34.2",
+    "loguru<=0.7.3",
+    "python-dotenv<=1.2.4",
+    "tqdm<=4.70.1",
+    "typer<=0.28.0",
+    "pyyaml<=6.0.3",
+    "pytorch-optimizer<=4.1.0",
+    "wsfr-download",
+    "wsfr-read",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+wsfr-download = { git = "https://github.com/pdmich/water-supply-forecast-rodeo-runtime.git", rev = "1069a65c89eb62556cb2931e881479a2fd0f1a2d", subdirectory = "data_download" }
+wsfr-read = { git = "https://github.com/drivendataorg/water-supply-forecast-rodeo-runtime.git", rev = "6bda07bc8ef91682377d77021a20b30028072771", subdirectory = "data_reading" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

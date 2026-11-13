@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import sys
+import time
 from datetime import date
 from pathlib import Path
 
@@ -24,6 +25,8 @@ import requests
 AWDB = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1/data"
 NWRFC = "https://www.nwrfc.noaa.gov/natural/nat_norm_text.cgi"
 COLUMNS = ["site_id", "forecast_year", "year", "month", "volume"]
+NWRFC_ATTEMPTS = 4
+NWRFC_BACKOFF_S = 5
 
 
 def forecast_year(issue_date: date) -> int:
@@ -53,8 +56,21 @@ def fetch_awdb(triplet: str, fy: int, issue_date: date) -> pd.DataFrame:
 
 
 def fetch_nwrfc(rfc_id: str, fy: int) -> pd.DataFrame:
-    r = requests.get(NWRFC, params=dict(id=rfc_id), timeout=60)
-    r.raise_for_status()
+    for attempt in range(1, NWRFC_ATTEMPTS + 1):
+        try:
+            r = requests.get(NWRFC, params=dict(id=rfc_id), timeout=60)
+            r.raise_for_status()
+            break
+        except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as error:
+            if isinstance(error, requests.HTTPError) and (
+                error.response is None or error.response.status_code not in (429, 500, 502, 503, 504)
+            ):
+                raise
+            if attempt == NWRFC_ATTEMPTS:
+                raise
+            wait = NWRFC_BACKOFF_S * attempt
+            print(f"WARNING NWRFC {rfc_id}: {error}; retrying in {wait}s (attempt {attempt}/{NWRFC_ATTEMPTS})", file=sys.stderr)
+            time.sleep(wait)
     lines = [ln for ln in r.text.replace("<br>", "\n").splitlines() if ln.startswith(rfc_id + ",") or ln.startswith("ID,")]
     wide = pd.read_csv(io.StringIO("\n".join(lines)))
     long = wide.melt(id_vars=["ID", "Calendar Year"], var_name="mon", value_name="volume").dropna(subset=["volume"])

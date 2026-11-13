@@ -21,7 +21,6 @@ from . import download, monthly_flow
 TIMEOUT = 30
 AWDB = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1/data"
 CDEC = "https://cdec.water.ca.gov/dynamicapp/req/JSONDataServlet"
-NWIS = "https://waterservices.usgs.gov/nwis/dv/"
 RISE = "https://data.usbr.gov/rise/api/result/download"
 PDSI = (
     "https://thredds.northwestknowledge.net/thredds/ncss/agg_met_pdsi_1979_CurrentYear_CONUS.nc"
@@ -75,10 +74,17 @@ def cdec(today: date):
 
 
 def nwis(today: date):
-    r = requests.get(NWIS, timeout=TIMEOUT, params=dict(format="json", sites="12362500", parameterCd="00060", period="P7D"))
-    r.raise_for_status()
-    ts = r.json()["value"]["timeSeries"][0]["values"][0]["value"]
-    return _age_status(pd.to_datetime(ts[-1]["dateTime"]).tz_localize(None), today, 3)
+    from dataretrieval import waterdata
+
+    frame, _ = waterdata.get_daily(
+        monitoring_location_id="USGS-12362500", parameter_code="00060", statistic_id="00003",
+        time=f"{(today - timedelta(days=7)).isoformat()}/{today.isoformat()}",
+    )
+    if frame.empty:
+        return FAIL, "no data returned"
+    usable = pd.to_numeric(frame["value"], errors="coerce").notna()
+    newest = pd.to_datetime(frame.loc[usable, "time"], utc=True).max()
+    return _age_status(newest.tz_localize(None) if pd.notna(newest) else None, today, 3)
 
 
 def rise(today: date):

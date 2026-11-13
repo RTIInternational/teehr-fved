@@ -25,7 +25,7 @@ Every package: downloads its own inputs for an issue date, runs the trained mode
 Run everything from the package folder. Replace the three `<...>` values from the table above.
 
 ```bash
-cd prefect-workflows/wsfr_inference/<folder>
+cd inference/<folder>
 micromamba create -f environment.yml
 eval "$(micromamba shell hook --shell bash)"
 micromamba activate <env name>
@@ -57,6 +57,27 @@ python -m rasyidstat_infer  fetch-assets --from ~/wsf-assets/rasyidstat_3rd
 
 Local directories need `rsync`; `s3://` sources need the AWS CLI (`aws s3 sync`). Use an absolute path (a literal `~` is only expanded by your shell).
 
+### Shared Python 3.12 environment with uv
+
+[`pyproject.toml`](pyproject.toml) and [`uv.lock`](uv.lock) provide one environment for all three packages without conda or
+micromamba. The package list comes from [`environment-py313.yml`](environment-py313.yml), with its versions used as upper
+bounds so uv can select Python 3.12-compatible releases (for example, rioxarray 0.24.0 requires Python 3.13). The lockfile
+records exact resolved versions and CPU-only PyTorch. `wsfr-download` is pinned to commit
+`9f6e29d3f3157b7be2281ce2811bfd23c2988f2b` of the
+[maintained fork](https://github.com/pdmich/water-supply-forecast-rodeo-runtime), which uses the modern USGS API;
+`wsfr-read` retains its original competition revision. GNU `patch` is a system prerequisite, not a Python dependency;
+install it separately if needed.
+
+```bash
+cd inference
+uv sync --locked --python 3.12
+source .venv/bin/activate
+# Then cd into a package folder, export PYTHONPATH=$PWD, and run python -m <package> as above.
+```
+
+The environment lives at `inference/.venv`; `.python-version` selects Python 3.12. To recreate it, run the same `uv sync`
+command. This environment still needs manual model validation; the conda environments remain available as references.
+
 ### Optional: one shared Python 3.13 environment for all three packages
 
 [`environment-py313.yml`](environment-py313.yml) (env `wsf_py313`) replaces the three per-package Python 3.10 environments with a single
@@ -64,7 +85,7 @@ one using current library versions (numpy 2, pandas 3, scikit-learn 1.9, torch 2
 not retrained; the code differences are handled by the patches in each package's `patches/` (see each `CHANGES.md`).
 
 ```bash
-cd prefect-workflows/wsfr_inference
+cd inference
 micromamba create -f environment-py313.yml
 micromamba activate wsf_py313
 # then, per package, from its folder: export PYTHONPATH=$PWD and run `python -m <package> ...` exactly as above
@@ -88,7 +109,7 @@ Quick start for all three, once each env/assets are set up:
 
 ```bash
 for p in oshbocker_1st:oshbocker_infer ckua_2nd:ckua_infer rasyidstat_3rd:rasyidstat_infer; do
-  (cd prefect-workflows/wsfr_inference/${p%%:*} && PYTHONPATH=$PWD micromamba run -n ${p##*:} python -m ${p##*:} run --issue-date 2026-03-01 --root "$WSF_ROOT")
+  (cd inference/${p%%:*} && PYTHONPATH=$PWD micromamba run -n ${p##*:} python -m ${p##*:} run --issue-date 2026-03-01 --root "$WSF_ROOT")
 done
 ```
 
