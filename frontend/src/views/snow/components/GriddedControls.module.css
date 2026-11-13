@@ -1,0 +1,19 @@
+.timestepInput {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.timestepInputField {
+  text-align: center;
+}
+
+/* Section headers read as compact captions inside the 380px layers popover. */
+.sectionControl {
+  padding-inline: 0;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+}
+
+.sectionItem {
+  border: none;
+}
