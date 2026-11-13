@@ -28,32 +28,30 @@ export const AppLayout = () => {
   }, [location.pathname, close]);
 
   return (
-    <div className="App">
-      <MapProvider>
-        <AppShell
-          navbar={{ breakpoint: NAV_BREAKPOINT, width: 250, collapsed: { mobile: !opened } }}
-        >
-          <Box hiddenFrom={NAV_BREAKPOINT} className={styles.mobileMenuToggle}>
-            <Burger opened={opened} onClick={toggle} size="sm" aria-label="Toggle navigation" />
-          </Box>
-          <AppShell.Navbar>
-            <NavBar />
-          </AppShell.Navbar>
-          <AppShell.Main>
-            <MapViewportUrlSync enabled={isMapShellRoute} />
-            {mapRequested && (
-              <MapStage
-                className={styles.mapLayer}
-                initialBounds={DEFAULT_MAP_BOUNDS}
-                transformRequest={mapTransformRequest}
-                hidden={!isMapShellRoute}
-              />
-            )}
-            <Outlet />
-          </AppShell.Main>
-        </AppShell>
-      </MapProvider>
-    </div>
+    <MapProvider>
+      <AppShell
+        navbar={{ breakpoint: NAV_BREAKPOINT, width: 250, collapsed: { mobile: !opened } }}
+      >
+        <Box hiddenFrom={NAV_BREAKPOINT} className={styles.mobileMenuToggle}>
+          <Burger opened={opened} onClick={toggle} size="sm" aria-label="Toggle navigation" />
+        </Box>
+        <AppShell.Navbar>
+          <NavBar />
+        </AppShell.Navbar>
+        <AppShell.Main>
+          <MapViewportUrlSync enabled={isMapShellRoute} />
+          {mapRequested && (
+            <MapStage
+              className={styles.mapLayer}
+              initialBounds={DEFAULT_MAP_BOUNDS}
+              transformRequest={mapTransformRequest}
+              hidden={!isMapShellRoute}
+            />
+          )}
+          <Outlet />
+        </AppShell.Main>
+      </AppShell>
+    </MapProvider>
   );
 };
 

@@ -1,17 +1,8 @@
-/* Custom styles for TEEHR Dashboard */
+/* App-wide styles that Mantine doesn't cover. */
 
+/* The app shell and map fill the viewport. */
+html,
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
-    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  margin: 0;
-  padding: 0;
-  height: 100%;
-}
-
-html {
   height: 100%;
 }
 
@@ -19,23 +10,7 @@ html {
   height: 100vh;
 }
 
-/* Ensure proper Bootstrap spacing */
-.container-fluid {
-  padding: 0;
-}
-
-/* Custom card styling */
-.card {
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-  border: 1px solid rgba(0, 0, 0, 0.125);
-}
-
-.card-header {
-  background-color: #f8f9fa;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.125);
-}
-
-/* Map container styling */
+/* MapLibre popups (built from HTML strings, so not Mantine-styled) */
 .maplibregl-popup {
   max-width: 300px;
 }
@@ -45,59 +20,11 @@ html {
   border-radius: 6px;
 }
 
-/* Form styling */
-.form-select,
-.form-control {
-  font-size: 0.9rem;
-}
-
-.form-label {
-  font-weight: 600;
-  color: #495057;
-}
-
-/* Loading states */
-.spinner-border-sm {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .sidebar {
-    height: auto;
-    min-height: 100vh;
-  }
-
-  .card-body {
-    padding: 1rem;
-  }
-}
-
-/* Plotly overrides */
+/* Plotly modebar: blend into the chart instead of a solid bar */
 .js-plotly-plot .plotly .modebar {
   background: transparent;
 }
 
 .js-plotly-plot .plotly .modebar-btn {
   background: rgba(255, 255, 255, 0.7);
-}
-
-/* Alert styling */
-.alert {
-  border-radius: 6px;
-}
-
-/* Small text improvements */
-.small {
-  font-size: 0.875rem;
-}
-
-.text-muted {
-  color: #6c757d !important;
-}
-
-/* Main content padding when navbar is present */
-main {
-  padding-top: 0;
 }
