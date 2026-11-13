@@ -2,6 +2,7 @@
 // with Mantine's styles, and Mantine wins ties with Bootstrap's.
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@mantine/core/styles.css';
+import '@mantine/dates/styles.css';
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 

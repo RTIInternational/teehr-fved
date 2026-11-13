@@ -7,6 +7,10 @@
   text-align: center;
 }
 
+.timeSelect {
+  flex: 0 0 5.5rem;
+}
+
 /* Section headers read as compact captions inside the 380px layers popover. */
 .sectionControl {
   padding-inline: 0;
