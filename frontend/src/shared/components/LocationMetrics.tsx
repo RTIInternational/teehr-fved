@@ -2,21 +2,20 @@ import { Group, SegmentedControl, Select } from '@mantine/core';
 import { IconChartLine, IconFilter, IconTable } from '@tabler/icons-react';
 import { useState, type ReactNode } from 'react';
 
-import MetricsTable from '@/shared/components/MetricsTable';
+import MetricsTable, { type MetricsViewMode } from '@/shared/components/metrics/MetricsTable';
+import { isLeadTimeBinField } from '@/shared/components/metrics/metricsTableUtils';
 import { useMetricsByLocation } from '@/shared/queries/metrics';
 import { useTableProperties } from '@/shared/queries/queryables';
 import type { MapLocation } from '@/shared/types/locations';
 
 import styles from './LocationMetrics.module.css';
 
-type ViewMode = 'filters' | 'plot' | 'table';
-
 type LocationMetricsProps = {
   selectedLocation: MapLocation;
   tables: string[];
 };
 
-const viewOption = (value: ViewMode, icon: ReactNode, label: string) => ({
+const viewOption = (value: MetricsViewMode, icon: ReactNode, label: string) => ({
   value,
   label: (
     <Group gap={6} wrap="nowrap">
@@ -30,7 +29,7 @@ const LocationMetrics = ({ selectedLocation, tables }: LocationMetricsProps) => 
   const { data: tableProperties = {} } = useTableProperties(tables);
 
   const [selectedTable, setSelectedTable] = useState(tables[0] || null);
-  const [requestedViewMode, setViewMode] = useState<ViewMode>('table');
+  const [requestedViewMode, setViewMode] = useState<MetricsViewMode>('table');
 
   const metrics = useMetricsByLocation(selectedLocation?.primary_location_id, selectedTable);
 
@@ -39,12 +38,7 @@ const LocationMetrics = ({ selectedLocation, tables }: LocationMetricsProps) => 
 
   // Check if current table has lead time bins for plot capability
   const hasLeadTimeBin = Boolean(
-    selectedTable &&
-    tableProperties[selectedTable]?.group_by?.some(
-      (field: string) =>
-        field.toLowerCase().includes('lead_time_bin') ||
-        field.toLowerCase().includes('forecast_lead_time_bin')
-    )
+    selectedTable && tableProperties[selectedTable]?.group_by?.some(isLeadTimeBinField)
   );
 
   // A view the selected table doesn't support (e.g. Plot after switching to a table
@@ -86,27 +80,26 @@ const LocationMetrics = ({ selectedLocation, tables }: LocationMetricsProps) => 
           <SegmentedControl
             size="xs"
             value={viewMode}
-            onChange={(value) => setViewMode(value as ViewMode)}
+            onChange={(value) => setViewMode(value as MetricsViewMode)}
             data={viewOptions}
             className={styles.viewToggle}
           />
         )}
       </Group>
       <div className={styles.body}>
+        {/* Keyed by table so filters (stored by column index) and sort reset on switch */}
         <MetricsTable
+          key={selectedTable}
           metrics={metrics.data}
           loading={metrics.isLoading}
           error={metrics.error?.message}
-          title="Metrics"
           emptyMessage={
             selectedTable
               ? `No metrics available for this location in ${selectedTable}.`
               : 'Select a table to view metrics.'
           }
-          showTitle={false}
           tableProperties={selectedTable ? tableProperties[selectedTable] : null}
           viewMode={viewMode}
-          onViewModeChange={setViewMode}
         />
       </div>
     </div>
