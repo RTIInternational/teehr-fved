@@ -26,12 +26,14 @@ assets.sha256  checksums of the trained weights (the weights themselves are NOT 
 
 ## Use
 ```bash
-micromamba create -f environment.yml && micromamba activate ckua_infer
-export WSF_ROOT=/data/wsf PYTHONPATH=$PWD          # run from inference/ckua_2nd
+cd prefect-workflows/wsfr_inference
+uv sync --locked --python 3.12
+cd ckua_2nd
+export WSF_ROOT=/data/wsf PYTHONPATH=$PWD
 
-python -m ckua_infer fetch-assets --from /shared/ckua_2nd_assets      # or s3://bucket/prefix ; verifies checksums
-python -m ckua_infer check-sources                                          # ping every data endpoint, verify response shapes (exit 1 on drift)
-python -m ckua_infer run --issue-date 2026-03-01                      # download + build + predict
+uv run --project .. python -m ckua_infer fetch-assets --from /shared/ckua_2nd_assets      # or s3://bucket/prefix ; verifies checksums
+uv run --project .. python -m ckua_infer check-sources
+uv run --project .. python -m ckua_infer run --issue-date 2026-03-01
 # or step by step:  download | build | predict   (all take --issue-date, --root)
 ```
 `predict` exits non-zero if any site fails or the output is invalid (`--allow-partial` to override). Sites whose issue month is after

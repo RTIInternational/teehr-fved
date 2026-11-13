@@ -31,12 +31,14 @@ saved artifacts, so the 16 GB of historical data the training run used is not ne
 
 ## Use
 ```bash
-micromamba create -f environment.yml && micromamba activate rasyidstat_infer      # needs ~/.cdsapirc for ERA5-Land / SEAS5.1
-export WSF_ROOT=/data/wsf PYTHONPATH=$PWD                                         # run from inference/rasyidstat_3rd
+cd prefect-workflows/wsfr_inference
+uv sync --locked --python 3.12
+cd rasyidstat_3rd
+export WSF_ROOT=/data/wsf PYTHONPATH=$PWD                                         # needs ~/.cdsapirc for ERA5-Land / SEAS5.1
 
-python -m rasyidstat_infer fetch-assets --from /shared/rasyidstat_3rd_assets      # or s3://bucket/prefix ; verifies checksums
-python -m rasyidstat_infer check-sources                                          # ping every data endpoint, verify response shapes (exit 1 on drift)
-python -m rasyidstat_infer run --issue-date 2026-03-01                            # build + download + preprocess + predict
+uv run --project .. python -m rasyidstat_infer fetch-assets --from /shared/rasyidstat_3rd_assets      # or s3://bucket/prefix ; verifies checksums
+uv run --project .. python -m rasyidstat_infer check-sources
+uv run --project .. python -m rasyidstat_infer run --issue-date 2026-03-01
 # or step by step:  build | download [--sources ...] | preprocess [--sources ...] | predict      (all take --issue-date, --root)
 ```
 Issue dates must be in January–July. Python API: `rasyidstat_infer.solution.{preprocess, predict}`.

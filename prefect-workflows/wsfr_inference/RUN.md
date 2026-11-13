@@ -14,27 +14,31 @@ Every package: downloads its own inputs for an issue date, runs the trained mode
 
 ## 1. Prerequisites
 
-- Linux/macOS (WSL works), internet access, `micromamba` (or conda/mamba), GNU `patch` (installed by the env files).
+- Linux/macOS (WSL works), Python 3.12, `uv`, internet access, Git, and GNU `patch`.
 - Disk: 1st ≈ 552 MB of weights, 2nd ≈ 5 MB, 3rd ≈ 172 MB, plus downloaded data under the root.
 - **3rd place only:** a Copernicus CDS account with the ERA5-Land and SEAS5 licences accepted, and `~/.cdsapirc`
   (or `CDSAPI_URL` / `CDSAPI_KEY`). Without it only 3 of the 9 variants can run (see [Timing](#5-timing-3rd-place-needs-patience)).
 - Trained weights ("assets") are **not in git**. Get the shared assets location from the maintainers (`~/wsf-assets/<folder>/` on the dev machine, or an `s3://` prefix).
 
-## 2. One-time setup (per package)
+## 2. One-time setup
 
-Run everything from the package folder. Replace the three `<...>` values from the table above.
+Create the shared locked environment from the `wsfr_inference` directory. It
+contains dependencies for all three models:
 
 ```bash
-cd inference/<folder>
-micromamba create -f environment.yml
-eval "$(micromamba shell hook --shell bash)"
-micromamba activate <env name>
+cd prefect-workflows/wsfr_inference
+uv sync --locked --python 3.12
+export WSF_ROOT=/data/wsf
+```
 
-export WSF_ROOT=/data/wsf          # work root; default is ~/wsf; --root overrides per command
-export PYTHONPATH=$PWD             # required: lets `python -m <package>` find the code
+Then run commands from the selected solution folder. For example:
 
-python -m <package> fetch-assets --from ~/wsf-assets/<folder>   # or s3://bucket/prefix; copies and verifies checksums
-python -m <package> check-sources                                  # optional: pings every endpoint, exit 1 on drift
+```bash
+cd ckua_2nd
+export PYTHONPATH=$PWD
+uv run --project .. python -m ckua_infer fetch-assets --from ~/wsf-assets/ckua_2nd
+uv run --project .. python -m ckua_infer check-sources
+uv run --project .. python -m ckua_infer run --issue-date 2026-03-01
 ```
 
 `fetch-assets` is only needed once per root (re-run to repair; `check-assets` re-verifies without copying).
@@ -57,44 +61,15 @@ python -m rasyidstat_infer  fetch-assets --from ~/wsf-assets/rasyidstat_3rd
 
 Local directories need `rsync`; `s3://` sources need the AWS CLI (`aws s3 sync`). Use an absolute path (a literal `~` is only expanded by your shell).
 
-### Shared Python 3.12 environment with uv
+### Shared dependency environment
 
-[`pyproject.toml`](pyproject.toml) and [`uv.lock`](uv.lock) provide one environment for all three packages without conda or
-micromamba. The package list comes from [`environment-py313.yml`](environment-py313.yml), with its versions used as upper
-bounds so uv can select Python 3.12-compatible releases (for example, rioxarray 0.24.0 requires Python 3.13). The lockfile
-records exact resolved versions and CPU-only PyTorch. `wsfr-download` is pinned to commit
-`9f6e29d3f3157b7be2281ce2811bfd23c2988f2b` of the
-[maintained fork](https://github.com/pdmich/water-supply-forecast-rodeo-runtime), which uses the modern USGS API;
-`wsfr-read` retains its original competition revision. GNU `patch` is a system prerequisite, not a Python dependency;
-install it separately if needed.
-
-```bash
-cd inference
-uv sync --locked --python 3.12
-source .venv/bin/activate
-# Then cd into a package folder, export PYTHONPATH=$PWD, and run python -m <package> as above.
-```
-
-The environment lives at `inference/.venv`; `.python-version` selects Python 3.12. To recreate it, run the same `uv sync`
-command. This environment still needs manual model validation; the conda environments remain available as references.
-
-### Optional: one shared Python 3.13 environment for all three packages
-
-[`environment-py313.yml`](environment-py313.yml) (env `wsf_py313`) replaces the three per-package Python 3.10 environments with a single
-one using current library versions (numpy 2, pandas 3, scikit-learn 1.9, torch 2.14 CPU, lightgbm 4, geopandas 1.2, ...). The models are
-not retrained; the code differences are handled by the patches in each package's `patches/` (see each `CHANGES.md`).
-
-```bash
-cd inference
-micromamba create -f environment-py313.yml
-micromamba activate wsf_py313
-# then, per package, from its folder: export PYTHONPATH=$PWD and run `python -m <package> ...` exactly as above
-```
-
-The per-package `environment.yml` files stay the reference environments. In the trial runs (issue date 2026-04-01, before the final
-patch set was re-run end to end), `wsf_py313` matched them to within 0.013 % on `volume_50` for the 2nd and 3rd place. For the 1st place,
-patches `004`-`006` make the features independent of the pandas version; `006` changes the 30-day streamflow feature for some sites
-versus the original submission (see `oshbocker_1st/CHANGES.md`).
+[`pyproject.toml`](pyproject.toml) defines the Python 3.12-compatible dependency
+set and [`uv.lock`](uv.lock) pins exact versions, including CPU-only PyTorch.
+The WSF image exports that lock and installs it into the existing Prefect/TEEHR
+Python environment. For local work, `uv sync --locked` creates `.venv` from the
+same lock. The xarray constraint stays below 2026.9 to satisfy TEEHR; the lock
+currently resolves xarray 2026.7.0 and rioxarray 0.23.0. Model-specific source
+compatibility changes remain reviewable under each package's `patches/`.
 
 ## 3. Produce a forecast
 
@@ -108,8 +83,10 @@ Output: `$WSF_ROOT/<folder>/output/2026-03-01/forecast.csv`; log: `.../logs/pred
 Quick start for all three, once each env/assets are set up:
 
 ```bash
-for p in oshbocker_1st:oshbocker_infer ckua_2nd:ckua_infer rasyidstat_3rd:rasyidstat_infer; do
-  (cd inference/${p%%:*} && PYTHONPATH=$PWD micromamba run -n ${p##*:} python -m ${p##*:} run --issue-date 2026-03-01 --root "$WSF_ROOT")
+for spec in oshbocker_1st:oshbocker_infer ckua_2nd:ckua_infer rasyidstat_3rd:rasyidstat_infer; do
+  folder=${spec%%:*}
+  package=${spec##*:}
+  (cd "$folder" && PYTHONPATH=$PWD uv run --project .. python -m "$package" run --issue-date 2026-03-01 --root "$WSF_ROOT")
 done
 ```
 

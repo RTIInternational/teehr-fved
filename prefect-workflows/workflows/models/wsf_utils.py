@@ -9,6 +9,7 @@ import fcntl
 import hashlib
 import os
 from pathlib import Path
+import sys
 import signal
 import shutil
 import subprocess
@@ -23,7 +24,7 @@ MODEL_PACKAGES = {
     "ckua_2nd": "ckua_infer",
     "rasyidstat_3rd": "rasyidstat_infer",
 }
-MODEL_PYTHON = "/opt/conda/envs/wsf_py313/bin/python"
+MODEL_PYTHON = sys.executable
 QUANTILES = (10, 50, 90)
 
 

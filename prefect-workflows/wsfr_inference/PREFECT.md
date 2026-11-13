@@ -7,18 +7,17 @@ warehouse migrations or location crosswalks are required for execution.
 
 ## Runtime
 
-`Dockerfile.prefect-wsf` derives from the existing TEEHR Prefect image. Its one
-shared Python 3.13 environment, `wsf_py313`, is built from
-`environment-py313.yml`. Micromamba is a lightweight build-time installer for
-this standard conda environment specification; it is not required at runtime.
-All three models run through `/opt/conda/envs/wsf_py313/bin/python` in separate
-processes, with package-specific working directories and module paths.
+`Dockerfile.prefect-wsf` derives from the existing TEEHR Prefect image. It uses
+uv to install the locked dependencies from `pyproject.toml` and `uv.lock` into
+the image's existing Python 3.12 system environment. Model subprocesses use the
+same interpreter via `sys.executable`, with package-specific working
+directories and module paths; the deployed image has no separate model venv.
 
-Prefect and its orchestration dependencies stay in the base Python 3.12
-environment. In particular, do not install the model environment's xarray into
-the orchestration environment: the base image has a different xarray constraint.
-The initial image build supports Linux amd64. Other architectures need explicit
-validation of all pinned packages, including CPU PyTorch.
+The uv project caps xarray below 2026.9 to satisfy the existing TEEHR image; the
+lock currently resolves xarray 2026.7.0 and rioxarray 0.23.0. The Docker install
+is additive and keeps existing Prefect/TEEHR packages. Verify the built image and
+run integration tests before deployment. The image build currently targets Linux
+amd64; other architectures need explicit validation, including CPU PyTorch.
 
 ## Assets And S3 Configuration
 
@@ -174,20 +173,137 @@ availability can change independently of firewall access.
 
 ## Local Verification
 
-Create the shared model environment using any compatible conda/mamba installer.
-Run the source offline tests separately from each solution directory:
+The checks below progress from quick offline validation to a live forecast.
+They use the same locked Python 3.12 dependency set as the WSF image.
+
+### 1. Sync And Run Offline Model Tests
 
 ```bash
-PYTHONPATH=$PWD /path/to/wsf_py313/bin/python -m pytest tests/test_offline.py
+cd prefect-workflows/wsfr_inference
+uv sync --locked --python 3.12
+for model in ckua_2nd oshbocker_1st rasyidstat_3rd; do
+  (
+    cd "$model"
+    PYTHONPATH="$PWD" uv run --project .. python -m pytest tests/test_offline.py -q
+  ) || exit $?
+done
 ```
 
-Run orchestration tests from the repository root in an environment containing
-Prefect 3.4.24, pytest, pandas, numpy, boto3, PyYAML and croniter:
+These are offline tests and do not need trained assets, network access, Prefect,
+S3, or CDS credentials. They exercise each model's checksums, patches, data
+validation and output schema. Run the standalone source probes separately when
+you want to check live upstream endpoints:
 
 ```bash
-python -m pytest prefect-workflows/workflows/tests/wsf_forecasts_test.py -q
+python3 prefect-workflows/wsfr_inference/check_data_sources.py
 ```
 
-Live endpoint/regression tests are opt-in and require network access, weights
-and relevant credentials. Offline checks and mocked orchestration tests do not
-prove a Docker build, cluster deployment or live forecast succeeds.
+### 2. Build And Smoke-Test The WSF Image
+
+The WSF image inherits Prefect/TEEHR from the base image. Build or pull that
+base image first, then build the WSF image from the `prefect-workflows`
+directory. Replace `teehr-prefect:latest` with the actual base image reference
+if Garden tagged it differently:
+
+```bash
+cd prefect-workflows
+docker build \
+  --build-arg PREFECT_BASE_IMAGE=teehr-prefect:latest \
+  --file Dockerfile.prefect-wsf \
+  --tag teehr-prefect-wsf:local .
+```
+
+Run the workflow tests inside that image; this checks the installed Prefect,
+system Python, deployment YAML and model code together:
+
+```bash
+docker run --rm --entrypoint python teehr-prefect-wsf:local \
+  -m pytest /teehr/workflows/tests/wsf_forecasts_test.py -q
+```
+
+Check that each model CLI imports in the same image interpreter:
+
+```bash
+for pair in "ckua_2nd ckua_infer" "oshbocker_1st oshbocker_infer" "rasyidstat_3rd rasyidstat_infer"; do
+  set -- $pair
+  docker run --rm --entrypoint python \
+    --workdir "/teehr/wsfr_inference/$1" \
+    --env "PYTHONPATH=/teehr/wsfr_inference/$1" \
+    teehr-prefect-wsf:local -m "$2" --help
+done
+```
+
+### 3. Run A Live Flow Locally
+
+A live forecast additionally needs internet access to the data sources, a valid
+January-July issue date, the model's trained assets in the configured S3 prefix,
+S3 read/write credentials, and enough local disk for the cache. For the 3rd
+model's strict full ensemble, also provide licensed CDS credentials. Do not put
+credentials in the command line or commit them; use your normal local AWS
+credential provider and local environment or `~/.cdsapirc` for CDS.
+
+Create a writable cache directory and set non-secret S3 locations in the shell:
+
+```bash
+export WSF_LOCAL_CACHE="${TMPDIR:-/tmp}/wsf-cache"
+mkdir -p "$WSF_LOCAL_CACHE"
+export WSF_ASSETS_S3_URI=s3://YOUR-BUCKET/wsf/assets
+export WSF_OUTPUT_S3_URI=s3://YOUR-BUCKET/wsf/outputs
+```
+
+Invoke the Prefect flow directly in the container. This runs the actual flow and
+subprocess pipeline without deploying it to Kubernetes. The required parameters
+below use a supported issue date and one site to keep the first check smaller:
+
+```bash
+docker run --rm \
+  --mount "type=bind,src=$WSF_LOCAL_CACHE,dst=/data/wsf" \
+  --mount "type=bind,src=$HOME/.aws,dst=/home/prefect/.aws,readonly" \
+  --env WSF_ASSETS_S3_URI \
+  --env WSF_OUTPUT_S3_URI \
+  --env AWS_REGION \
+  --env AWS_PROFILE \
+  --env CDSAPI_URL \
+  --env CDSAPI_KEY \
+  --entrypoint python \
+  teehr-prefect-wsf:local -c '
+from workflows.models.wsf_forecasts import run_wsf_inference
+run_wsf_inference(
+    solution="ckua_2nd",
+    issue_date="2026-03-01",
+    sites=["american_river_folsom_lake"],
+    cache_dir="/data/wsf",
+)
+'
+```
+
+The model's season/site metadata is used; warehouse locations and TEEHR tables
+are not involved. Use `solution="oshbocker_1st"` or
+`solution="rasyidstat_3rd"` to test the other models. The 3rd model defaults to
+`strict_ensemble=True` and needs ERA5-Land/SEAS5.1 to be available; set
+`strict_ensemble=False` only when intentionally testing partial-ensemble mode.
+Alternatively run `python -m <model-package> run --issue-date YYYY-MM-DD` from
+that package directory inside the image to test the model CLI without Prefect.
+
+### 4. Test A Local Prefect Deployment
+
+To test deployment registration and a worker run, start the local Garden/KIND
+stack and deploy with the local environment. Configure local S3 asset/output
+variables and credentials first:
+
+```bash
+garden deploy prefect-workflow-deploy --env local
+prefect deployment run wsf-inference/wsf-inference-ckua-2nd \
+  --param issue_date=2026-03-01 \
+  --param sites='["american_river_folsom_lake"]'
+```
+
+Schedules are intentionally inactive. Trigger runs manually during testing.
+
+The regression tests are opt-in and perform real downloads; they also need
+trained weights. Offline tests and mocked workflow tests do not prove upstream
+availability, S3 permissions, a successful full forecast, or a Docker/Kubernetes
+deployment. The Docker example mounts the local AWS profile directory; omit or
+replace that mount if your AWS credential provider is configured differently.
+`$WSF_LOCAL_CACHE` is outside the repository and can be removed after the run
+completes.

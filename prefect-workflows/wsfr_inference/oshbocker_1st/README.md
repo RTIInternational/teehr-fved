@@ -28,12 +28,14 @@ assets.sha256  checksums of models/*.txt and feature_parameters/*.csv (552 MB; N
 
 ## Use
 ```bash
-micromamba create -f environment.yml && micromamba activate oshbocker_infer
-export WSF_ROOT=/data/wsf PYTHONPATH=$PWD            # run from inference/oshbocker_1st
+cd prefect-workflows/wsfr_inference
+uv sync --locked --python 3.12
+cd oshbocker_1st
+export WSF_ROOT=/data/wsf PYTHONPATH=$PWD
 
-python -m oshbocker_infer fetch-assets --from /shared/oshbocker_1st_assets   # or s3://bucket/prefix ; verifies checksums
-python -m oshbocker_infer check-sources                                          # ping every data endpoint, verify response shapes (exit 1 on drift)
-python -m oshbocker_infer run --issue-date 2026-03-01                        # download + build + predict (~4 min)
+uv run --project .. python -m oshbocker_infer fetch-assets --from /shared/oshbocker_1st_assets   # or s3://bucket/prefix ; verifies checksums
+uv run --project .. python -m oshbocker_infer check-sources
+uv run --project .. python -m oshbocker_infer run --issue-date 2026-03-01
 # or:  download | build | predict   (all take --issue-date, --root)
 ```
 Issue dates must be in January–July. `predict` exits non-zero on failed sites / invalid output (`--allow-partial` to override).

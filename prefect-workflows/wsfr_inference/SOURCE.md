@@ -14,5 +14,8 @@ checksum manifests, static inputs and tests. Consult those source documents
 for attribution and licensing. Trained assets are not included in this repository;
 their distribution and use must follow the upstream asset terms.
 
-`environment-py313.yml` is the sole model environment build input. The original
-per-package environment files are retained for provenance only.
+`pyproject.toml` and `uv.lock` define the shared Python 3.12 dependency set. The
+individual model environment YAML files and the experimental
+`environment-py313.yml` were removed in the transition to uv. The deployed WSF
+image installs the locked requirements into the existing Prefect/TEEHR Python
+interpreter; local development uses `uv sync --locked`.
