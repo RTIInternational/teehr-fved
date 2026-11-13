@@ -1,4 +1,5 @@
-import { Container, Alert } from 'react-bootstrap';
+import { Alert, Container } from '@mantine/core';
+import { IconLock } from '@tabler/icons-react';
 import { Navigate } from 'react-router-dom';
 
 import { useAuth } from '@/shared/auth';
@@ -16,10 +17,9 @@ export const AdminRoute = ({ children }: React.PropsWithChildren) => {
 
   if (!roles.includes('admin')) {
     return (
-      <Container className="mt-5 text-center">
-        <Alert variant="danger">
-          <Alert.Heading>Access Denied</Alert.Heading>
-          <p>Admin role required.</p>
+      <Container size="sm" py="xl">
+        <Alert color="red" title="Access Denied" icon={<IconLock size={18} />}>
+          Admin role required.
         </Alert>
       </Container>
     );
