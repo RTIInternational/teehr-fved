@@ -1,0 +1,31 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.toolbar {
+  flex: 0 0 auto;
+  padding-bottom: var(--mantine-spacing-xs);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.filters {
+  height: 100%;
+  overflow: auto;
+  padding: var(--mantine-spacing-md);
+}
+
+/* PlotlyChart sizes itself to 100% of this box. */
+.plot {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--mantine-spacing-xs);
+}

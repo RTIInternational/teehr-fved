@@ -1,4 +1,4 @@
-import { createContext, useContext, useReducer, type Dispatch } from 'react';
+import { createContext, useContext, type Dispatch } from 'react';
 
 import type {
   ClickedPoint,
@@ -39,7 +39,7 @@ export const timeseriesDatasets = (
   activeDataset: string | null
 ) => (filters.datasets.length > 0 ? filters.datasets : activeDataset ? [activeDataset] : []);
 
-const initialState: DashboardState = {
+export const initialState: DashboardState = {
   mapFilters: {
     dataset: null,
     variable: null,
@@ -98,7 +98,7 @@ export type DashboardAction =
   | { type: typeof ActionTypes.SET_ERROR; payload: string | null }
   | { type: typeof ActionTypes.CLEAR_ERROR };
 
-const reducer = (state: DashboardState, action: DashboardAction): DashboardState => {
+export const reducer = (state: DashboardState, action: DashboardAction): DashboardState => {
   switch (action.type) {
     case ActionTypes.UPDATE_MAP_FILTERS:
       return {
@@ -189,16 +189,7 @@ export type DashboardContextValue = {
   dispatch: Dispatch<DashboardAction>;
 };
 
-const GriddedDashboardContext = createContext<DashboardContextValue | undefined>(undefined);
-
-export const DashboardProvider = ({ children }: React.PropsWithChildren) => {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  return (
-    <GriddedDashboardContext.Provider value={{ state, dispatch }}>
-      {children}
-    </GriddedDashboardContext.Provider>
-  );
-};
+export const GriddedDashboardContext = createContext<DashboardContextValue | undefined>(undefined);
 
 export const useDashboard = () => {
   const context = useContext(GriddedDashboardContext);

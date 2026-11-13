@@ -1,4 +1,6 @@
 // Shared Map Legend Component - shows color scale for any dashboard
+import { ColorSwatch, Group, Paper, Stack, Text } from '@mantine/core';
+
 import { getMetricDisplay, getMetricLabel, metricDisplay } from '@/shared/utils/mapMetrics';
 
 type MapLegendProps = {
@@ -11,36 +13,20 @@ const MapLegend = ({ metric }: MapLegendProps) => {
   const display = getMetricDisplay(metric);
   if (!display) return null;
 
-  const metricLabel = getMetricLabel(metric);
-
   return (
-    <div
-      className="card shadow-sm"
-      style={{ minWidth: '150px', maxWidth: '200px', fontSize: '0.85rem' }}
-    >
-      <div className="card-header py-2">
-        <h6 className="card-title mb-0 small">Legend</h6>
-      </div>
-      <div className="card-body py-2">
-        <div className="small">
-          <strong>{metricLabel}</strong>
-        </div>
+    <Paper shadow="sm" radius="md" p="xs" withBorder miw={150} maw={200}>
+      <Stack gap={4}>
+        <Text size="xs" fw={600}>
+          {getMetricLabel(metric)}
+        </Text>
         {display.colors.map((color, i) => (
-          <div key={i} className="d-flex align-items-center mt-1">
-            <div
-              style={{
-                width: '12px',
-                height: '12px',
-                backgroundColor: color,
-                border: '1px solid #ccc',
-                marginRight: '6px',
-              }}
-            ></div>
-            <small>{display.stops[i]}</small>
-          </div>
+          <Group key={i} gap={6} wrap="nowrap">
+            <ColorSwatch color={color} size={12} radius={2} />
+            <Text size="xs">{display.stops[i]}</Text>
+          </Group>
         ))}
-      </div>
-    </div>
+      </Stack>
+    </Paper>
   );
 };
 

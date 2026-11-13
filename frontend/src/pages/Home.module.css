@@ -1,0 +1,111 @@
+/* Hydro topographic page: a pale water wash with faint contour lines in USBR dark blue. */
+.page {
+  position: relative;
+  min-height: 100vh;
+  background: #eef6f5;
+}
+
+.page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.28;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320' viewBox='0 0 320 320'%3E%3Cg fill='none' stroke='%23003E51' stroke-opacity='0.20' stroke-width='1.1'%3E%3Cpath d='M0 42c44 18 91 18 136 0s92-18 138 0'/%3E%3Cpath d='M0 78c44 18 91 18 136 0s92-18 138 0'/%3E%3Cpath d='M0 114c44 18 91 18 136 0s92-18 138 0'/%3E%3Cpath d='M0 150c44 18 91 18 136 0s92-18 138 0'/%3E%3Cpath d='M0 186c44 18 91 18 136 0s92-18 138 0'/%3E%3Cpath d='M0 222c44 18 91 18 136 0s92-18 138 0'/%3E%3Cpath d='M0 258c44 18 91 18 136 0s92-18 138 0'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 320px 320px;
+  mix-blend-mode: multiply;
+}
+
+.page > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* USBR dark blue band with a USBR gold rule beneath it. */
+.hero {
+  padding-block: 3rem;
+  background-color: var(--mantine-color-usbrBlue-9);
+  border-bottom: 4px solid var(--mantine-color-usbrGold-7);
+  color: var(--mantine-color-white);
+  text-align: center;
+}
+
+.heroTitle {
+  font-size: clamp(2rem, 1.475rem + 2.7vw, 3.5rem);
+  font-weight: 300;
+  line-height: 1.2;
+  margin-bottom: var(--mantine-spacing-md);
+}
+
+.heroLead {
+  font-size: 1.25rem;
+  font-weight: 300;
+  color: var(--mantine-color-usbrBlue-0);
+}
+
+/* Frosted card over the contour background. */
+.card {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(2px);
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.diagram {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: var(--mantine-spacing-md) auto;
+}
+
+.overviewDiagram {
+  max-width: min(720px, 100%);
+}
+
+/* Bordered list of TEEHR-Python capabilities, image beside description. */
+.features {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.feature {
+  padding: var(--mantine-spacing-sm);
+}
+
+.feature + .feature {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.featureImage {
+  flex-shrink: 0;
+  width: 154px;
+  height: auto;
+}
+
+.iconLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+}
+
+.funding {
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: var(--mantine-radius-md);
+}
+
+.fundingLogo {
+  flex-shrink: 0;
+  width: 160px;
+  height: auto;
+}
+
+@media (max-width: $mantine-breakpoint-sm) {
+  .featureImage {
+    width: 110px;
+  }
+
+  .fundingLogo {
+    width: 90px;
+  }
+}

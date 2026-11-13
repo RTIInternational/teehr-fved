@@ -1,0 +1,5 @@
+.root {
+  height: 100%;
+  overflow: auto;
+  padding: var(--mantine-spacing-md);
+}

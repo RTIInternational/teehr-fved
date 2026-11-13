@@ -1,19 +1,21 @@
+import { Center, Group, List, Loader, SegmentedControl, Stack, Text } from '@mantine/core';
+import { IconChartLine, IconDatabaseOff, IconFilter } from '@tabler/icons-react';
 import { useQueries } from '@tanstack/react-query';
 import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef, useState } from 'react';
-import { Button, ButtonGroup, Spinner } from 'react-bootstrap';
 
-import DashboardPanel from '@/shared/components/DashboardPanel';
 import { usePlotResize } from '@/shared/hooks/usePlotResize';
 import { useEdrTimeseries } from '@/shared/queries/gridded/edr';
 import { usePolygonTimeseries } from '@/shared/queries/gridded/polygonTimeseries';
 import { variableAttrsQueryOptions } from '@/shared/queries/gridded/variableAttrs';
 import { parseUtcTime, shortestStep } from '@/shared/utils/dates';
-import { formatLatLon, formatUnitName, formatVariableName } from '@/shared/utils/formatters';
+import { formatUnitName, formatVariableName } from '@/shared/utils/formatters';
 import { seriesColor } from '@/shared/utils/plotColors';
 
 import { ActionTypes, timeseriesDatasets, useDashboard } from '../DashboardContext';
 import GriddedTimeseriesControls from './GriddedTimeseriesControls';
+
+import styles from './GriddedTimeseriesPanel.module.css';
 
 type PlotSeries = {
   name: string;
@@ -111,10 +113,6 @@ const GriddedTimeseriesPanel = () => {
       };
   usePlotResize(plotRef, viewMode === 'plot' && !!request && !isLoading && plotted.length > 0);
 
-  const title = polygonQuery
-    ? polygonQuery.name || polygonQuery.location_id
-    : clickedPoint && `(${formatLatLon(clickedPoint.lat, clickedPoint.lon)})`;
-
   useEffect(() => {
     if (!plotRef.current || !request || plotted.length === 0) return;
     const traces = plotted.map((s, i) => ({
@@ -137,105 +135,111 @@ const GriddedTimeseriesPanel = () => {
       plotRef.current,
       traces as Partial<Plotly.ScatterData>[],
       {
-        title: { text: title, font: { size: 13 } },
         xaxis: { title: 'Time', type: 'date' },
         yaxis: { title: sharedUnit || 'Value' },
         showlegend: true,
         legend: { orientation: 'h', y: -0.2 },
-        margin: { t: 40, r: 20, b: 50, l: 60 },
+        margin: { t: 10, r: 20, b: 50, l: 60 },
         autosize: true,
       } as Partial<Plotly.Layout>,
       { responsive: true, displayModeBar: false }
     );
   });
 
-  const header = (
-    <div className="d-flex justify-content-between align-items-center">
-      <span className="small fw-bold">Timeseries</span>
-      <ButtonGroup size="sm">
-        <Button
-          variant={viewMode === 'filters' ? 'primary' : 'outline-primary'}
-          onClick={() => setViewMode('filters')}
-          style={{ fontSize: '11px' }}
-        >
-          🔍 Filters
-        </Button>
-        <Button
-          variant={viewMode === 'plot' ? 'primary' : 'outline-primary'}
-          onClick={() => setViewMode('plot')}
-          style={{ fontSize: '11px' }}
-        >
-          📈 Plot
-        </Button>
-      </ButtonGroup>
-    </div>
-  );
-
   const notesList = notes.length > 0 && (
-    <ul className="small text-muted mb-0 px-3 pb-2" style={{ flex: '0 0 auto' }}>
+    <List size="sm" c="dimmed" withPadding className={styles.notes}>
       {notes.map((note) => (
-        <li key={note}>{note}</li>
+        <List.Item key={note}>{note}</List.Item>
       ))}
-    </ul>
+    </List>
   );
 
-  let body;
-  if (viewMode === 'filters') {
-    body = (
-      <div className="p-3 h-100 overflow-auto">
-        <GriddedTimeseriesControls
-          timeseriesFilters={timeseriesFilters}
-          updateTimeseriesFilters={(patch) =>
-            dispatch({ type: ActionTypes.UPDATE_TIMESERIES_FILTERS, payload: patch })
-          }
-          activeDataset={mapFilters.dataset}
-        />
-      </div>
-    );
-  } else if (!request) {
-    body = (
-      <div className="d-flex align-items-center justify-content-center h-100 text-muted small">
-        Click a point on the map, or load a timeseries for a selected polygon
-      </div>
+  let plotBody;
+  if (!request) {
+    plotBody = (
+      <Center h="100%">
+        <Text size="sm" c="dimmed">
+          Click a point on the map, or load a timeseries for a selected polygon
+        </Text>
+      </Center>
     );
   } else if (isLoading) {
-    body = (
-      <div className="d-flex justify-content-center align-items-center h-100">
-        <div className="text-center">
-          <Spinner animation="border" variant="primary" />
-          <div className="mt-2 small text-muted">Loading timeseries data...</div>
-        </div>
-      </div>
+    plotBody = (
+      <Stack h="100%" align="center" justify="center" gap="xs">
+        <Loader />
+        <Text size="sm" c="dimmed">
+          Loading timeseries data...
+        </Text>
+      </Stack>
     );
   } else if (plotted.length === 0) {
-    body = (
-      <div className="d-flex flex-column align-items-center justify-content-center h-100">
-        <div className="text-center text-muted">
-          <div style={{ fontSize: '2rem' }}>📊</div>
-          <h6>No Data Available</h6>
-          <p className="small">Try switching to Filters to adjust the datasets or time span.</p>
-        </div>
+    plotBody = (
+      <Stack h="100%" align="center" justify="center" gap="xs">
+        <IconDatabaseOff size={32} stroke={1.5} color="var(--mantine-color-dimmed)" />
+        <Text fw={600} c="dimmed">
+          No Data Available
+        </Text>
+        <Text size="sm" c="dimmed" ta="center">
+          Try switching to Filters to adjust the datasets or time span.
+        </Text>
         {notesList}
-      </div>
+      </Stack>
     );
   } else {
     // Keyed so React never reuses this div for another state with Plotly's nodes still in it
-    body = (
-      <div key="plot" className="d-flex flex-column h-100">
-        <div ref={plotRef} style={{ flex: '1 1 auto', minHeight: 0, width: '100%' }} />
+    plotBody = (
+      <div key="plot" className={styles.plot}>
+        <div ref={plotRef} className={styles.plotArea} />
         {notesList}
       </div>
     );
   }
 
   return (
-    <DashboardPanel
-      header={header}
-      style={{ height: '100%' }}
-      bodyStyle={{ padding: 0, overflow: 'hidden', height: '100%' }}
-    >
-      {body}
-    </DashboardPanel>
+    <div className={styles.panel}>
+      <Group justify="flex-end" className={styles.toolbar}>
+        <SegmentedControl
+          size="xs"
+          value={viewMode}
+          onChange={setViewMode}
+          data={[
+            {
+              value: 'filters',
+              label: (
+                <Group gap={6} wrap="nowrap">
+                  <IconFilter size={14} />
+                  <span>Filters</span>
+                </Group>
+              ),
+            },
+            {
+              value: 'plot',
+              label: (
+                <Group gap={6} wrap="nowrap">
+                  <IconChartLine size={14} />
+                  <span>Plot</span>
+                </Group>
+              ),
+            },
+          ]}
+        />
+      </Group>
+      <div className={styles.body}>
+        {viewMode === 'filters' ? (
+          <div className={styles.filters}>
+            <GriddedTimeseriesControls
+              timeseriesFilters={timeseriesFilters}
+              updateTimeseriesFilters={(patch) =>
+                dispatch({ type: ActionTypes.UPDATE_TIMESERIES_FILTERS, payload: patch })
+              }
+              activeDataset={mapFilters.dataset}
+            />
+          </div>
+        ) : (
+          plotBody
+        )}
+      </div>
+    </div>
   );
 };
 

@@ -1,191 +1,122 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Form, Spinner } from 'react-bootstrap';
+import {
+  Button,
+  Checkbox,
+  Combobox,
+  Group,
+  Input,
+  InputBase,
+  ScrollArea,
+  useCombobox,
+  type InputBaseProps,
+} from '@mantine/core';
 
-type MultiSelectDropdownProps = {
-  options?: string[];
-  selected?: string[];
-  onChange: (options: string[]) => void;
-  isLoading?: boolean;
-  allSelectedText?: string;
-  noneSelectedText?: string;
-  labelledBy?: string;
-  ariaLabel?: string;
-  style?: React.CSSProperties;
+import classes from './MultiSelectDropdown.module.css';
+
+type MultiSelectDropdownProps = Omit<InputBaseProps, 'value' | 'onChange'> & {
+  data?: string[];
+  value: string[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
 };
 
 /**
- * A clean multi-select dropdown component
- * Handles all the event propagation issues internally
+ * Checkbox multi-select that summarizes the selection ("3 of 10 selected")
+ * instead of rendering each value as a pill. Remaining props go to InputBase
+ * (label, size, loading, disabled, ...).
  */
 const MultiSelectDropdown = ({
-  options = [],
-  selected = [],
+  data = [],
+  value,
   onChange,
-  isLoading = false,
-  allSelectedText = 'All selected',
-  noneSelectedText = 'None selected',
-  labelledBy,
-  ariaLabel,
-  style = {},
+  placeholder,
+  ...inputProps
 }: MultiSelectDropdownProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isMenuOpen = isOpen && !isLoading;
+  const combobox = useCombobox({
+    onDropdownClose: () => combobox.resetSelectedOption(),
+  });
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        event.target instanceof Node &&
-        !containerRef.current.contains(event.target)
-      ) {
-        setIsOpen(false);
-      }
-    };
+  const toggle = (item: string) =>
+    onChange(value.includes(item) ? value.filter((v) => v !== item) : [...value, item]);
 
-    if (isMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+  const summary =
+    value.length === 0
+      ? null
+      : value.length === data.length
+        ? 'All selected'
+        : `${value.length} of ${data.length} selected`;
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isMenuOpen]);
-
-  const handleToggle = (value: string) => {
-    const newSelected = selected.includes(value)
-      ? selected.filter((v) => v !== value)
-      : [...selected, value];
-    onChange(newSelected);
-  };
-
-  const handleSelectAll = () => {
-    onChange([...options]);
-  };
-
-  const handleClearAll = () => {
-    onChange([]);
-  };
-
-  const getDisplayText = () => {
-    if (selected.length === 0) return noneSelectedText;
-    if (selected.length === options.length) return allSelectedText;
-    return `${selected.length} of ${options.length} selected`;
-  };
+  // Keep focus on the target so keyboard navigation still works after clicking a header button.
+  const keepFocus = (event: React.MouseEvent) => event.preventDefault();
 
   return (
-    <div
-      ref={containerRef}
-      className="multi-select-dropdown"
-      style={{ position: 'relative', ...style }}
-    >
-      {/* Toggle Button */}
-      <button
-        type="button"
-        className="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center"
-        onClick={() => {
-          if (!isLoading) {
-            setIsOpen(!isOpen);
+    <Combobox store={combobox} onOptionSubmit={toggle}>
+      <Combobox.Target targetType="button">
+        <InputBase
+          component="button"
+          type="button"
+          pointer
+          rightSection={
+            value.length > 0 ? (
+              <Combobox.ClearButton onClear={() => onChange([])} />
+            ) : (
+              <Combobox.Chevron />
+            )
           }
-        }}
-        aria-labelledby={labelledBy}
-        aria-label={ariaLabel}
-        disabled={isLoading}
-        aria-busy={isLoading}
-        style={{
-          fontSize: '14px',
-          opacity: isLoading ? 0.75 : 1,
-          backgroundColor: isLoading ? '#e9ecef' : undefined,
-          borderColor: isLoading ? '#ced4da' : undefined,
-          color: isLoading ? '#6c757d' : undefined,
-          cursor: isLoading ? 'not-allowed' : undefined,
-        }}
-      >
-        {isLoading ? (
-          <span className="d-inline-flex align-items-center gap-2 text-muted">
-            <output className="d-inline-flex align-items-center m-0" aria-label="Loading">
-              <Spinner animation="border" size="sm" aria-hidden="true" />
-            </output>
-            <span>Loading...</span>
-          </span>
-        ) : (
-          <>
-            <span className="text-truncate">{getDisplayText()}</span>
-            <span style={{ marginLeft: '8px' }}>{isMenuOpen ? '▲' : '▼'}</span>
-          </>
-        )}
-      </button>
-
-      {/* Dropdown Menu */}
-      {isMenuOpen && (
-        <div
-          className="multi-select-menu"
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 1050,
-            backgroundColor: 'white',
-            border: '1px solid #dee2e6',
-            borderRadius: '4px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            marginTop: '2px',
-            minWidth: '250px',
-          }}
+          rightSectionPointerEvents={value.length > 0 ? 'all' : 'none'}
+          onClick={() => combobox.toggleDropdown()}
+          {...inputProps}
         >
-          {/* Header with Select All / Clear All */}
-          <div
-            className="px-3 py-2 border-bottom d-flex gap-3"
-            style={{ backgroundColor: '#f8f9fa' }}
-          >
-            <button
-              type="button"
-              className="btn btn-sm btn-link p-0 text-decoration-none"
-              onClick={handleSelectAll}
-            >
-              Select All
-            </button>
-            <button
-              type="button"
-              className="btn btn-sm btn-link p-0 text-decoration-none text-danger"
-              onClick={handleClearAll}
-            >
-              Clear All
-            </button>
-          </div>
+          {summary ?? <Input.Placeholder>{placeholder}</Input.Placeholder>}
+        </InputBase>
+      </Combobox.Target>
 
-          {/* Options List */}
-          <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
-            {options.map((option) => {
-              const inputId = `multi-select-${option}`;
-              const checked = selected.includes(option);
+      <Combobox.Dropdown>
+        {data.length > 0 && (
+          <Combobox.Header>
+            <Group gap="xs">
+              <Button
+                variant="subtle"
+                size="compact-xs"
+                onMouseDown={keepFocus}
+                onClick={() => onChange([...data])}
+              >
+                Select All
+              </Button>
+              <Button
+                variant="subtle"
+                color="red"
+                size="compact-xs"
+                onMouseDown={keepFocus}
+                onClick={() => onChange([])}
+              >
+                Clear All
+              </Button>
+            </Group>
+          </Combobox.Header>
+        )}
 
-              return (
-                <label
-                  key={option}
-                  htmlFor={inputId}
-                  className="px-3 py-2 d-flex align-items-center"
-                >
-                  <Form.Check
-                    id={inputId}
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => handleToggle(option)}
-                    label={option}
-                    className="mb-0"
+        <Combobox.Options>
+          <ScrollArea.Autosize mah={250} type="scroll">
+            {data.length === 0 && <Combobox.Empty>No options available</Combobox.Empty>}
+            {data.map((item) => (
+              <Combobox.Option value={item} key={item} active={value.includes(item)}>
+                <Group gap="sm" wrap="nowrap">
+                  <Checkbox
+                    checked={value.includes(item)}
+                    readOnly
+                    tabIndex={-1}
+                    aria-hidden
+                    size="xs"
+                    className={classes.checkbox}
                   />
-                </label>
-              );
-            })}
-            {options.length === 0 && (
-              <div className="px-3 py-2 text-muted">No options available</div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+                  <span>{item}</span>
+                </Group>
+              </Combobox.Option>
+            ))}
+          </ScrollArea.Autosize>
+        </Combobox.Options>
+      </Combobox.Dropdown>
+    </Combobox>
   );
 };
 

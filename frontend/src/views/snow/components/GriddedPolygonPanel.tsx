@@ -1,8 +1,12 @@
-import DashboardPanel from '@/shared/components/DashboardPanel';
+import { Button, Group, Stack, Table, Text } from '@mantine/core';
+import { IconPolygon } from '@tabler/icons-react';
+
 import type { PolygonFeatureProps, PolygonFeatures } from '@/shared/types/gridded/tiles';
 
 import { useDashboard, ActionTypes } from '../DashboardContext';
 import { useCurrentTimestep } from '../hooks/useCurrentTimestep';
+
+import styles from './GriddedPolygonPanel.module.css';
 
 // Attribute columns are driven by the pmtiles archive, so render whatever the
 // features carry rather than hard-coding a schema. `id` leads since it is the
@@ -34,105 +38,84 @@ const GriddedPolygonPanel = () => {
     });
   };
 
-  const header = (
-    <div className="d-flex justify-content-between align-items-center">
-      <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>
-        📐 Polygon Attributes
-        {polygonFeatures.length > 0 && (
-          <span className="text-muted fw-normal ms-2" style={{ fontSize: '0.8rem' }}>
-            {polygonFeatures.length} at this location
-          </span>
-        )}
-      </span>
-      {polygonFeatures.length > 0 && (
-        <button
-          type="button"
-          className="btn-close"
-          aria-label="Clear polygon selection"
-          onClick={() => dispatch({ type: ActionTypes.CLEAR_POLYGON_FEATURES })}
-        />
-      )}
-    </div>
-  );
-
   if (polygonFeatures.length === 0) {
     return (
-      <DashboardPanel header={header} style={{ height: '100%' }}>
-        <div className="d-flex align-items-center justify-content-center h-100 text-muted">
-          <div className="text-center">
-            <div style={{ fontSize: '2rem' }}>📐</div>
-            <h6>Polygon Attributes</h6>
-            <p className="small mb-0">
-              {activePolygonLayer
-                ? 'Click a polygon on the map to list every polygon at that location.'
-                : 'Enable a polygon layer, then click the map.'}
-            </p>
-          </div>
-        </div>
-      </DashboardPanel>
+      <Stack h="100%" align="center" justify="center" gap="xs">
+        <IconPolygon size={32} stroke={1.5} color="var(--mantine-color-dimmed)" />
+        <Text fw={600} c="dimmed">
+          Polygon Attributes
+        </Text>
+        <Text size="sm" c="dimmed" ta="center">
+          {activePolygonLayer
+            ? 'Click a polygon on the map to list every polygon at that location.'
+            : 'Enable a polygon layer, then click the map.'}
+        </Text>
+      </Stack>
     );
   }
 
   const columns = orderedKeys(polygonFeatures);
 
   return (
-    <DashboardPanel
-      header={header}
-      style={{ height: '100%' }}
-      bodyStyle={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}
-    >
-      <div style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto' }}>
-        <table className="table table-sm table-hover mb-0" style={{ fontSize: '0.8rem' }}>
-          <thead className="table-light" style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-            <tr>
+    <div className={styles.panel}>
+      <div className={styles.tableScroll}>
+        <Table
+          stickyHeader
+          highlightOnHover
+          fz="xs"
+          verticalSpacing={4}
+          horizontalSpacing="xs"
+          className={styles.table}
+        >
+          <Table.Thead>
+            <Table.Tr>
               {columns.map((key) => {
                 if (typeof key === 'string' || typeof key === 'number') {
                   return (
-                    <th key={key} scope="col" className="text-nowrap">
+                    <Table.Th key={key} scope="col">
                       {key}
-                    </th>
+                    </Table.Th>
                   );
                 }
               })}
-            </tr>
-          </thead>
-          <tbody>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
             {polygonFeatures.map((props) => {
               const isSelected = selectedId != null && props.id === selectedId;
               return (
-                <tr
+                <Table.Tr
                   key={props.id}
                   onClick={() => selectFeature(props)}
-                  className={isSelected ? 'table-primary' : ''}
-                  style={{ cursor: 'pointer' }}
+                  data-selected={isSelected || undefined}
+                  className={styles.row}
                 >
                   {columns.map((key) => {
                     if (typeof key === 'string' || typeof key === 'number') {
                       return (
-                        <td key={key} className="text-nowrap">
+                        <Table.Td key={key}>
                           {props[key] !== null && props[key] !== undefined
                             ? String(props[key] as string | number | boolean)
                             : 'N/A'}
-                        </td>
+                        </Table.Td>
                       );
                     }
                   })}
-                </tr>
+                </Table.Tr>
               );
             })}
-          </tbody>
-        </table>
+          </Table.Tbody>
+        </Table>
       </div>
 
-      <div className="border-top px-3 py-2 d-flex justify-content-between align-items-center gap-2">
-        <span className="small text-muted text-truncate">
+      <Group justify="space-between" wrap="nowrap" gap="xs" className={styles.footer}>
+        <Text size="sm" c="dimmed" truncate miw={0}>
           {selectedLocation
             ? `Selected: ${selectedLocation.primary_location_id}`
             : 'Select a row to choose a location'}
-        </span>
-        <button
-          type="button"
-          className="btn btn-sm btn-primary text-nowrap"
+        </Text>
+        <Button
+          size="sm"
           disabled={!selectedLocation || !currentTimestep}
           onClick={() =>
             dispatch({
@@ -146,9 +129,9 @@ const GriddedPolygonPanel = () => {
           }
         >
           Load Timeseries
-        </button>
-      </div>
-    </DashboardPanel>
+        </Button>
+      </Group>
+    </div>
   );
 };
 

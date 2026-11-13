@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, type Dispatch } from 'react';
+import { createContext, useContext, type Dispatch } from 'react';
 
 import { FORECAST_DASHBOARD_DEFAULTS } from '@/config/dashboardDefaults';
 import type { MapLocation } from '@/shared/types/locations';
@@ -50,7 +50,7 @@ type DashboardAction =
     };
 
 // Initial state for forecast dashboard
-const initialState: DashboardState = {
+export const initialState: DashboardState = {
   // Map filters (original structure)
   mapFilters: {
     configuration: null,
@@ -97,7 +97,7 @@ export const ActionTypes = {
 } as const;
 
 // Reducer function (same logic as retrospective)
-const reducer = (state: DashboardState, action: DashboardAction) => {
+export const reducer = (state: DashboardState, action: DashboardAction) => {
   switch (action.type) {
     case ActionTypes.INITIALIZE_FILTERS: {
       const { configuration, variable } = action.payload;
@@ -208,16 +208,7 @@ type DashboardContextValue = {
   dispatch: Dispatch<DashboardAction>;
 };
 
-const DashboardContext = createContext<DashboardContextValue | null>(null);
-
-// Provider component
-export const DashboardProvider = ({ children }: React.PropsWithChildren) => {
-  const [state, dispatch] = useReducer(reducer, initialState);
-
-  return (
-    <DashboardContext.Provider value={{ state, dispatch }}>{children}</DashboardContext.Provider>
-  );
-};
+export const DashboardContext = createContext<DashboardContextValue | null>(null);
 
 // Hook to use the context
 export const useDashboard = () => {

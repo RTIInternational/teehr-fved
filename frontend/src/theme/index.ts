@@ -28,4 +28,5 @@ export const FvedTheme = createTheme({
     ],
   },
   primaryColor: 'usbrBlue',
+  primaryShade: 8,
 });
