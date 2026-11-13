@@ -1,3 +1,5 @@
+import { Button, Card, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { IconExternalLink } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
 
 const KEYCLOAK_BASE_URL =
@@ -21,9 +23,9 @@ type ExternalCard = BaseCard & {
   isExternal: true;
 };
 
-type Card = InternalCard | ExternalCard;
+type AdminCard = InternalCard | ExternalCard;
 
-const cards: Card[] = [
+const cards: AdminCard[] = [
   {
     title: 'API Keys',
     description: 'Create, review, and revoke API keys for administrative workflows.',
@@ -48,42 +50,47 @@ const cards: Card[] = [
 
 const AdminHome = () => {
   return (
-    <div className="p-3">
-      <h4 className="mb-2">Admin Home</h4>
-      <p className="text-muted mb-4">
-        Use this workspace to manage platform administration tasks. Additional tools will be added
-        over time.
-      </p>
-
-      <div className="row g-3">
-        {cards.map((card) => (
-          <div key={card.title} className="col-12 col-md-6 col-xl-4">
-            <div className="card h-100">
-              <div className="card-body d-flex flex-column">
-                <h5 className="card-title">{card.title}</h5>
-                <p className="card-text text-muted">{card.description}</p>
-                <div className="mt-auto">
-                  {card.isExternal ? (
-                    <a
-                      href={card.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-outline-primary"
-                    >
-                      {card.buttonLabel}
-                    </a>
-                  ) : (
-                    <Link to={card.to} className="btn btn-outline-primary">
-                      {card.buttonLabel}
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+    <Stack gap="lg">
+      <div>
+        <Title order={3}>Admin Home</Title>
+        <Text c="dimmed">
+          Use this workspace to manage platform administration tasks. Additional tools will be added
+          over time.
+        </Text>
       </div>
-    </div>
+
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+        {cards.map((card) => (
+          <Card key={card.title} withBorder padding="lg">
+            <Stack gap="sm" h="100%">
+              <Title order={4}>{card.title}</Title>
+              <Text size="sm" c="dimmed">
+                {card.description}
+              </Text>
+              {/* mt="auto" keeps the buttons aligned along the bottom of the row */}
+              {card.isExternal ? (
+                <Button
+                  component="a"
+                  href={card.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outline"
+                  rightSection={<IconExternalLink size={16} />}
+                  mt="auto"
+                  w="fit-content"
+                >
+                  {card.buttonLabel}
+                </Button>
+              ) : (
+                <Button component={Link} to={card.to} variant="outline" mt="auto" w="fit-content">
+                  {card.buttonLabel}
+                </Button>
+              )}
+            </Stack>
+          </Card>
+        ))}
+      </SimpleGrid>
+    </Stack>
   );
 };
 
