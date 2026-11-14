@@ -217,6 +217,23 @@ deployments:
       cron: "29 * * * *"
       active: false
 
+  # CDEC Ingest
+  - name: ingest-cdec-water-supply
+    version:
+    tags: []
+    concurrency_limit:
+      limit: 1
+      collision_strategy: "CANCEL_NEW"
+    description: Ingest CDEC water supply forecasts and observations; upserts the previous and current water years
+    entrypoint: workflows/ingests/cdec_water_supply.py:ingest_cdec_water_supply
+    parameters: {
+      "temp_dir_path": *temp_dir_path
+    }
+    work_pool: *work_pool_small
+    schedule:
+      cron: "0 15 * * 3"
+      active: false
+
   # Gridded Data Ingests
   - name: ingest-ua-4km-grids
     version:
