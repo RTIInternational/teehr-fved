@@ -12,33 +12,6 @@ from teehr.fetching.models.utils import (
 from prefect import task, get_run_logger
 
 
-# @task()
-# Note. Evaluation object is not serializable, gives an error
-# if treated as a task but still succeeds
-def get_usgs_location_ids(
-    ev: teehr.Evaluation
-) -> List:
-    """Query the USGS location IDs from the warehouse."""
-    logger = get_run_logger()
-    logger.info("⏰ Querying USGS location IDs")
-    locations_df = ev.location_attributes_view(
-            attr_list=["is_active", "has_inst_discharge"]
-    ).filter(
-        filters=[
-            {
-                "column": "location_id",
-                "operator": "like",
-                "value": "usgs-%"
-            },
-            "is_active = 'True'",
-            "has_inst_discharge = 'True'"
-        ]
-    ).to_pandas()
-    sites = locations_df["location_id"].str.upper().to_list()
-    logger.info(f"✅ Retrieved {len(sites)} USGS location IDs")
-    return sites
-
-
 @task()
 def fetch_usgs_data_to_cache(
     usgs_sites: List,
