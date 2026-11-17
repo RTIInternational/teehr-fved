@@ -265,18 +265,18 @@ ELEMENT_TO_VARIABLE_MAPPING: dict[str, dict[str, Any]] = {
 }
 
 NRCS_VARIABLE_MAPPING: dict[str, str] = {
-    "volume_amjj_sum": "Seasonal summed water supply volume (Apr-Jul)",
-    "volume_mjj_sum": "Seasonal summed water supply volume (May-Jul)",
-    "volume_jj_sum": "Seasonal summed water supply volume (Jun-Jul)",
-    "volume_amjjas_sum": "Seasonal summed water supply volume (Apr-Sep)",
-    "volume_mjjas_sum": "Seasonal summed water supply volume (May-Sep)",
-    "volume_jjas_sum": "Seasonal summed water supply volume (Jul-Sep)",
-    "volume_mamjj_sum": "Seasonal summed water supply volume (Mar-Jul)",
-    "volume_fmamjj_sum": "Seasonal summed water supply volume (Feb-Jul)",
-    "volume_fmamjjas_sum": "Seasonal summed water supply volume (Feb-Sep)",
-    "volume_mamjjas_sum": "Seasonal summed water supply volume (Mar-Sep)",
-    "volume_amj_sum": "Seasonal summed water supply volume (Apr-Jun)",
-    "volume_mj_sum": "Seasonal summed water supply volume (May-Jun)",
+    "volume_0407_sum": "Seasonal summed water supply volume (Apr-Jul)",
+    "volume_0507_sum": "Seasonal summed water supply volume (May-Jul)",
+    "volume_0607_sum": "Seasonal summed water supply volume (Jun-Jul)",
+    "volume_0409_sum": "Seasonal summed water supply volume (Apr-Sep)",
+    "volume_0509_sum": "Seasonal summed water supply volume (May-Sep)",
+    "volume_0709_sum": "Seasonal summed water supply volume (Jul-Sep)",
+    "volume_0307_sum": "Seasonal summed water supply volume (Mar-Jul)",
+    "volume_0207_sum": "Seasonal summed water supply volume (Feb-Jul)",
+    "volume_0209_sum": "Seasonal summed water supply volume (Feb-Sep)",
+    "volume_0309_sum": "Seasonal summed water supply volume (Mar-Sep)",
+    "volume_0406_sum": "Seasonal summed water supply volume (Apr-Jun)",
+    "volume_0506_sum": "Seasonal summed water supply volume (May-Jun)",
     "volume_monthly_sum": "Monthly summed water supply volume",
 }
 
@@ -387,18 +387,13 @@ def _forecast_period_metadata(
     """Build a forecast variable name and timestamp from one record's period."""
     start, end = _parse_forecast_period(forecast_period)
 
-    month_codes: list[str] = []
-    month = start.month
-    while True:
-        month_codes.append(MONTH_INITIALS[month - 1])
-        if month == end.month:
-            break
-        month = month % 12 + 1
+    start_month = f"{start.month:02d}"
+    end_month = f"{end.month:02d}"
 
     variable_config = ELEMENT_TO_VARIABLE_MAPPING[element_code]
     variable_name = (
         f"{variable_config['parameter']}_"
-        f"{''.join(month_codes)}_"
+        f"{start_month}{end_month}_"
         f"{variable_config['statistic']}"
     )
 
