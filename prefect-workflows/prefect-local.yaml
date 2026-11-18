@@ -118,6 +118,18 @@ deployments:
     }
     work_pool: *work_pool
 
+  # CDEC Ingest
+  - name: ingest-cdec-water-supply
+    version:
+    tags: []
+    description: Ingest CDEC water supply forecasts and observations; upserts the previous and current water years
+    entrypoint: workflows/ingests/cdec_water_supply.py:ingest_cdec_water_supply
+    parameters: {
+      "temp_dir_path": *temp_dir_path,
+      "start_spark_cluster": false
+    }
+    work_pool: *work_pool
+
   # Gridded Data Ingests
   - name: ingest-ua-4km-grids
     version:
