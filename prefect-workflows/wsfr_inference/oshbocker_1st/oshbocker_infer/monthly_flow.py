@@ -25,8 +25,26 @@ import requests
 AWDB = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1/data"
 NWRFC = "https://www.nwrfc.noaa.gov/natural/nat_norm_text.cgi"
 COLUMNS = ["site_id", "forecast_year", "year", "month", "volume"]
-NWRFC_ATTEMPTS = 4
-NWRFC_BACKOFF_S = 5
+ATTEMPTS = 4
+BACKOFF_S = 5
+
+
+def _get(url: str, params: dict) -> requests.Response:
+    """GET with retries: the NRCS/NWRFC servers intermittently answer a request with 403/429/5xx (a burst of ~22 sequential
+    site requests can trip their rate limiting); one bad answer must not discard the whole monthly file."""
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            r = requests.get(url, params=params, timeout=60)
+            if r.status_code not in (403, 429) and r.status_code < 500:
+                r.raise_for_status()
+                return r
+            err: Exception = requests.HTTPError(f"{r.status_code} for url: {r.url}")
+        except (requests.ConnectionError, requests.Timeout) as e:
+            err = e
+        if attempt == ATTEMPTS:
+            raise err
+        time.sleep(BACKOFF_S * attempt)
+    raise AssertionError("unreachable")
 
 
 def forecast_year(issue_date: date) -> int:
@@ -39,12 +57,10 @@ def _month_ended(year: int, month: int, issue_date: date) -> bool:
 
 
 def fetch_awdb(triplet: str, fy: int, issue_date: date) -> pd.DataFrame:
-    r = requests.get(
+    r = _get(
         AWDB,
-        params=dict(stationTriplets=triplet, elements="SRVO", duration="MONTHLY", beginDate=f"{fy - 1}-10-01", endDate=issue_date.isoformat()),
-        timeout=60,
+        dict(stationTriplets=triplet, elements="SRVO", duration="MONTHLY", beginDate=f"{fy - 1}-10-01", endDate=issue_date.isoformat()),
     )
-    r.raise_for_status()
     rows = [
         (v["year"], v["month"], v["value"] / 1000.0)  # ac-ft -> KAF
         for station in r.json()
@@ -56,21 +72,7 @@ def fetch_awdb(triplet: str, fy: int, issue_date: date) -> pd.DataFrame:
 
 
 def fetch_nwrfc(rfc_id: str, fy: int) -> pd.DataFrame:
-    for attempt in range(1, NWRFC_ATTEMPTS + 1):
-        try:
-            r = requests.get(NWRFC, params=dict(id=rfc_id), timeout=60)
-            r.raise_for_status()
-            break
-        except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as error:
-            if isinstance(error, requests.HTTPError) and (
-                error.response is None or error.response.status_code not in (429, 500, 502, 503, 504)
-            ):
-                raise
-            if attempt == NWRFC_ATTEMPTS:
-                raise
-            wait = NWRFC_BACKOFF_S * attempt
-            print(f"WARNING NWRFC {rfc_id}: {error}; retrying in {wait}s (attempt {attempt}/{NWRFC_ATTEMPTS})", file=sys.stderr)
-            time.sleep(wait)
+    r = _get(NWRFC, dict(id=rfc_id))
     lines = [ln for ln in r.text.replace("<br>", "\n").splitlines() if ln.startswith(rfc_id + ",") or ln.startswith("ID,")]
     wide = pd.read_csv(io.StringIO("\n".join(lines)))
     long = wide.melt(id_vars=["ID", "Calendar Year"], var_name="mon", value_name="volume").dropna(subset=["volume"])

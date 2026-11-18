@@ -5,8 +5,8 @@ defaultEnvironment: local
 
 variables:
   wsf:
-    assetsS3Uri: ""
-    outputS3Uri: ""
+    assetsS3Uri: "s3://warehouse/wsf/assets"
+    outputS3Uri: "s3://warehouse/wsf/outputs"
   smtp:
     host: smtp.gmail.com
     port: "587"
