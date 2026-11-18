@@ -1,0 +1,46 @@
+.overlay {
+  /* Room for the app's mobile menu button, which sits in the top-left corner. */
+  --menu-button-space: 3rem;
+
+  position: relative;
+  z-index: 1;
+  height: 100dvh;
+  pointer-events: none;
+}
+
+.topLeft,
+.topRight {
+  position: absolute;
+  top: var(--mantine-spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+  pointer-events: none;
+}
+
+.topLeft > *,
+.topRight > * {
+  pointer-events: auto;
+}
+
+.topLeft {
+  left: var(--mantine-spacing-sm);
+  align-items: flex-start;
+}
+
+.topRight {
+  right: var(--mantine-spacing-sm);
+  width: min(380px, calc(100% - 2 * var(--mantine-spacing-sm)));
+  align-items: flex-end;
+}
+
+/* Below the nav breakpoint the navbar collapses to a menu button in the top-left. */
+@media (max-width: $mantine-breakpoint-sm) {
+  .topLeft {
+    top: calc(var(--mantine-spacing-sm) + var(--menu-button-space));
+  }
+
+  .topRight {
+    width: calc(100% - 2 * var(--mantine-spacing-sm) - var(--menu-button-space));
+  }
+}

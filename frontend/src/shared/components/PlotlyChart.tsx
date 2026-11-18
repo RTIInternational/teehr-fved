@@ -1,6 +1,7 @@
 import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef } from 'react';
 
+import { usePlotResize } from '@/shared/hooks/usePlotResize';
 import type { MapLocation } from '@/shared/types/locations';
 import type { TimeseriesFilters, TimeseriesResult } from '@/shared/types/timeseries';
 import { formatVariableName, formatUnitName, getYAxisTitle } from '@/shared/utils/formatters';
@@ -26,6 +27,7 @@ const PlotlyChart = ({
 }: PlotlyChartProps) => {
   const plotRef = useRef<HTMLDivElement & Plotly.PlotlyHTMLElement>(null);
   const selectedForecastTraceRef = useRef<number>(null);
+  usePlotResize(plotRef);
 
   useEffect(() => {
     if (!plotRef.current) return;

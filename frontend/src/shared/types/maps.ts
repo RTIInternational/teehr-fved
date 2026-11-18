@@ -27,8 +27,3 @@ export type MapMetricClamped = {
   original: number;
   clamped: number;
 };
-
-export type MapState = {
-  mapFilters: MapFilters;
-  mapLoaded: boolean;
-};

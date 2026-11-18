@@ -1,7 +1,26 @@
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Code,
+  CopyButton,
+  Grid,
+  Group,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Title,
+  Tooltip,
+} from '@mantine/core';
+import { IconCheck, IconCopy } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
-import { Alert, Button, Card, Col, Form, Row, Table } from 'react-bootstrap';
 
 import { useApiKeys, useCreateApiKey, useRevokeApiKey } from '@/shared/queries/apiKeys';
+
+import styles from './ApiKeysAdmin.module.css';
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
@@ -61,128 +80,145 @@ const ApiKeysAdmin = () => {
     apiKeysQuery.isLoading || createApiKeyMutation.isPending || revokeApiKeyMutation.isPending;
 
   return (
-    <div className="p-3">
-      <h4 className="mb-3">API Keys</h4>
-      <Row className="g-4">
-        <Col lg={5}>
-          <Card>
-            <Card.Body>
-              <Card.Title>Create API Key</Card.Title>
-              <Card.Text className="text-muted">
-                Key value is only shown once. Save it securely.
-              </Card.Text>
+    <Stack gap="md">
+      <Title order={3}>API Keys</Title>
+      <Grid gap="lg">
+        <Grid.Col span={{ base: 12, md: 5 }}>
+          <Card withBorder padding="lg">
+            <Title order={4}>Create API Key</Title>
+            <Text size="sm" c="dimmed" mb="md">
+              Key value is only shown once. Save it securely.
+            </Text>
 
-              <Form onSubmit={onCreate}>
-                <Form.Group className="mb-3" controlId="apiKeyName">
-                  <Form.Label>Name</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={createName}
-                    onChange={(e) => setCreateName(e.target.value)}
-                    maxLength={120}
-                    placeholder="e.g. docs-test-key"
-                    required
-                  />
-                </Form.Group>
-
-                <Form.Group className="mb-3" controlId="apiKeyScopes">
-                  <Form.Label>Scopes (optional)</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={createScopes}
-                    onChange={(e) => setCreateScopes(e.target.value)}
-                    placeholder="comma,separated,scopes"
-                  />
-                </Form.Group>
-
-                <Button type="submit" disabled={createApiKeyMutation.isPending}>
-                  {createApiKeyMutation.isPending ? 'Creating...' : 'Create Key'}
+            <form onSubmit={onCreate}>
+              <Stack gap="sm">
+                <TextInput
+                  label="Name"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  maxLength={120}
+                  placeholder="e.g. docs-test-key"
+                  required
+                />
+                <TextInput
+                  label="Scopes (optional)"
+                  value={createScopes}
+                  onChange={(e) => setCreateScopes(e.target.value)}
+                  placeholder="comma,separated,scopes"
+                />
+                <Button type="submit" loading={createApiKeyMutation.isPending} w="fit-content">
+                  Create Key
                 </Button>
-              </Form>
+              </Stack>
+            </form>
 
-              {createdKey && (
-                <Alert variant="success" className="mt-3 mb-0">
-                  <div className="fw-semibold">New key (copy now):</div>
-                  <code>{createdKey}</code>
-                </Alert>
-              )}
-            </Card.Body>
+            {createdKey && (
+              <Alert color="green" title="New key (copy now)" mt="md">
+                <Group gap="xs" wrap="nowrap">
+                  <Code block className={styles.key}>
+                    {createdKey}
+                  </Code>
+                  <CopyButton value={createdKey}>
+                    {({ copied, copy }) => (
+                      <Tooltip label={copied ? 'Copied' : 'Copy key'}>
+                        <ActionIcon
+                          variant="subtle"
+                          color={copied ? 'green' : 'gray'}
+                          onClick={copy}
+                          aria-label="Copy API key"
+                        >
+                          {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </CopyButton>
+                </Group>
+              </Alert>
+            )}
           </Card>
-        </Col>
+        </Grid.Col>
 
-        <Col lg={7}>
-          <Card>
-            <Card.Body>
-              <Card.Title>Existing API Keys</Card.Title>
+        <Grid.Col span={{ base: 12, md: 7 }}>
+          <Card withBorder padding="lg">
+            <Title order={4} mb="md">
+              Existing API Keys
+            </Title>
 
-              {(error || apiKeysQuery.error) && (
-                <Alert variant="danger">{error || apiKeysQuery.error?.message}</Alert>
-              )}
+            {(error || apiKeysQuery.error) && (
+              <Alert color="red" mb="md">
+                {error || apiKeysQuery.error?.message}
+              </Alert>
+            )}
 
-              <div className="table-responsive">
-                <Table striped bordered hover size="sm" className="mb-0 align-middle">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Scopes</th>
-                      <th>Created</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {apiKeysQuery.isLoading && (
-                      <tr>
-                        <td colSpan={5} className="text-center text-muted py-3">
-                          Loading API keys...
-                        </td>
-                      </tr>
-                    )}
-                    {!apiKeysQuery.isLoading && sortedItems.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="text-center text-muted py-3">
-                          No API keys yet.
-                        </td>
-                      </tr>
-                    )}
-                    {sortedItems.map((item) => {
-                      const revoked = Boolean(item.revoked_at);
-                      return (
-                        <tr key={item.id}>
-                          <td>{item.name}</td>
-                          <td>{(item.scopes || []).join(', ') || '-'}</td>
-                          <td>
-                            {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
-                          </td>
-                          <td>{revoked ? 'Revoked' : 'Active'}</td>
-                          <td>
-                            {!revoked ? (
-                              <Button
-                                variant="outline-danger"
-                                size="sm"
-                                disabled={isBusy}
-                                onClick={() => onRevoke(item.id)}
-                              >
-                                {revokeApiKeyMutation.isPending &&
+            <Table.ScrollContainer minWidth={560}>
+              <Table striped highlightOnHover withTableBorder withColumnBorders fz="sm">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Name</Table.Th>
+                    <Table.Th>Scopes</Table.Th>
+                    <Table.Th>Created</Table.Th>
+                    <Table.Th>Status</Table.Th>
+                    <Table.Th>Action</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {apiKeysQuery.isLoading && (
+                    <Table.Tr>
+                      <Table.Td colSpan={5} ta="center" c="dimmed" py="md">
+                        Loading API keys...
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                  {!apiKeysQuery.isLoading && sortedItems.length === 0 && (
+                    <Table.Tr>
+                      <Table.Td colSpan={5} ta="center" c="dimmed" py="md">
+                        No API keys yet.
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                  {sortedItems.map((item) => {
+                    const revoked = Boolean(item.revoked_at);
+                    return (
+                      <Table.Tr key={item.id}>
+                        <Table.Td>{item.name}</Table.Td>
+                        <Table.Td>{(item.scopes || []).join(', ') || '-'}</Table.Td>
+                        <Table.Td>
+                          {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color={revoked ? 'gray' : 'green'}>
+                            {revoked ? 'Revoked' : 'Active'}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          {!revoked ? (
+                            <Button
+                              variant="outline"
+                              color="red"
+                              size="compact-xs"
+                              disabled={isBusy}
+                              loading={
+                                revokeApiKeyMutation.isPending &&
                                 revokeApiKeyMutation.variables === item.id
-                                  ? 'Revoking...'
-                                  : 'Revoke'}
-                              </Button>
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </Table>
-              </div>
-            </Card.Body>
+                              }
+                              onClick={() => onRevoke(item.id)}
+                            >
+                              Revoke
+                            </Button>
+                          ) : (
+                            '-'
+                          )}
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
           </Card>
-        </Col>
-      </Row>
-    </div>
+        </Grid.Col>
+      </Grid>
+    </Stack>
   );
 };
 

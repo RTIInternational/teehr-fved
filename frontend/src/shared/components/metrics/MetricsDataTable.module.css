@@ -1,0 +1,65 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  border: 1px solid var(--mantine-color-default-border);
+}
+
+.filterBar {
+  flex: 0 0 auto;
+  padding: 4px var(--mantine-spacing-sm);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background-color: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
+}
+
+.scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Wide pivots scroll horizontally rather than squeezing their columns. */
+.table {
+  min-width: 600px;
+  border-bottom: 1px solid var(--table-border-color);
+}
+
+.table th {
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.table td {
+  white-space: nowrap;
+}
+
+.sortButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.sortIcon {
+  flex-shrink: 0;
+  opacity: 0.3;
+}
+
+.sortIcon[data-active] {
+  opacity: 1;
+}
+
+/* Group-by columns identify the row; weight alone sets them apart from the values. */
+.groupByCell {
+  font-weight: 500;
+}
+
+/* Right-aligned, fixed-width digits so values line up down a column. */
+.metricCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

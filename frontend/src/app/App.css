@@ -1,0 +1,30 @@
+/* App-wide styles that Mantine doesn't cover. */
+
+/* The app shell and map fill the viewport. */
+html,
+body {
+  height: 100%;
+}
+
+#root {
+  height: 100vh;
+}
+
+/* MapLibre popups (built from HTML strings, so not Mantine-styled) */
+.maplibregl-popup {
+  max-width: 300px;
+}
+
+.maplibregl-popup-content {
+  padding: 8px;
+  border-radius: 6px;
+}
+
+/* Plotly modebar: blend into the chart instead of a solid bar */
+.js-plotly-plot .plotly .modebar {
+  background: transparent;
+}
+
+.js-plotly-plot .plotly .modebar-btn {
+  background: rgba(255, 255, 255, 0.7);
+}

@@ -1,0 +1,4 @@
+/* Display-only checkbox: the Combobox.Option handles the click/keyboard toggle. */
+.checkbox {
+  pointer-events: none;
+}
