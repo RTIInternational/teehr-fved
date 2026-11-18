@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import pandas as pd
 from prefect import flow, get_run_logger, task
@@ -223,6 +223,152 @@ def _validate_forecasts_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 @task(cache_policy=NO_CACHE)
+def _build_forecast_period_metadata_from_dataframe(
+    forecast_df: pd.DataFrame,
+) -> dict[int, dict[str, Any]]:
+    """Build forecast period metadata directly from forecast DataFrame.
+    
+    Since we only have the flattened forecast DataFrame (not the original API response),
+    we infer the forecast periods by analyzing variable_name patterns.
+    
+    Key logic: NRCS forecasts are truncated as months progress (Apr-Jul → May-Jul → Jun-Jul).
+    All these truncated variants (0407, 0507, 0607) belong to the SAME forecast period.
+    For each end_month found in the data, we identify the earliest start_month,
+    considering only the periods present in the data (not merged across locations).
+    
+    Example:
+        Input variables: volume_0407, volume_0507, volume_0607, volume_0409, volume_0509
+        Grouped by end_month:
+          - end_month=7: [0407, 0507, 0607] → earliest start_month=4 → volume_0407
+          - end_month=9: [0409, 0509] → earliest start_month=4 → volume_0409
+        Output metadata:
+          {7: {start_month: 4, end_month: 7, variable_base: 'volume_0407'},
+           9: {start_month: 4, end_month: 9, variable_base: 'volume_0409'}}
+    
+    Args:
+        forecast_df: DataFrame with forecast data including variable_name column.
+    
+    Returns:
+        Dict mapping end_month (int) to metadata with keys:
+        start_month, end_month, variable_base, etc.
+    """
+    if forecast_df.empty:
+        return {}
+    
+    # Collect all (start_month, end_month) pairs from ALL variables in the data
+    periods_by_end_month: dict[int, list[int]] = {}
+    
+    for var_name in forecast_df["variable_name"].unique():
+        if not isinstance(var_name, str) or "_" not in var_name:
+            continue
+        
+        parts = var_name.split("_")
+        if len(parts) < 2:
+            continue
+        
+        mmdd = parts[1] if len(parts) > 1 else None
+        if not mmdd or len(mmdd) < 4:
+            continue
+        
+        try:
+            start_month = int(mmdd[0:2])
+            end_month = int(mmdd[2:4])
+        except (ValueError, IndexError):
+            continue
+        
+        # Basic validation of months
+        if start_month < 1 or start_month > 12 or end_month < 1 or end_month > 12:
+            continue
+        
+        # Collect all start_months for each end_month
+        if end_month not in periods_by_end_month:
+            periods_by_end_month[end_month] = []
+        periods_by_end_month[end_month].append(start_month)
+    
+    # For each end_month, the earliest start_month represents the full period
+    metadata = {}
+    for end_month, start_months in periods_by_end_month.items():
+        earliest_start = min(start_months)
+        metadata[end_month] = {
+            "start_month": earliest_start,
+            "end_month": end_month,
+            "variable_base": f"volume_{earliest_start:02d}{end_month:02d}",
+        }
+    
+    return metadata
+
+
+@task(cache_policy=NO_CACHE)
+@task(cache_policy=NO_CACHE)
+def _process_observed_cumsum(
+    obs_df: pd.DataFrame,
+    forecast_period_metadata: dict[int, dict[str, Any]],
+    forecast_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Generate cumulative sum observations from monthly observations."""
+    logger = get_run_logger()
+
+    if obs_df.empty or not forecast_period_metadata:
+        logger.info("⚠️ Skipping cumsum generation (empty data or metadata)")
+        return pd.DataFrame()
+
+    try:
+        cumsum_df = nrcs_utils._generate_observed_cumsum(obs_df, forecast_period_metadata, forecast_df)
+        logger.info(f"✅ Generated {len(cumsum_df)} cumsum observation records")
+        return cumsum_df
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to generate cumsum observations: {e}")
+        return pd.DataFrame()
+
+
+@task(cache_policy=NO_CACHE)
+def _process_forecast_reconstruction(
+    forecast_df: pd.DataFrame,
+    cumsum_obs_df: pd.DataFrame,
+    forecast_period_metadata: dict[int, dict[str, Any]],
+) -> pd.DataFrame:
+    """Reconstruct full-period forecasts from truncated API data."""
+    logger = get_run_logger()
+
+    if forecast_df.empty or not forecast_period_metadata:
+        logger.info("⚠️ Skipping forecast reconstruction (empty data or metadata)")
+        return forecast_df
+
+    try:
+        reconstructed_df = nrcs_utils._reconstruct_full_period_forecasts(
+            forecast_df, cumsum_obs_df, forecast_period_metadata
+        )
+        logger.info(f"✅ Reconstructed {len(reconstructed_df)} forecast records")
+        return reconstructed_df
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to reconstruct forecasts: {e}")
+        return forecast_df
+
+
+@task(cache_policy=NO_CACHE)
+def _process_final_observed_values(
+    cumsum_obs_df: pd.DataFrame,
+    forecast_period_metadata: dict[int, dict[str, Any]],
+) -> pd.DataFrame:
+    """Generate final observed values from cumsum observations."""
+    logger = get_run_logger()
+
+    if cumsum_obs_df.empty or not forecast_period_metadata:
+        logger.info("⚠️ Skipping final observed generation (empty cumsum data or metadata)")
+        return pd.DataFrame()
+
+    try:
+        final_obs_df = nrcs_utils._generate_final_observed_value(
+            cumsum_obs_df, forecast_period_metadata
+        )
+        logger.info(f"✅ Generated {len(final_obs_df)} final observed records")
+        return final_obs_df
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to generate final observed values: {e}")
+        return pd.DataFrame()
+
+
+@task(cache_policy=NO_CACHE)
 def _load_to_warehouse_primary(
     ev: teehr.RemoteReadWriteEvaluation,
     df: pd.DataFrame,
@@ -361,6 +507,41 @@ def ingest_nrcs_streamflow_forecasts_observations(
             start_date=start_date_str,
             end_date=end_date_str,
         )
+
+        # Process forecasts to extract period metadata and generate adjusted timeseries
+        logger.info("Processing NRCS forecast periods and observations...")
+        
+        # Extract forecast period metadata from variable names in forecast DataFrame
+        forecast_period_metadata = _build_forecast_period_metadata_from_dataframe(forecast_df)
+        
+        if not forecast_period_metadata:
+            logger.warning("⚠️ No forecast periods identified in data")
+        else:
+            # Generate cumulative sum observations
+            cumsum_obs_df = _process_observed_cumsum(obs_df, forecast_period_metadata, forecast_df)
+            if not cumsum_obs_df.empty:
+                obs_df = pd.concat([obs_df, cumsum_obs_df], ignore_index=True)
+                logger.info(f"Added {len(cumsum_obs_df)} cumsum observations to dataset")
+            
+            # Reconstruct full-period forecasts from truncated API data
+            reconstructed_forecast_df = _process_forecast_reconstruction(
+                forecast_df, cumsum_obs_df, forecast_period_metadata
+            )
+            if not reconstructed_forecast_df.empty:
+                forecast_df = pd.concat(
+                    [forecast_df, reconstructed_forecast_df], ignore_index=True
+                )
+                logger.info(
+                    f"Added {len(reconstructed_forecast_df)} reconstructed forecasts to dataset"
+                )
+            
+            # Generate final observed values at end of periods
+            final_obs_df = _process_final_observed_values(
+                cumsum_obs_df, forecast_period_metadata
+            )
+            if not final_obs_df.empty:
+                obs_df = pd.concat([obs_df, final_obs_df], ignore_index=True)
+                logger.info(f"Added {len(final_obs_df)} final observed values to dataset")
 
         # Validate DataFrames
         obs_df = _validate_observations_dataframe(obs_df)

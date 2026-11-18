@@ -265,19 +265,56 @@ ELEMENT_TO_VARIABLE_MAPPING: dict[str, dict[str, Any]] = {
 }
 
 NRCS_VARIABLE_MAPPING: dict[str, str] = {
-    "volume_0407_sum": "Seasonal summed water supply volume (Apr-Jul)",
-    "volume_0507_sum": "Seasonal summed water supply volume (May-Jul)",
-    "volume_0607_sum": "Seasonal summed water supply volume (Jun-Jul)",
-    "volume_0409_sum": "Seasonal summed water supply volume (Apr-Sep)",
-    "volume_0509_sum": "Seasonal summed water supply volume (May-Sep)",
-    "volume_0709_sum": "Seasonal summed water supply volume (Jul-Sep)",
-    "volume_0307_sum": "Seasonal summed water supply volume (Mar-Jul)",
+    # Full forecast periods (earliest start for each end month)
+    # Only these represent the complete forecast period for analysis
     "volume_0207_sum": "Seasonal summed water supply volume (Feb-Jul)",
     "volume_0209_sum": "Seasonal summed water supply volume (Feb-Sep)",
+    "volume_0307_sum": "Seasonal summed water supply volume (Mar-Jul)",
     "volume_0309_sum": "Seasonal summed water supply volume (Mar-Sep)",
     "volume_0406_sum": "Seasonal summed water supply volume (Apr-Jun)",
-    "volume_0506_sum": "Seasonal summed water supply volume (May-Jun)",
+    "volume_0407_sum": "Seasonal summed water supply volume (Apr-Jul)",
+    "volume_0409_sum": "Seasonal summed water supply volume (Apr-Sep)",
     "volume_monthly_sum": "Monthly summed water supply volume",
+    # Cumulative sum observations (computed from monthly data)
+    # Only generated for actual full forecast periods present in data
+    "volume_0207_cumsum": "Cumulative water supply volume (Feb-Jul)",
+    "volume_0209_cumsum": "Cumulative water supply volume (Feb-Sep)",
+    "volume_0307_cumsum": "Cumulative water supply volume (Mar-Jul)",
+    "volume_0309_cumsum": "Cumulative water supply volume (Mar-Sep)",
+    "volume_0406_cumsum": "Cumulative water supply volume (Apr-Jun)",
+    "volume_0407_cumsum": "Cumulative water supply volume (Apr-Jul)",
+    "volume_0409_cumsum": "Cumulative water supply volume (Apr-Sep)",
+}
+
+# Internal mapping for handling truncated forecast variants during reconstruction
+# Maps truncated periods to their full period equivalents
+# E.g., 0507 (May-Jul) is a truncated variant of 0407 (Apr-Jul)
+TRUNCATED_TO_FULL_PERIOD_MAP: dict[tuple[int, int], tuple[int, int]] = {
+    (5, 6): (4, 6),  # May-Jun → Apr-Jun
+    (5, 7): (4, 7),  # May-Jul → Apr-Jul
+    (5, 9): (4, 9),  # May-Sep → Apr-Sep
+    (6, 6): (4, 6),  # Jun-Jun → Apr-Jun
+    (6, 7): (4, 7),  # Jun-Jul → Apr-Jul
+    (6, 9): (4, 9),  # Jun-Sep → Apr-Sep
+    (7, 9): (4, 9),  # Jul-Sep → Apr-Sep
+    # Additional mappings for other start periods
+    (3, 7): (2, 7),  # Mar-Jul → Feb-Jul
+    (3, 9): (2, 9),  # Mar-Sep → Feb-Sep
+    (4, 7): (3, 7),  # Apr-Jul → Mar-Jul
+    (4, 9): (3, 9),  # Apr-Sep → Mar-Sep
+}
+
+# Forecast variable mapping for filtering (includes truncated variants that will be retagged)
+# This is used only for filtering raw API data - truncated variants are retagged during reconstruction
+_NRCS_FORECAST_FILTERING_MAP: dict[str, str] = {
+    **NRCS_VARIABLE_MAPPING,  # Include all warehouse-valid variables
+    # Add truncated variants for internal processing (not stored in warehouse)
+    "volume_0506_sum": "Seasonal summed water supply volume (May-Jun)",
+    "volume_0507_sum": "Seasonal summed water supply volume (May-Jul)",
+    "volume_0509_sum": "Seasonal summed water supply volume (May-Sep)",
+    "volume_0607_sum": "Seasonal summed water supply volume (Jun-Jul)",
+    "volume_0609_sum": "Seasonal summed water supply volume (Jun-Sep)",
+    "volume_0709_sum": "Seasonal summed water supply volume (Jul-Sep)",
 }
 
 sim_cols_raw = list(secondary_timeseries_schema(type="pandas").columns.keys())
@@ -300,11 +337,17 @@ def _configuration_for_element_code(
 
 
 def _conversion_for_unit_code(
-    element_code: str,
+    element_code: str | None,
     unit_code: str | None,
 ) -> float | None:
     """Select an element's permitted conversion using the response unit code."""
-    variable_config = ELEMENT_TO_VARIABLE_MAPPING[element_code]
+    if element_code is None:
+        return None
+    
+    variable_config = ELEMENT_TO_VARIABLE_MAPPING.get(element_code)
+    if variable_config is None:
+        return None
+    
     allowed_conversions = variable_config.get("conversion")
 
     if allowed_conversions is None:
@@ -756,6 +799,296 @@ def _filter_unmapped_variables(
     return df
 
 
+# =============================================================================
+# Forecast Period Processing
+# =============================================================================
+
+def _generate_observed_cumsum(
+    observed_df: pd.DataFrame,
+    forecast_period_metadata: dict[int, dict[str, Any]],
+    forecasts_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Generate cumulative sum timeseries from monthly observations.
+    
+    For each location and forecast period, creates a cumulative sum timeseries
+    starting from the period's start_month. This enables direct comparison with 
+    reconstructed forecasts (which provide full-period sums).
+    
+    When forecasts_df is provided, metadata is filtered to only include periods
+    that have actual forecasts FOR EACH LOCATION, preventing periods from other
+    locations from being included.
+    
+    Args:
+        observed_df: DataFrame with columns: location_id, value_time, value, 
+                     unit_name, and optional _element_code.
+        forecast_period_metadata: Dict mapping end_month → period metadata.
+        forecasts_df: Optional DataFrame to validate periods per location.
+    
+    Returns:
+        DataFrame with new rows for cumsum timeseries with variable_name pattern:
+        volume_MMDD_cumsum, configuration_name='nrcs_adjusted_observed'.
+    """
+    if observed_df.empty:
+        return pd.DataFrame()
+    
+    rows: list[dict[str, Any]] = []
+    
+    for location_id in observed_df["location_id"].unique():
+        location_obs = observed_df[observed_df["location_id"] == location_id].copy()
+        location_obs = location_obs.sort_values("value_time").reset_index(drop=True)
+        
+        # Build location-specific periods from forecast data if available
+        location_periods = {}
+        if forecasts_df is not None and not forecasts_df.empty:
+            location_forecasts = forecasts_df[forecasts_df["location_id"] == location_id]
+            periods_by_end = {}
+            
+            for var_name in location_forecasts["variable_name"].unique():
+                if isinstance(var_name, str) and "_" in var_name:
+                    parts = var_name.split("_")
+                    mmdd = parts[1] if len(parts) > 1 else None
+                    if mmdd and len(mmdd) >= 4:
+                        try:
+                            start_month = int(mmdd[0:2])
+                            end_month = int(mmdd[2:4])
+                            if end_month not in periods_by_end:
+                                periods_by_end[end_month] = []
+                            periods_by_end[end_month].append(start_month)
+                        except ValueError:
+                            pass
+            
+            # Build metadata for this location's periods
+            for end_month, start_months in periods_by_end.items():
+                earliest = min(start_months)
+                location_periods[end_month] = {
+                    "start_month": earliest,
+                    "end_month": end_month,
+                    "variable_base": f"volume_{earliest:02d}{end_month:02d}",
+                }
+        else:
+            # Fallback: use global metadata
+            location_periods = forecast_period_metadata
+        
+        # Generate cumsum for this location's periods
+        for end_month, period_info in location_periods.items():
+            start_month = period_info["start_month"]
+            end_month_val = period_info["end_month"]
+            start_day = period_info.get("start_day", 1)
+            variable_base = period_info["variable_base"]
+            
+            # Filter observations that fall within [start_month, end_month] range
+            relevant_obs = []
+            for _, obs_row in location_obs.iterrows():
+                v_time = obs_row["value_time"]
+                month = v_time.month
+                # Check if month is within the forecast period
+                if start_month <= end_month_val:
+                    # Normal case: April-July (04-07)
+                    if start_month <= month <= end_month_val:
+                        relevant_obs.append(obs_row)
+                else:
+                    # Wrapped case: October-February (10-02) - would need special handling
+                    # For now, only handle normal case
+                    if month >= start_month or month <= end_month_val:
+                        relevant_obs.append(obs_row)
+            
+            if not relevant_obs:
+                continue
+            
+            # Build cumsum timeseries
+            cumsum_value = 0.0
+            for obs in relevant_obs:
+                cumsum_value += obs["value"]
+                rows.append({
+                    "reference_time": pd.NaT,
+                    "value_time": obs["value_time"],
+                    "value": cumsum_value,
+                    "variable_name": f"{variable_base}_cumsum",
+                    "configuration_name": "nrcs_adjusted_observed",
+                    "unit_name": obs["unit_name"],
+                    "location_id": location_id,
+                    "_element_code": obs.get("_element_code"),
+                })
+            
+            # Add initial zero point if first observation is after period start
+            if relevant_obs:
+                first_obs_month = relevant_obs[0]["value_time"].month
+                first_obs_year = relevant_obs[0]["value_time"].year
+                if first_obs_month > start_month:
+                    period_start = pd.Timestamp(year=first_obs_year, month=start_month, day=start_day)
+                    rows.append({
+                        "reference_time": pd.NaT,
+                        "value_time": period_start,
+                        "value": 0.0,
+                        "variable_name": f"{variable_base}_cumsum",
+                        "configuration_name": "nrcs_adjusted_observed",
+                        "unit_name": location_obs.iloc[0]["unit_name"],
+                        "location_id": location_id,
+                        "_element_code": location_obs.iloc[0].get("_element_code"),
+                    })
+    
+    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=_OBSERVED_COLUMNS)
+
+
+def _reconstruct_full_period_forecasts(
+    forecasts_df: pd.DataFrame,
+    cumsum_df: pd.DataFrame,
+    forecast_period_metadata: dict[int, dict[str, Any]],
+) -> pd.DataFrame:
+    """Reconstruct full-period forecasts from truncated API data.
+    
+    NRCS API returns truncated forecasts (e.g., May 1-Jul 31 for the final
+    forecast when the full period is Apr-Jul). This function:
+    1. Keeps ALL forecasts for each end_month (full period and truncated variants)
+    2. For truncated forecasts, reconstructs by adding previous month's observed cumsum
+    3. Tags all forecasts with the full-period variable_name
+    
+    For example, for forecast period 0407 (Apr-Jul):
+    - 0407 forecast covers Apr-Jul (use as-is)
+    - 0507 forecast covers May-Jul, add April observed cumsum to get Apr-Jul total
+    - 0607 forecast covers Jun-Jul, add May observed cumsum to get Apr-Jul total
+    
+    Args:
+        forecasts_df: DataFrame with forecast data (location_id, reference_time,
+                     value_time, value, variable_name, member, etc.).
+        cumsum_df: Output from _generate_observed_cumsum for month offsets.
+        forecast_period_metadata: Dict mapping end_month → metadata with variable_base.
+    
+    Returns:
+        DataFrame with reconstructed forecasts all tagged with full-period variable_names.
+    """
+    if forecasts_df.empty:
+        return forecasts_df[[]].copy()
+    
+    output_rows: list[dict[str, Any]] = []
+    
+    for _, row in forecasts_df.iterrows():
+        location_id = row["location_id"]
+        pub_time = row["reference_time"]
+        value_time = row["value_time"]
+        forecast_value = row["value"]
+        member = row.get("member", "mean")
+        var_name = row["variable_name"]
+        
+        # Parse variable name to get start_month and end_month
+        parts = var_name.split("_")
+        if len(parts) < 2:
+            # Can't parse this variable, skip it
+            continue
+        
+        mmdd = parts[1] if len(parts) > 1 else None
+        if not mmdd or len(mmdd) < 4:
+            continue
+        
+        try:
+            start_month_this = int(mmdd[0:2])
+            end_month_this = int(mmdd[2:4])
+        except (ValueError, IndexError):
+            continue
+        
+        # Check if this end_month is in our metadata
+        if end_month_this not in forecast_period_metadata:
+            continue
+        
+        period_info = forecast_period_metadata[end_month_this]
+        full_period_base = period_info["variable_base"]
+        full_period_start = period_info["start_month"]
+        
+        # Reconstruct the forecast value
+        reconstructed_value = forecast_value
+        
+        if start_month_this != full_period_start:
+            # This is a truncated variant (e.g., 0507 when full is 0407)
+            # We need to add the previous month's observed cumsum to get the full period total
+            
+            # Calculate which month is "previous" (the month before the truncation starts)
+            # E.g., if forecast starts in May (05), previous is April (04)
+            previous_month = start_month_this - 1
+            if previous_month == 0:
+                previous_month = 12
+            
+            # Look up the cumsum value from cumsum_df (if available)
+            if not cumsum_df.empty and "location_id" in cumsum_df.columns:
+                # Find matching cumsum rows
+                # cumsum rows should have: location_id, value_time (with the month), 
+                # variable_name containing the full_period_base, and the cumsum value
+                cumsum_matches = cumsum_df[
+                    (cumsum_df["location_id"] == location_id) &
+                    (cumsum_df["variable_name"] == f"{full_period_base}_cumsum") &
+                    (cumsum_df["value_time"].dt.month == previous_month)
+                ]
+                
+                if not cumsum_matches.empty:
+                    # Get the latest (most recent) cumsum value for the previous month
+                    # Sort by value_time descending and take the first
+                    cumsum_matches = cumsum_matches.sort_values("value_time", ascending=False)
+                    prev_cumsum_value = cumsum_matches.iloc[0]["value"]
+                    reconstructed_value = prev_cumsum_value + forecast_value
+        
+        # Create the reconstructed row with the full-period variable name
+        reconstructed = row.copy()
+        reconstructed["variable_name"] = f"{full_period_base}_sum"
+        reconstructed["value"] = reconstructed_value
+        output_rows.append(reconstructed)
+    
+    return pd.DataFrame(output_rows)[_FORECAST_COLUMNS] if output_rows else pd.DataFrame(columns=_FORECAST_COLUMNS)
+
+
+def _generate_final_observed_value(
+    cumsum_df: pd.DataFrame,
+    forecast_period_metadata: dict[int, dict[str, Any]],
+) -> pd.DataFrame:
+    """Generate final observed value at end of forecast period.
+    
+    Extracts the last cumsum value for each forecast period and location.
+    This represents the total observed value for the entire period and provides
+    a comparable "final observed" timeseries with the same variable_name as
+    reconstructed forecasts.
+    
+    Args:
+        cumsum_df: DataFrame from _generate_observed_cumsum with cumsum observations.
+        forecast_period_metadata: Dict mapping end_month → period metadata.
+    
+    Returns:
+        DataFrame with final observed rows (variable_name: volume_MMDD_sum).
+        Each row is the last cumsum value for that period per location.
+    """
+    if cumsum_df.empty or not forecast_period_metadata:
+        return pd.DataFrame(columns=_OBSERVED_COLUMNS)
+    
+    rows: list[dict[str, Any]] = []
+    
+    for location_id in cumsum_df["location_id"].unique():
+        location_cumsum = cumsum_df[cumsum_df["location_id"] == location_id].copy()
+        
+        for end_month, period_info in forecast_period_metadata.items():
+            variable_base = period_info["variable_base"]
+            cumsum_var_name = f"{variable_base}_cumsum"
+            
+            # Find cumsum rows for this period
+            period_cumsum = location_cumsum[location_cumsum["variable_name"] == cumsum_var_name]
+            
+            if period_cumsum.empty:
+                continue
+            
+            # Get the last (final) cumsum value
+            period_cumsum = period_cumsum.sort_values("value_time")
+            final_row = period_cumsum.iloc[-1]
+            
+            rows.append({
+                "reference_time": pd.NaT,
+                "value_time": final_row["value_time"],
+                "value": final_row["value"],
+                "variable_name": f"{variable_base}_sum",
+                "configuration_name": "nrcs_adjusted_observed",
+                "unit_name": final_row["unit_name"],
+                "location_id": location_id,
+                "_element_code": final_row.get("_element_code"),
+            })
+    
+    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=_OBSERVED_COLUMNS)
+
+
 def fetch_nrcs_forecasts(
     start_date: str,
     end_date: str,
@@ -797,7 +1130,7 @@ def fetch_nrcs_forecasts(
         frames.append(_forecasts_to_dataframe(response))
 
     df = _combine_location_frames(frames, include_member=True)
-    return _filter_unmapped_variables(df, variable_mapping=NRCS_VARIABLE_MAPPING)
+    return _filter_unmapped_variables(df, variable_mapping=_NRCS_FORECAST_FILTERING_MAP)
 
 
 def fetch_nrcs_observations(
