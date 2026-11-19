@@ -208,7 +208,7 @@ deployments:
         "temp_dir_path": *temp_dir_path,
         "configuration_name": "ua_swann_4km",
         "location_id_prefix": "usgsbasin",
-        "grid_variable_name": "swe_daily_inst"
+        "grid_variable_name": "SWE"
       }
     }
     work_pool: *work_pool

@@ -14,8 +14,10 @@ from prefect.blocks.system import Secret
 from pydantic import AfterValidator, BaseModel, Field
 from teehr.fetching.utils import REMOTE_RETRY_CONFIG
 
+from workflows.models.packed_encoding import PackedEncoding
 from workflows.utils.data_status import with_status
 from workflows.utils.repo_const import LEAD_TIME, MEMBER, REFERENCE_TIME, STATUS_COORD, STATUS_MEANINGS
+from workflows.utils.teehr_mapping import DEPTH_DAILY_INST, MM, SWE_DAILY_INST, TeehrMapping
 
 # Columns of a source listing, indexed by each file's timestamp (or forecast step)
 LISTING_COLUMNS = ["url", STATUS_COORD, "last_modified"]
@@ -58,6 +60,20 @@ class GriddedSource(BaseModel, ABC):
     def grid_name(self) -> str:
         """Grid (CRS, pixel size, extent) the source's data is on; sources sharing a grid share a name."""
         return self.repository_name()
+
+    def teehr_mappings(self) -> dict[str, TeehrMapping]:
+        """teehr variable, unit and conversion of each ingested variable, keyed by its own name.
+
+        Ingest stamps them on the repo as ``teehr:*`` attributes, which the dashboard and mean areal values read.
+        """
+        return {}
+
+    def overview_encoding(self) -> dict[str, PackedEncoding]:
+        """Overview packing of each ingested variable, keyed by its own name, in its stored units.
+
+        Variables not listed get float32 overviews.
+        """
+        return {}
 
     def lead_times(self) -> list[int] | None:
         """Forecast lead times in hours, fixed when the repo is created; None for analysis sources."""
@@ -178,6 +194,18 @@ class UASwan4km(GriddedSource):
     def ingest_variables(self) -> list[str]:
         return list(self.variables)
 
+    def teehr_mappings(self) -> dict[str, TeehrMapping]:
+        return {
+            "SWE": TeehrMapping(MM, SWE_DAILY_INST, source_units="millimeters h20"),
+            "DEPTH": TeehrMapping(MM, DEPTH_DAILY_INST, source_units="millimeters snow thickness"),
+        }
+
+    def overview_encoding(self) -> dict[str, PackedEncoding]:
+        return {
+            "SWE": PackedEncoding(dtype="uint16", max_value=10000, units="millimeters h20"),
+            "DEPTH": PackedEncoding(dtype="uint16", max_value=8000, units="millimeters snow thickness"),
+        }
+
     def preprocess(self, ds: xr.Dataset, url: str) -> xr.Dataset:
         return with_status(ds, url.rsplit("_", 1)[-1].removesuffix(".nc"))
 
@@ -231,6 +259,14 @@ class ISnobal(GriddedSource):
     def ingest_variables(self) -> list[str]:
         return [self.variable]
 
+    def teehr_mappings(self) -> dict[str, TeehrMapping]:
+        # 1 kg m-2 of water is 1 mm deep
+        return {"specific_mass": TeehrMapping(MM, SWE_DAILY_INST, source_units=self.units["specific_mass"])}
+
+    def overview_encoding(self) -> dict[str, PackedEncoding]:
+        # Peaks near 7,700 kg m-2 (willamette_extended)
+        return {"specific_mass": PackedEncoding(dtype="uint16", max_value=10000, units=self.units["specific_mass"])}
+
     def credentials(self) -> dict:
         return _secret_credentials("m3works")
 
@@ -255,7 +291,7 @@ class CUSwe(GriddedSource):
     store_kwargs: ClassVar[dict] = {"region": "us-east-2", "retry_config": REMOTE_RETRY_CONFIG}
     virtual_store_kwargs: ClassVar[dict] = {"region": "us-east-2"}
     time_step: ClassVar[pd.Timedelta] = pd.Timedelta("1D")
-    # The files carry no units tag; m is unconfirmed. Ingest converts to mm.
+    # The files carry no units tag; m is unconfirmed
     units: ClassVar[str] = "m"
     file_pattern: ClassVar[re.Pattern] = re.compile(r"/WW_phvrcn_(\d{8})_fscamsk_clp\.tif$")
 
@@ -293,6 +329,13 @@ class CUSwe(GriddedSource):
 
     def ingest_variables(self) -> list[str]:
         return [self.variable]
+
+    def teehr_mappings(self) -> dict[str, TeehrMapping]:
+        return {self.variable: TeehrMapping(MM, SWE_DAILY_INST, scale=1000.0, source_units=self.units)}
+
+    def overview_encoding(self) -> dict[str, PackedEncoding]:
+        # About 0.15 mm steps
+        return {self.variable: PackedEncoding(dtype="uint16", max_value=10, units=self.units)}
 
     def credentials(self) -> dict:
         return _secret_credentials("cu-swe")
