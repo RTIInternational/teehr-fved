@@ -1,7 +1,12 @@
-"""Ingest NRCS AWDB streamflow forecasts and observations.
+"""Ingest NRCS AWDB streamflow forecasts and observations (per-location processing with water year support).
 
-This workflow fetches both NRCS-adjusted forecast and observed SRVO (Snow Water
-Equivalent) data from the NRCS AWDB REST API and loads it into the teehr warehouse.
+This workflow processes each location sequentially:
+1. Fetch location's observations and forecasts
+2. Identify unique full forecast periods for the location
+3. Generate cumsum observations (only for period months)
+4. Extract final observed values from cumsum
+5. Process forecasts with Cases A/B/C retagging and reconstruction
+6. Write all locations' combined data to warehouse
 """
 
 from __future__ import annotations
@@ -9,7 +14,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Union
+from typing import Union
 
 import pandas as pd
 from prefect import flow, get_run_logger, task
@@ -19,14 +24,30 @@ import teehr
 from teehr.evaluation.spark_session_utils import create_spark_session
 
 from utils import nrcs_utils
+from utils.nrcs_utils import _FORECAST_COLUMNS
 from workflows.utils.common_utils import initialize_evaluation
 
 
 # Constants
-DEFAULT_LOOKBACK_DAYS = 120
 CONFIGURATION_NAME_FORECASTS = "nrcs_adjusted_forecast"
 CONFIGURATION_NAME_OBSERVATIONS = "nrcs_adjusted_observed"
-FAILURE_RATE_THRESHOLD = 0.5  # Allow up to 50% failure rate before failing workflow
+
+
+def _water_year_to_dates(water_year: int) -> tuple[str, str]:
+    """Convert water year number to date range strings.
+    
+    Water year runs Oct 1 (of WY-1) to Sep 30 (of WY).
+    E.g., WY2025 → (2024-10-01, 2025-09-30)
+    
+    Args:
+        water_year: Water year number (e.g., 2025)
+    
+    Returns:
+        Tuple of (start_date_str, end_date_str) in ISO format
+    """
+    start_date = datetime(year=water_year - 1, month=10, day=1).date()
+    end_date = datetime(year=water_year, month=9, day=30).date()
+    return start_date.isoformat(), end_date.isoformat()
 
 
 @task(timeout_seconds=60 * 5, retries=2)
@@ -97,7 +118,6 @@ def _get_nrcs_locations_forecast(
             .to_pandas()
         )
 
-        # Extract unique secondary location IDs and get their primary counterparts
         secondary_ids = crosswalks_df["secondary_location_id"].unique().tolist()
         logger.info(f"Found {len(secondary_ids)} NRCS forecast locations")
 
@@ -109,453 +129,343 @@ def _get_nrcs_locations_forecast(
 
 @task(cache_policy=NO_CACHE, retries=2, retry_delay_seconds=30, timeout_seconds=60 * 15)
 def _fetch_nrcs_observations(
-    location_ids: list[str],
+    location_id: str,
     start_date: str,
     end_date: str,
 ) -> pd.DataFrame:
-    """Fetch NRCS observations from API."""
+    """Fetch NRCS observations for a single location from API."""
     logger = get_run_logger()
-
-    if not location_ids:
-        logger.warning("⚠️ No location IDs provided for observations fetch")
-        return pd.DataFrame()
-
-    logger.info(
-        f"Fetching NRCS observations for {len(location_ids)} locations, "
-        f"period: {start_date} to {end_date}"
-    )
 
     try:
         df = nrcs_utils.fetch_nrcs_observations(
             start_date=start_date,
             end_date=end_date,
-            location_ids=location_ids,
+            location_ids=location_id,
         )
-        logger.info(f"✅ Fetched {len(df)} observation records")
+        logger.info(f"✅ Fetched {len(df)} observation records for {location_id}")
         return df
     except Exception as e:
-        logger.error(f"❌ Failed to fetch observations: {e}")
-        raise
+        logger.error(f"❌ Failed to fetch observations for {location_id}: {e}")
+        return pd.DataFrame()
 
 
 @task(cache_policy=NO_CACHE, retries=2, retry_delay_seconds=30, timeout_seconds=60 * 15)
 def _fetch_nrcs_forecasts(
-    location_ids: list[str],
+    location_id: str,
     start_date: str,
     end_date: str,
 ) -> pd.DataFrame:
-    """Fetch NRCS forecasts from API."""
+    """Fetch NRCS forecasts for a single location from API."""
     logger = get_run_logger()
-
-    if not location_ids:
-        logger.warning("⚠️ No location IDs provided for forecasts fetch")
-        return pd.DataFrame()
-
-    logger.info(
-        f"Fetching NRCS forecasts for {len(location_ids)} locations, "
-        f"period: {start_date} to {end_date}"
-    )
 
     try:
         df = nrcs_utils.fetch_nrcs_forecasts(
             start_date=start_date,
             end_date=end_date,
-            location_ids=location_ids,
+            location_ids=location_id,
         )
-        logger.info(f"✅ Fetched {len(df)} forecast records")
+        logger.info(f"✅ Fetched {len(df)} forecast records for {location_id}")
         return df
     except Exception as e:
-        logger.error(f"❌ Failed to fetch forecasts: {e}")
-        raise
+        logger.error(f"❌ Failed to fetch forecasts for {location_id}: {e}")
+        return pd.DataFrame()
 
 
-@task(cache_policy=NO_CACHE)
-def _validate_observations_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Validate observations DataFrame against schema."""
-    logger = get_run_logger()
-
-    if df.empty:
-        logger.warning("⚠️ Observations DataFrame is empty")
-        return df
-
-    required_columns = ["location_id", "value_time", "value", "variable_name"]
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        raise ValueError(
-            f"Observations DataFrame missing required columns: {missing_columns}"
-        )
-
-    logger.info(
-        f"✅ Observations validated: {len(df)} records, "
-        f"columns: {list(df.columns)}"
-    )
-    return df
-
-
-@task(cache_policy=NO_CACHE)
-def _validate_forecasts_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Validate forecasts DataFrame against schema."""
-    logger = get_run_logger()
-
-    if df.empty:
-        logger.warning("⚠️ Forecasts DataFrame is empty")
-        return df
-
-    required_columns = [
-        "location_id",
-        "reference_time",
-        "value_time",
-        "value",
-        "variable_name",
-        "member",
-    ]
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        raise ValueError(
-            f"Forecasts DataFrame missing required columns: {missing_columns}"
-        )
-
-    logger.info(
-        f"✅ Forecasts validated: {len(df)} records, "
-        f"columns: {list(df.columns)}"
-    )
-    return df
-
-
-@task(cache_policy=NO_CACHE)
-def _build_forecast_period_metadata_from_dataframe(
-    forecast_df: pd.DataFrame,
-) -> dict[int, dict[str, Any]]:
-    """Build forecast period metadata directly from forecast DataFrame.
-    
-    Since we only have the flattened forecast DataFrame (not the original API response),
-    we infer the forecast periods by analyzing variable_name patterns.
-    
-    Key logic: NRCS forecasts are truncated as months progress (Apr-Jul → May-Jul → Jun-Jul).
-    All these truncated variants (0407, 0507, 0607) belong to the SAME forecast period.
-    For each end_month found in the data, we identify the earliest start_month,
-    considering only the periods present in the data (not merged across locations).
-    
-    Example:
-        Input variables: volume_0407, volume_0507, volume_0607, volume_0409, volume_0509
-        Grouped by end_month:
-          - end_month=7: [0407, 0507, 0607] → earliest start_month=4 → volume_0407
-          - end_month=9: [0409, 0509] → earliest start_month=4 → volume_0409
-        Output metadata:
-          {7: {start_month: 4, end_month: 7, variable_base: 'volume_0407'},
-           9: {start_month: 4, end_month: 9, variable_base: 'volume_0409'}}
-    
-    Args:
-        forecast_df: DataFrame with forecast data including variable_name column.
-    
-    Returns:
-        Dict mapping end_month (int) to metadata with keys:
-        start_month, end_month, variable_base, etc.
-    """
-    if forecast_df.empty:
-        return {}
-    
-    # Collect all (start_month, end_month) pairs from ALL variables in the data
-    periods_by_end_month: dict[int, list[int]] = {}
-    
-    for var_name in forecast_df["variable_name"].unique():
-        if not isinstance(var_name, str) or "_" not in var_name:
-            continue
-        
-        parts = var_name.split("_")
-        if len(parts) < 2:
-            continue
-        
-        mmdd = parts[1] if len(parts) > 1 else None
-        if not mmdd or len(mmdd) < 4:
-            continue
-        
-        try:
-            start_month = int(mmdd[0:2])
-            end_month = int(mmdd[2:4])
-        except (ValueError, IndexError):
-            continue
-        
-        # Basic validation of months
-        if start_month < 1 or start_month > 12 or end_month < 1 or end_month > 12:
-            continue
-        
-        # Collect all start_months for each end_month
-        if end_month not in periods_by_end_month:
-            periods_by_end_month[end_month] = []
-        periods_by_end_month[end_month].append(start_month)
-    
-    # For each end_month, the earliest start_month represents the full period
-    metadata = {}
-    for end_month, start_months in periods_by_end_month.items():
-        earliest_start = min(start_months)
-        metadata[end_month] = {
-            "start_month": earliest_start,
-            "end_month": end_month,
-            "variable_base": f"volume_{earliest_start:02d}{end_month:02d}",
-        }
-    
-    return metadata
-
-
-@task(cache_policy=NO_CACHE)
-@task(cache_policy=NO_CACHE)
-def _process_observed_cumsum(
+def _process_location(
+    location_id: str,
     obs_df: pd.DataFrame,
-    forecast_period_metadata: dict[int, dict[str, Any]],
-    forecast_df: pd.DataFrame | None = None,
-) -> pd.DataFrame:
-    """Generate cumulative sum observations from monthly observations."""
-    logger = get_run_logger()
-
-    if obs_df.empty or not forecast_period_metadata:
-        logger.info("⚠️ Skipping cumsum generation (empty data or metadata)")
-        return pd.DataFrame()
-
-    try:
-        cumsum_df = nrcs_utils._generate_observed_cumsum(obs_df, forecast_period_metadata, forecast_df)
-        logger.info(f"✅ Generated {len(cumsum_df)} cumsum observation records")
-        return cumsum_df
-    except Exception as e:
-        logger.warning(f"⚠️ Failed to generate cumsum observations: {e}")
-        return pd.DataFrame()
-
-
-@task(cache_policy=NO_CACHE)
-def _process_forecast_reconstruction(
     forecast_df: pd.DataFrame,
-    cumsum_obs_df: pd.DataFrame,
-    forecast_period_metadata: dict[int, dict[str, Any]],
-) -> pd.DataFrame:
-    """Reconstruct full-period forecasts from truncated API data."""
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Process a single location's observations and forecasts.
+    
+    Returns tuple of (combined_obs_df, forecast_df) where obs_df includes
+    raw observations, cumsum observations, and final observed values.
+    """
     logger = get_run_logger()
+    
+    # Skip if either dataset is empty
+    if obs_df.empty or forecast_df.empty:
+        logger.warning(f"⚠️ Skipping {location_id}: obs={len(obs_df)}, fcst={len(forecast_df)}")
+        return obs_df, forecast_df
+    
+    # Identify unique full forecast periods for this location
+    periods = nrcs_utils._identify_forecast_periods_per_location(forecast_df)
+    location_periods = periods.get(location_id, [])
+    
+    if not location_periods:
+        logger.warning(f"⚠️ No forecast periods identified for {location_id}")
+        return obs_df, forecast_df
+    
+    logger.info(f"Found periods for {location_id}: {location_periods}")
+    
+    # Generate cumsum observations (only for period months)
+    cumsum_obs_df = nrcs_utils._generate_observed_cumsum(
+        location_obs_df=obs_df,
+        periods=location_periods,
+        location_id=location_id,
+    )
+    
+    if not cumsum_obs_df.empty:
+        logger.info(f"Generated {len(cumsum_obs_df)} cumsum observations for {location_id}")
+        obs_df = pd.concat([obs_df, cumsum_obs_df], ignore_index=True)
+    
+    # Extract final observed values from cumsum
+    final_obs_df = nrcs_utils._extract_final_observed_from_cumsum(
+        location_cumsum_df=cumsum_obs_df,
+        periods=location_periods,
+        location_id=location_id,
+    )
+    
+    if not final_obs_df.empty:
+        logger.info(f"Generated {len(final_obs_df)} final observed values for {location_id}")
+        obs_df = pd.concat([obs_df, final_obs_df], ignore_index=True)
+    
+    # Process forecasts with Cases A/B/C logic
+    processed_forecast_df = nrcs_utils._process_location_forecasts(
+        location_forecasts_df=forecast_df,
+        location_cumsum_df=cumsum_obs_df,
+        periods=location_periods,
+        location_id=location_id,
+    )
+    
+    if not processed_forecast_df.empty:
+        logger.info(f"Processed {len(processed_forecast_df)} forecasts for {location_id}")
+        forecast_df = processed_forecast_df
+    else:
+        forecast_df = pd.DataFrame(columns=_FORECAST_COLUMNS)
+    
+    return obs_df, forecast_df
 
-    if forecast_df.empty or not forecast_period_metadata:
-        logger.info("⚠️ Skipping forecast reconstruction (empty data or metadata)")
-        return forecast_df
 
-    try:
-        reconstructed_df = nrcs_utils._reconstruct_full_period_forecasts(
-            forecast_df, cumsum_obs_df, forecast_period_metadata
-        )
-        logger.info(f"✅ Reconstructed {len(reconstructed_df)} forecast records")
-        return reconstructed_df
-    except Exception as e:
-        logger.warning(f"⚠️ Failed to reconstruct forecasts: {e}")
-        return forecast_df
-
-
-@task(cache_policy=NO_CACHE)
-def _process_final_observed_values(
-    cumsum_obs_df: pd.DataFrame,
-    forecast_period_metadata: dict[int, dict[str, Any]],
-) -> pd.DataFrame:
-    """Generate final observed values from cumsum observations."""
+@task(cache_policy=NO_CACHE, timeout_seconds=60 * 60)
+def _process_all_locations_for_period(
+    location_ids: list[str],
+    start_date: str,
+    end_date: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Process all locations for a specific date period.
+    
+    Returns combined obs_df and forecast_df for all locations in this period.
+    """
     logger = get_run_logger()
-
-    if cumsum_obs_df.empty or not forecast_period_metadata:
-        logger.info("⚠️ Skipping final observed generation (empty cumsum data or metadata)")
-        return pd.DataFrame()
-
-    try:
-        final_obs_df = nrcs_utils._generate_final_observed_value(
-            cumsum_obs_df, forecast_period_metadata
+    
+    all_obs = []
+    all_forecasts = []
+    
+    for idx, location_id in enumerate(location_ids, 1):
+        logger.info(f"Processing location {idx}/{len(location_ids)}: {location_id}")
+        
+        # Fetch data for this location
+        obs_df = _fetch_nrcs_observations(location_id, start_date, end_date)
+        forecast_df = _fetch_nrcs_forecasts(location_id, start_date, end_date)
+        
+        if obs_df.empty or forecast_df.empty:
+            logger.warning(f"⚠️ Skipping {location_id}: insufficient data")
+            continue
+        
+        # Process this location
+        processed_obs, processed_forecast = _process_location(
+            location_id=location_id,
+            obs_df=obs_df,
+            forecast_df=forecast_df,
         )
-        logger.info(f"✅ Generated {len(final_obs_df)} final observed records")
-        return final_obs_df
-    except Exception as e:
-        logger.warning(f"⚠️ Failed to generate final observed values: {e}")
-        return pd.DataFrame()
+        
+        all_obs.append(processed_obs)
+        all_forecasts.append(processed_forecast)
+    
+    # Combine all locations
+    combined_obs_df = (
+        pd.concat(all_obs, ignore_index=True) if all_obs else pd.DataFrame()
+    )
+    combined_forecast_df = (
+        pd.concat(all_forecasts, ignore_index=True) if all_forecasts else pd.DataFrame()
+    )
+    
+    logger.info(
+        f"Combined results: {len(combined_obs_df)} obs records, "
+        f"{len(combined_forecast_df)} forecast records"
+    )
+    
+    return combined_obs_df, combined_forecast_df
 
 
-@task(cache_policy=NO_CACHE)
+@task(timeout_seconds=60 * 10, retries=1)
 def _load_to_warehouse_primary(
     ev: teehr.RemoteReadWriteEvaluation,
-    df: pd.DataFrame,
+    obs_df: pd.DataFrame,
 ) -> None:
-    """Load observations to primary_timeseries table."""
+    """Load observations to warehouse primary_timeseries table."""
     logger = get_run_logger()
-
-    if df.empty:
-        logger.warning("⚠️ Skipping load: observations DataFrame is empty")
+    
+    if obs_df.empty:
+        logger.warning("⚠️ No observations to load")
         return
-
+    
     try:
-        logger.info(f"Loading {len(df)} observation records to primary_timeseries")
-        ev.primary_timeseries.load_dataframe(df=df)
-        logger.info("✅ Successfully loaded observations to primary_timeseries")
+        ev.primary_timeseries.load_dataframe(
+            df=obs_df,
+            write_mode="upsert"
+        )
+        logger.info(f"✅ Loaded {len(obs_df)} observation records to warehouse")
     except Exception as e:
         logger.error(f"❌ Failed to load observations: {e}")
         raise
 
 
-@task(cache_policy=NO_CACHE)
+@task(timeout_seconds=60 * 10, retries=1)
 def _load_to_warehouse_secondary(
     ev: teehr.RemoteReadWriteEvaluation,
-    df: pd.DataFrame,
+    forecast_df: pd.DataFrame,
 ) -> None:
-    """Load forecasts to secondary_timeseries table."""
+    """Load forecasts to warehouse secondary_timeseries table."""
     logger = get_run_logger()
-
-    if df.empty:
-        logger.warning("⚠️ Skipping load: forecasts DataFrame is empty")
+    
+    if forecast_df.empty:
+        logger.warning("⚠️ No forecasts to load")
         return
-
+    
     try:
-        logger.info(f"Loading {len(df)} forecast records to secondary_timeseries")
-        ev.secondary_timeseries.load_dataframe(df=df)
-        logger.info("✅ Successfully loaded forecasts to secondary_timeseries")
+        ev.secondary_timeseries.load_dataframe(
+            df=forecast_df,
+            write_mode="upsert"
+        )
+        logger.info(f"✅ Loaded {len(forecast_df)} forecast records to warehouse")
     except Exception as e:
         logger.error(f"❌ Failed to load forecasts: {e}")
         raise
 
 
-@flow(
-    flow_run_name="ingest-nrcs-streamflow-forecasts-observations",
-    timeout_seconds=60 * 60,
-)
+@task(cache_policy=NO_CACHE, timeout_seconds=60 * 90)
+def _process_single_water_year(
+    location_ids: list[str],
+    water_year: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Process all locations for a single water year.
+    
+    Args:
+        location_ids: List of location IDs to process
+        water_year: Water year number (e.g., 2025)
+    
+    Returns:
+        Tuple of (obs_df, forecast_df) for this water year
+    """
+    logger = get_run_logger()
+    start_date_str, end_date_str = _water_year_to_dates(water_year)
+    logger.info(f"Processing water year {water_year}: {start_date_str} to {end_date_str}")
+    
+    obs_df, forecast_df = _process_all_locations_for_period(
+        location_ids=location_ids,
+        start_date=start_date_str,
+        end_date=end_date_str,
+    )
+    
+    return obs_df, forecast_df
+
+
+@flow(name="ingest-nrcs-streamflow-forecasts-observations")
 def ingest_nrcs_streamflow_forecasts_observations(
-    temp_dir_path: Union[str, Path],
-    end_dt: Union[str, datetime, pd.Timestamp, None] = None,
-    num_lookback_days: Union[int, None] = DEFAULT_LOOKBACK_DAYS,
+    temp_dir_path: Union[str, Path] = "/data/temp-spark",
+    end_WY: int = 2025,
+    start_WY: Union[int, None] = None,
     start_spark_cluster: bool = False,
     location_ids: Union[str, list[str], None] = None,
 ) -> None:
-    """Ingest NRCS AWDB streamflow forecasts and observations.
-
-    Fetches NRCS-adjusted forecast and observed SRVO (Snow Water Equivalent) data
-    from the NRCS AWDB REST API within a flexible date window. Data is filtered to
-    include only variables defined in nrcs_utils.NRCS_VARIABLE_MAPPING.
-
-    Parameters
-    ----------
-    temp_dir_path : Union[str, Path]
-        Working directory for Spark and cache storage
-    end_dt : Union[str, datetime, pd.Timestamp, None], optional
-        End of date window. If None, defaults to current UTC date.
-        Can be a string (YYYY-MM-DD), datetime, or pandas Timestamp.
-    num_lookback_days : Union[int, None], optional
-        Number of days to look back from end_dt for start_dt.
-        Default is 120 days (allows 1 month data posting delay).
-        If None, no start_date limit is applied.
-    start_spark_cluster : bool, optional
-        Whether to start a Spark cluster. Default is False (local mode).
-    location_ids : Union[str, list[str], None], optional
-        Override location IDs for both observations and forecasts.
-        If None, locations are queried dynamically from warehouse tables:
-        - Observations from location_id_aliases table (prefix 'nrcs-')
-        - Forecasts from location_crosswalks table (secondary_location_id prefix 'nrcs-')
-
-    Returns
-    -------
-    None
+    """Main workflow for ingesting NRCS streamflow forecasts and observations.
+    
+    Water-year based processing:
+    1. For each water year (start_WY to end_WY):
+       a. For each location: fetch obs and forecasts
+       b. Identify unique full forecast periods
+       c. Generate cumsum and final observed for those periods
+       d. Process forecasts with Cases A/B/C reconstruction
+    2. Combine all water years and load to warehouse
+    
+    Args:
+        temp_dir_path: Path to temporary Spark working directory
+        end_WY: End water year number (e.g., 2025). Required.
+        start_WY: Start water year number (e.g., 2023). Defaults to end_WY (single year).
+        start_spark_cluster: Whether to start a new Spark cluster
+        location_ids: Specific location IDs to process (optional filter)
     """
     logger = get_run_logger()
-    logging.getLogger("teehr").setLevel(logging.INFO)
-
+    logger.info("🚀🚀🚀 RUNNING NRCS WORKFLOW (WATER YEAR MODE) 🚀🚀🚀")
     ev = None
+    
     try:
-        logger.info(
-            "🚀 Starting NRCS streamflow forecasts & observations ingest workflow"
-        )
-
-        # Initialize evaluation
+        # Set start_WY to end_WY if not provided
+        if start_WY is None:
+            start_WY = end_WY
+        
+        logger.info(f"Processing water years: {start_WY} to {end_WY}")
+        
+        # Initialize
         ev = _initialize_evaluation(
             temp_dir_path=temp_dir_path,
-            start_spark_cluster=start_spark_cluster,
+            start_spark_cluster=False,
         )
-
-        # Compute date window
-        if isinstance(end_dt, str):
-            end_dt = pd.Timestamp(end_dt)
-        elif isinstance(end_dt, datetime) and not isinstance(end_dt, pd.Timestamp):
-            end_dt = pd.Timestamp(end_dt)
-        elif end_dt is None:
-            end_dt = pd.Timestamp.utcnow().normalize()
-
-        if num_lookback_days is None:
-            start_dt = pd.Timestamp("1900-01-01")
-        else:
-            start_dt = end_dt - timedelta(days=num_lookback_days)
-
-        start_date_str = start_dt.strftime("%Y-%m-%d")
-        end_date_str = end_dt.strftime("%Y-%m-%d")
-
-        logger.info(f"Date window: {start_date_str} to {end_date_str}")
-
-        # Determine location IDs
-        if location_ids is not None:
-            if isinstance(location_ids, str):
-                location_ids = [location_ids]
-            logger.info(f"Using provided location_ids: {len(location_ids)} locations")
-            obs_location_ids = location_ids
-            forecast_location_ids = location_ids
-        else:
-            logger.info("Querying locations from warehouse tables...")
-            obs_location_ids = _get_nrcs_locations_observed(ev)
-            forecast_location_ids = _get_nrcs_locations_forecast(ev)
-
-        # Fetch data
-        obs_df = _fetch_nrcs_observations(
-            location_ids=obs_location_ids,
-            start_date=start_date_str,
-            end_date=end_date_str,
-        )
-
-        forecast_df = _fetch_nrcs_forecasts(
-            location_ids=forecast_location_ids,
-            start_date=start_date_str,
-            end_date=end_date_str,
-        )
-
-        # Process forecasts to extract period metadata and generate adjusted timeseries
-        logger.info("Processing NRCS forecast periods and observations...")
         
-        # Extract forecast period metadata from variable names in forecast DataFrame
-        forecast_period_metadata = _build_forecast_period_metadata_from_dataframe(forecast_df)
+        # Get location lists
+        obs_location_ids = _get_nrcs_locations_observed(ev)
+        forecast_location_ids = _get_nrcs_locations_forecast(ev)
         
-        if not forecast_period_metadata:
-            logger.warning("⚠️ No forecast periods identified in data")
-        else:
-            # Generate cumulative sum observations
-            cumsum_obs_df = _process_observed_cumsum(obs_df, forecast_period_metadata, forecast_df)
-            if not cumsum_obs_df.empty:
-                obs_df = pd.concat([obs_df, cumsum_obs_df], ignore_index=True)
-                logger.info(f"Added {len(cumsum_obs_df)} cumsum observations to dataset")
+        # Use intersection of both lists (must have both obs and forecasts)
+        all_location_ids = sorted(set(obs_location_ids) & set(forecast_location_ids))
+        
+        if not all_location_ids:
+            logger.warning("⚠️ No NRCS locations found with both observations and forecasts")
+            return
+        
+        logger.info(f"Processing {len(all_location_ids)} NRCS locations")
+        
+        # Process each water year and accumulate results
+        all_obs = []
+        all_forecasts = []
+        
+        for wy in range(start_WY, end_WY + 1):
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Water Year {wy}")
+            logger.info(f"{'='*60}")
             
-            # Reconstruct full-period forecasts from truncated API data
-            reconstructed_forecast_df = _process_forecast_reconstruction(
-                forecast_df, cumsum_obs_df, forecast_period_metadata
+            obs_df, forecast_df = _process_single_water_year(
+                location_ids=all_location_ids,
+                water_year=wy,
             )
-            if not reconstructed_forecast_df.empty:
-                forecast_df = pd.concat(
-                    [forecast_df, reconstructed_forecast_df], ignore_index=True
-                )
-                logger.info(
-                    f"Added {len(reconstructed_forecast_df)} reconstructed forecasts to dataset"
-                )
             
-            # Generate final observed values at end of periods
-            final_obs_df = _process_final_observed_values(
-                cumsum_obs_df, forecast_period_metadata
-            )
-            if not final_obs_df.empty:
-                obs_df = pd.concat([obs_df, final_obs_df], ignore_index=True)
-                logger.info(f"Added {len(final_obs_df)} final observed values to dataset")
-
-        # Validate DataFrames
-        obs_df = _validate_observations_dataframe(obs_df)
-        forecast_df = _validate_forecasts_dataframe(forecast_df)
-
+            if not obs_df.empty:
+                all_obs.append(obs_df)
+            if not forecast_df.empty:
+                all_forecasts.append(forecast_df)
+        
+        # Combine all water years
+        combined_obs_df = (
+            pd.concat(all_obs, ignore_index=True) if all_obs else pd.DataFrame()
+        )
+        combined_forecast_df = (
+            pd.concat(all_forecasts, ignore_index=True) if all_forecasts else pd.DataFrame()
+        )
+        
+        logger.info(f"\n{'='*60}")
+        logger.info("Final Results")
+        logger.info(f"{'='*60}")
+        logger.info(
+            f"Combined {end_WY - start_WY + 1} water years: "
+            f"{len(combined_obs_df)} obs records, {len(combined_forecast_df)} forecast records"
+        )
+        
+        if combined_obs_df.empty or combined_forecast_df.empty:
+            logger.warning("⚠️ No data to load")
+            return
+        
         # Load to warehouse
-        _load_to_warehouse_primary(ev, obs_df)
-        _load_to_warehouse_secondary(ev, forecast_df)
-
+        _load_to_warehouse_primary(ev, combined_obs_df)
+        _load_to_warehouse_secondary(ev, combined_forecast_df)
+        
         logger.info("✅ NRCS ingest workflow completed successfully")
-
+    
     except Exception as e:
         logger.error(f"❌ NRCS ingest workflow failed: {e}")
         raise
+    
     finally:
         if ev is not None:
             try:
