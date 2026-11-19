@@ -24,11 +24,12 @@ import teehr
 from teehr.evaluation.spark_session_utils import create_spark_session
 
 from utils import nrcs_utils_v2 as nrcs_utils
+from utils.nrcs_utils_v2 import _FORECAST_COLUMNS
 from workflows.utils.common_utils import initialize_evaluation
 
 
 # Constants
-DEFAULT_LOOKBACK_DAYS = 120
+DEFAULT_LOOKBACK_DAYS = 364
 CONFIGURATION_NAME_FORECASTS = "nrcs_adjusted_forecast"
 CONFIGURATION_NAME_OBSERVATIONS = "nrcs_adjusted_observed"
 
@@ -213,7 +214,9 @@ def _process_location(
     
     if not processed_forecast_df.empty:
         logger.info(f"Processed {len(processed_forecast_df)} forecasts for {location_id}")
-        forecast_df = pd.concat([forecast_df, processed_forecast_df], ignore_index=True)
+        forecast_df = processed_forecast_df
+    else:
+        forecast_df = pd.DataFrame(columns=_FORECAST_COLUMNS)
     
     return obs_df, forecast_df
 
@@ -283,7 +286,10 @@ def _load_to_warehouse_primary(
         return
     
     try:
-        ev.primary_timeseries.append(obs_df)
+        ev.primary_timeseries.load_dataframe(
+            df=obs_df,
+            write_mode="upsert"
+        )
         logger.info(f"✅ Loaded {len(obs_df)} observation records to warehouse")
     except Exception as e:
         logger.error(f"❌ Failed to load observations: {e}")
@@ -303,7 +309,10 @@ def _load_to_warehouse_secondary(
         return
     
     try:
-        ev.secondary_timeseries.append(forecast_df)
+        ev.secondary_timeseries.load_dataframe(
+            df=forecast_df,
+            write_mode="upsert"
+        )
         logger.info(f"✅ Loaded {len(forecast_df)} forecast records to warehouse")
     except Exception as e:
         logger.error(f"❌ Failed to load forecasts: {e}")
@@ -313,6 +322,10 @@ def _load_to_warehouse_secondary(
 @flow(name="ingest-nrcs-streamflow-forecasts-observations-v2")
 def ingest_nrcs_streamflow_forecasts_observations_v2(
     temp_dir_path: Union[str, Path] = "/data/temp-spark",
+    end_dt: Union[str, datetime, pd.Timestamp, None] = None,
+    num_lookback_days: Union[int, None] = DEFAULT_LOOKBACK_DAYS,
+    start_spark_cluster: bool = False,
+    location_ids: Union[str, list[str], None] = None,
 ) -> None:
     """Main workflow for ingesting NRCS streamflow forecasts and observations.
     
@@ -324,6 +337,7 @@ def ingest_nrcs_streamflow_forecasts_observations_v2(
     5. Combine all locations and load to warehouse
     """
     logger = get_run_logger()
+    logger.info("🚀🚀🚀 RUNNING V2 WORKFLOW 🚀🚀🚀")
     ev = None
     
     try:
@@ -346,13 +360,26 @@ def ingest_nrcs_streamflow_forecasts_observations_v2(
         
         logger.info(f"Processing {len(all_location_ids)} NRCS locations")
         
-        # Calculate date range (default: last 120 days)
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=DEFAULT_LOOKBACK_DAYS)
+        # Calculate date range
+        if end_dt is None:
+            end_date = datetime.now().date()
+        else:
+            # Convert end_dt to date if needed
+            if isinstance(end_dt, str):
+                end_date = pd.Timestamp(end_dt).date()
+            elif isinstance(end_dt, datetime):
+                end_date = end_dt.date()
+            elif isinstance(end_dt, pd.Timestamp):
+                end_date = end_dt.date()
+            else:
+                end_date = datetime.now().date()
+        
+        lookback_days = num_lookback_days if num_lookback_days is not None else DEFAULT_LOOKBACK_DAYS
+        start_date = end_date - timedelta(days=lookback_days)
         start_date_str = start_date.isoformat()
         end_date_str = end_date.isoformat()
         
-        logger.info(f"Date range: {start_date_str} to {end_date_str}")
+        logger.info(f"Date range: {start_date_str} to {end_date_str} (lookback: {lookback_days} days)")
         
         # Process all locations sequentially
         obs_df, forecast_df = _process_all_locations(

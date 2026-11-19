@@ -1467,7 +1467,7 @@ def _process_location_forecasts(
             # Case B: Earlier month forecast - use value directly (no cumsum offset)
             reconstructed_value = row["value"]
         else:
-            # Case C: Truncated variant - add previous month's cumsum
+            # Case C: Truncated variant - add previous month's cumsum and adjust value_time
             # e.g., if forecast starts in May (05), previous is April (04)
             previous_month = this_start_month - 1
             if previous_month == 0:
@@ -1487,6 +1487,11 @@ def _process_location_forecasts(
             else:
                 # No cumsum available, use forecast value directly (fallback)
                 reconstructed_value = row["value"]
+            
+            # Adjust value_time to the start month of the full period
+            # Get the year from current value_time, then set to start_month
+            current_value_time = pd.Timestamp(row["value_time"])
+            output_row["value_time"] = current_value_time.replace(month=full_start_month, day=1)
         
         output_row["value"] = reconstructed_value
         output_rows.append(output_row)
