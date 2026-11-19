@@ -3,8 +3,8 @@
 End-to-end runbook: stand up the local KinD + Garden stack, stage the trained
 model assets in the in-cluster S3, and execute the three deployments
 (`wsf-inference-oshbocker-1st`, `-ckua-2nd`, `-rasyidstat-3rd`) as real Prefect
-flow runs on a local Kubernetes worker. Complements `PREFECT.md` (reference) and
-`teehr-cloud-core/README.md` (platform).
+flow runs on a local Kubernetes worker. Complements `teehr-cloud-core/README.md`
+(platform).
 
 Run the steps **in order**; several only work after an earlier one (called out
 inline). Commands run from the repo root (`teehr-fved/`) unless stated. Only the
@@ -351,9 +351,6 @@ Stage logs are also on the node while the cluster exists:
 | Empty `wsf` S3 URI error | Step 3.2, then redeploy with `--force`. |
 | Dashboard "Unable to connect" | UI patch in step 6. |
 | No deployments listed | Re-run step 4 and watch `kubectl -n teehr-hub logs -f job/deploy-prefect-workflows` while it runs. |
-
-For a faster loop without Kubernetes, `PREFECT.md` ("Run A Live Flow Locally")
-runs the same flow function inside the built image with `docker run`.
 
 ## Teardown
 
