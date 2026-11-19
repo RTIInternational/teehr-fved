@@ -29,9 +29,25 @@ from workflows.utils.common_utils import initialize_evaluation
 
 
 # Constants
-DEFAULT_LOOKBACK_DAYS = 364
 CONFIGURATION_NAME_FORECASTS = "nrcs_adjusted_forecast"
 CONFIGURATION_NAME_OBSERVATIONS = "nrcs_adjusted_observed"
+
+
+def _water_year_to_dates(water_year: int) -> tuple[str, str]:
+    """Convert water year number to date range strings.
+    
+    Water year runs Oct 1 (of WY-1) to Sep 30 (of WY).
+    E.g., WY2025 → (2024-10-01, 2025-09-30)
+    
+    Args:
+        water_year: Water year number (e.g., 2025)
+    
+    Returns:
+        Tuple of (start_date_str, end_date_str) in ISO format
+    """
+    start_date = datetime(year=water_year - 1, month=10, day=1).date()
+    end_date = datetime(year=water_year, month=9, day=30).date()
+    return start_date.isoformat(), end_date.isoformat()
 
 
 @task(timeout_seconds=60 * 5, retries=2)
@@ -222,14 +238,14 @@ def _process_location(
 
 
 @task(cache_policy=NO_CACHE, timeout_seconds=60 * 60)
-def _process_all_locations(
+def _process_all_locations_for_period(
     location_ids: list[str],
     start_date: str,
     end_date: str,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Process all locations sequentially.
+    """Process all locations for a specific date period.
     
-    Returns combined obs_df and forecast_df for all locations.
+    Returns combined obs_df and forecast_df for all locations in this period.
     """
     logger = get_run_logger()
     
@@ -319,28 +335,69 @@ def _load_to_warehouse_secondary(
         raise
 
 
+@task(cache_policy=NO_CACHE, timeout_seconds=60 * 90)
+def _process_single_water_year(
+    location_ids: list[str],
+    water_year: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Process all locations for a single water year.
+    
+    Args:
+        location_ids: List of location IDs to process
+        water_year: Water year number (e.g., 2025)
+    
+    Returns:
+        Tuple of (obs_df, forecast_df) for this water year
+    """
+    logger = get_run_logger()
+    start_date_str, end_date_str = _water_year_to_dates(water_year)
+    logger.info(f"Processing water year {water_year}: {start_date_str} to {end_date_str}")
+    
+    obs_df, forecast_df = _process_all_locations_for_period(
+        location_ids=location_ids,
+        start_date=start_date_str,
+        end_date=end_date_str,
+    )
+    
+    return obs_df, forecast_df
+
+
 @flow(name="ingest-nrcs-streamflow-forecasts-observations-v2")
 def ingest_nrcs_streamflow_forecasts_observations_v2(
     temp_dir_path: Union[str, Path] = "/data/temp-spark",
-    end_dt: Union[str, datetime, pd.Timestamp, None] = None,
-    num_lookback_days: Union[int, None] = DEFAULT_LOOKBACK_DAYS,
+    end_WY: int = 2025,
+    start_WY: Union[int, None] = None,
     start_spark_cluster: bool = False,
     location_ids: Union[str, list[str], None] = None,
 ) -> None:
     """Main workflow for ingesting NRCS streamflow forecasts and observations.
     
-    Per-location sequential processing:
-    1. For each location: fetch obs and forecasts
-    2. Identify unique full forecast periods
-    3. Generate cumsum and final observed for those periods
-    4. Process forecasts with Cases A/B/C reconstruction
-    5. Combine all locations and load to warehouse
+    Water-year based processing:
+    1. For each water year (start_WY to end_WY):
+       a. For each location: fetch obs and forecasts
+       b. Identify unique full forecast periods
+       c. Generate cumsum and final observed for those periods
+       d. Process forecasts with Cases A/B/C reconstruction
+    2. Combine all water years and load to warehouse
+    
+    Args:
+        temp_dir_path: Path to temporary Spark working directory
+        end_WY: End water year number (e.g., 2025). Required.
+        start_WY: Start water year number (e.g., 2023). Defaults to end_WY (single year).
+        start_spark_cluster: Whether to start a new Spark cluster
+        location_ids: Specific location IDs to process (optional filter)
     """
     logger = get_run_logger()
-    logger.info("🚀🚀🚀 RUNNING V2 WORKFLOW 🚀🚀🚀")
+    logger.info("🚀🚀🚀 RUNNING V2 WORKFLOW (WATER YEAR MODE) 🚀🚀🚀")
     ev = None
     
     try:
+        # Set start_WY to end_WY if not provided
+        if start_WY is None:
+            start_WY = end_WY
+        
+        logger.info(f"Processing water years: {start_WY} to {end_WY}")
+        
         # Initialize
         ev = _initialize_evaluation(
             temp_dir_path=temp_dir_path,
@@ -360,41 +417,48 @@ def ingest_nrcs_streamflow_forecasts_observations_v2(
         
         logger.info(f"Processing {len(all_location_ids)} NRCS locations")
         
-        # Calculate date range
-        if end_dt is None:
-            end_date = datetime.now().date()
-        else:
-            # Convert end_dt to date if needed
-            if isinstance(end_dt, str):
-                end_date = pd.Timestamp(end_dt).date()
-            elif isinstance(end_dt, datetime):
-                end_date = end_dt.date()
-            elif isinstance(end_dt, pd.Timestamp):
-                end_date = end_dt.date()
-            else:
-                end_date = datetime.now().date()
+        # Process each water year and accumulate results
+        all_obs = []
+        all_forecasts = []
         
-        lookback_days = num_lookback_days if num_lookback_days is not None else DEFAULT_LOOKBACK_DAYS
-        start_date = end_date - timedelta(days=lookback_days)
-        start_date_str = start_date.isoformat()
-        end_date_str = end_date.isoformat()
+        for wy in range(start_WY, end_WY + 1):
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Water Year {wy}")
+            logger.info(f"{'='*60}")
+            
+            obs_df, forecast_df = _process_single_water_year(
+                location_ids=all_location_ids,
+                water_year=wy,
+            )
+            
+            if not obs_df.empty:
+                all_obs.append(obs_df)
+            if not forecast_df.empty:
+                all_forecasts.append(forecast_df)
         
-        logger.info(f"Date range: {start_date_str} to {end_date_str} (lookback: {lookback_days} days)")
-        
-        # Process all locations sequentially
-        obs_df, forecast_df = _process_all_locations(
-            location_ids=all_location_ids,
-            start_date=start_date_str,
-            end_date=end_date_str,
+        # Combine all water years
+        combined_obs_df = (
+            pd.concat(all_obs, ignore_index=True) if all_obs else pd.DataFrame()
+        )
+        combined_forecast_df = (
+            pd.concat(all_forecasts, ignore_index=True) if all_forecasts else pd.DataFrame()
         )
         
-        if obs_df.empty or forecast_df.empty:
+        logger.info(f"\n{'='*60}")
+        logger.info("Final Results")
+        logger.info(f"{'='*60}")
+        logger.info(
+            f"Combined {end_WY - start_WY + 1} water years: "
+            f"{len(combined_obs_df)} obs records, {len(combined_forecast_df)} forecast records"
+        )
+        
+        if combined_obs_df.empty or combined_forecast_df.empty:
             logger.warning("⚠️ No data to load")
             return
         
         # Load to warehouse
-        _load_to_warehouse_primary(ev, obs_df)
-        _load_to_warehouse_secondary(ev, forecast_df)
+        _load_to_warehouse_primary(ev, combined_obs_df)
+        _load_to_warehouse_secondary(ev, combined_forecast_df)
         
         logger.info("✅ NRCS ingest v2 workflow completed successfully")
     
