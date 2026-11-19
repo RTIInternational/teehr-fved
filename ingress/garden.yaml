@@ -4,6 +4,7 @@ name: dashboards-ingress
 spec:
   manifestTemplates:
     - manifests/dashboards.yaml.tpl
+    - manifests/apex-redirect.yaml.tpl
 environments:
   - local
   - remote
