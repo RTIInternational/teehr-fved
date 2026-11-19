@@ -1,6 +1,8 @@
 import { Group, Paper, ScrollArea, Stack, Text } from '@mantine/core';
 
+import { teehrMapping } from '@/shared/api/gridded/variableAttrs';
 import { useTilesLegend } from '@/shared/queries/gridded/tiles';
+import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
 
 import { useDashboard } from '../DashboardContext';
 import { useOverlayLegends } from '../hooks/useOverlayLegends';
@@ -13,6 +15,7 @@ export const SnowLegend = () => {
 
   const tilesLegend = useTilesLegend(dataset, variable, colorRamp, colorRampMin, colorRampMax);
   const overlayLegends = useOverlayLegends(state.activeOverlays);
+  const variableAttrs = useVariableAttrs(dataset);
 
   const colorLegend = dataset && variable ? tilesLegend.data : undefined;
   if (!colorLegend && overlayLegends.length === 0) return null;
@@ -21,7 +24,12 @@ export const SnowLegend = () => {
     <Paper shadow="sm" radius="md" p="xs" withBorder>
       <ScrollArea.Autosize mah="40dvh">
         <Stack gap="sm">
-          {colorLegend && <GriddedColorBar legend={colorLegend} />}
+          {colorLegend && (
+            <GriddedColorBar
+              legend={colorLegend}
+              mapping={variable ? teehrMapping(variable, variableAttrs.data?.[variable]) : null}
+            />
+          )}
           {overlayLegends.map(({ id, label, entries }) => (
             <Stack key={id} gap={2}>
               <Text size="xs" fw={600}>

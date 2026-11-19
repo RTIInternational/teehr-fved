@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 
 import { SNOW_DASHBOARD_DEFAULTS, selectDefault } from '@/config/dashboardDefaults';
+import { teehrMapping } from '@/shared/api/gridded/variableAttrs';
 import { useDatasets } from '@/shared/queries/gridded/datasets';
 import { useTimesteps } from '@/shared/queries/gridded/timesteps';
+import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
 import { useVariables } from '@/shared/queries/gridded/variables';
 
 import { ActionTypes, useDashboard } from '../DashboardContext';
@@ -20,6 +22,7 @@ export const useSnowDefaults = () => {
   const datasets = useDatasets();
   const variables = useVariables(dataset);
   const timesteps = useTimesteps(dataset);
+  const variableAttrs = useVariableAttrs(dataset);
   const { resetStyles, applyVariableStyleIfNew } = useGriddedVariableStyles();
 
   const defaultAppliedRef = useRef(dataset !== null);
@@ -33,7 +36,7 @@ export const useSnowDefaults = () => {
       type: ActionTypes.UPDATE_MAP_FILTERS,
       payload: {
         dataset: preferred,
-        // GriddedControls replaces an unknown variable with the dataset's first one.
+        // A teehr name: GriddedControls picks the dataset's variable with it (else its first).
         variable: SNOW_DASHBOARD_DEFAULTS.preferredVariable,
         timestepIndex: 0,
       },
@@ -66,7 +69,10 @@ export const useSnowDefaults = () => {
     if (dataset) resetStyles();
   }, [dataset, resetStyles]);
 
+  // Wait for the dataset's attributes: they convert the style's teehr units to the stored ones
   useEffect(() => {
-    applyVariableStyleIfNew(variable);
-  }, [variable, applyVariableStyleIfNew]);
+    if (variable && variableAttrs.data) {
+      applyVariableStyleIfNew(variable, teehrMapping(variable, variableAttrs.data[variable]));
+    }
+  }, [variable, variableAttrs.data, applyVariableStyleIfNew]);
 };

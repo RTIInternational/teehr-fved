@@ -14,8 +14,9 @@ import {
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
+import { teehrMapping } from '@/shared/api/gridded/variableAttrs';
 import { useDatasets } from '@/shared/queries/gridded/datasets';
 import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
 import { useTimesteps } from '@/shared/queries/gridded/timesteps';
@@ -118,7 +119,11 @@ const GriddedControls = () => {
   const timesteps = useTimesteps(dataset);
   const variableAttrs = useVariableAttrs(dataset);
 
-  const units = variable ? variableAttrs.data?.[variable]?.units : undefined;
+  // Shown the teehr way; the color range is stored in the variable's own units, as the tiles need
+  const mapping = variable ? teehrMapping(variable, variableAttrs.data?.[variable]) : null;
+  const units = mapping?.units ?? undefined;
+  const shown = (value: number) => (mapping ? mapping.toDisplay(value) : value);
+  const stored = (value: number) => (mapping ? mapping.fromDisplay(value) : value);
 
   const currentTimestep = useCurrentTimestep() ?? '';
   const canStepBack = timestepIndex > 0;
@@ -126,19 +131,25 @@ const GriddedControls = () => {
 
   const polygonLayers = usePolygonLayers();
 
-  // Auto-select variable when dataset is selected
+  // Auto-select variable when dataset is selected: the dataset's variable with the selected one's
+  // teehr name (the default swe_daily_inst, or e.g. UA SWANN's SWE when switching to iSnobal's
+  // specific_mass), else its first. Waits for the attributes, which carry the teehr names.
+  const selectedTeehrNameRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!dataset) return;
-    if (variables.data.length === 0) return;
+    if (!dataset || variables.data.length === 0 || !variableAttrs.data) return;
+    const teehrName = (v: string) => teehrMapping(v, variableAttrs.data?.[v]).variable;
 
-    const currentIsValid = !!variable && variables.data.includes(variable);
-    if (currentIsValid) return;
-
+    if (variable && variables.data.includes(variable)) {
+      selectedTeehrNameRef.current = teehrName(variable);
+      return;
+    }
+    const wanted = selectedTeehrNameRef.current ?? variable;
+    const match = variables.data.find((v) => teehrName(v) === wanted);
     dispatch({
       type: ActionTypes.UPDATE_MAP_FILTERS,
-      payload: { variable: variables.data[0], timestepIndex: 0 },
+      payload: { variable: match ?? variables.data[0], timestepIndex: 0 },
     });
-  }, [dataset, variable, variables.data, dispatch]);
+  }, [dataset, variable, variables.data, variableAttrs.data, dispatch]);
 
   // Daily or coarser data picks a date only; sub-daily data picks a time on that date too
   const isDaily = shortestStep(timesteps.data.map(parseUtcTime)) >= 24 * 60 * 60 * 1000;
@@ -212,7 +223,10 @@ const GriddedControls = () => {
       <Select
         label="Variable"
         placeholder="Select variable…"
-        data={variables.data}
+        data={variables.data.map((v) => ({
+          value: v,
+          label: teehrMapping(v, variableAttrs.data?.[v]).variable,
+        }))}
         value={variable}
         onChange={(selected) => updateMapFilters({ variable: selected, timestepIndex: 0 })}
         allowDeselect={false}
@@ -355,10 +369,15 @@ const GriddedControls = () => {
                 allowDeselect={false}
               />
               <ColorRangeInputs
-                min={colorRampMin}
-                max={colorRampMax}
+                min={shown(colorRampMin)}
+                max={shown(colorRampMax)}
                 units={units}
-                onCommit={updateMapFilters}
+                onCommit={(range) =>
+                  updateMapFilters({
+                    colorRampMin: stored(range.colorRampMin),
+                    colorRampMax: stored(range.colorRampMax),
+                  })
+                }
               />
             </Stack>
           </Accordion.Panel>

@@ -1,5 +1,7 @@
 // Per-variable default styling for the gridded map.
 // Variables not listed here fall back to DEFAULT_VARIABLE_STYLE.
+// Keyed by teehr variable name, with min/max in teehr units; they're converted to the
+// variable's stored units (its teehr:* attributes) when applied to the tiles.
 // Units listed here are used only if the API does not provide them from the
 // dataset's variable attributes.
 // min is set to a small positive epsilon for accumulation/rate variables so
