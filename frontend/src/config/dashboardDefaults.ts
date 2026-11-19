@@ -20,6 +20,12 @@ export const FORECAST_DASHBOARD_DEFAULTS = {
   preferredObservationsDuration: 'PT1H',
 };
 
+export const SNOW_DASHBOARD_DEFAULTS = {
+  // Preferred default gridded dataset and variable for the snow view
+  preferredDataset: 'ua_swann_4km',
+  preferredVariable: 'swe_daily_inst',
+};
+
 /**
  * Helper function to select the best default from available options
  * @param {string|null} preferred - The preferred default value

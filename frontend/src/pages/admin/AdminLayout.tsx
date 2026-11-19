@@ -1,10 +1,11 @@
+import { Container } from '@mantine/core';
 import { Outlet } from 'react-router-dom';
 
 const AdminLayout = () => {
   return (
-    <div className="container-fluid py-4">
+    <Container fluid py="lg">
       <Outlet />
-    </div>
+    </Container>
   );
 };
 

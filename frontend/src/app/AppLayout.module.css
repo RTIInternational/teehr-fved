@@ -1,0 +1,13 @@
+.mobileMenuToggle {
+  position: absolute;
+  top: var(--mantine-spacing-sm);
+  left: var(--mantine-spacing-sm);
+  z-index: 300;
+}
+
+.mapLayer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inset-inline-start: var(--app-shell-navbar-offset, 0rem);
+}

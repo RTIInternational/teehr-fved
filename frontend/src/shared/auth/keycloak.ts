@@ -32,7 +32,40 @@ export const signup = (redirectUri: string) =>
 
 export const logout = () => keycloak.logout({ redirectUri: window.location.origin });
 
+const INIT_WAIT_TIMEOUT_MS = 10_000;
+
+/**
+ * Waits for Keycloak init, up to INIT_WAIT_TIMEOUT_MS, so a slow or unreachable
+ * Keycloak fails requests instead of hanging them. Init itself keeps running;
+ * AuthProvider still waits for it and reports failures.
+ */
+const waitForInit = async () => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(
+        `Keycloak init exceeded ${INIT_WAIT_TIMEOUT_MS} ms; sending request without a token.`
+      );
+      resolve();
+    }, INIT_WAIT_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([initKeycloak(), timeout]);
+  } catch {
+    // Init failed; continue unauthenticated.
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+ * The current access token, refreshed if close to expiry. Waits for Keycloak
+ * init first, so requests made during app boot carry the token instead of
+ * racing it and failing with a 401.
+ */
 export const ensureFreshToken = async () => {
+  await waitForInit();
+
   if (!keycloak.authenticated && !keycloak.token) {
     return null;
   }

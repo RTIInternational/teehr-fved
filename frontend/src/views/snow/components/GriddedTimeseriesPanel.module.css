@@ -1,0 +1,42 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.toolbar {
+  flex: 0 0 auto;
+  padding-bottom: var(--mantine-spacing-xs);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.filters {
+  height: 100%;
+  overflow: auto;
+  padding: var(--mantine-spacing-md);
+}
+
+/* Plotly sizes itself from this container, so it must stay a plain flex child. */
+.plot {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.plotArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.notes {
+  flex: 0 0 auto;
+  margin: 0;
+  padding-bottom: var(--mantine-spacing-xs);
+}
