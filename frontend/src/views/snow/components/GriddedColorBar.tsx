@@ -4,11 +4,14 @@
 import { Text } from '@mantine/core';
 
 import type { TilesLegendResponse } from '@/shared/api/gridded/tiles';
+import type { TeehrMapping } from '@/shared/api/gridded/variableAttrs';
 
 import styles from './GriddedColorBar.module.css';
 
 type GriddedColorBarProps = {
   legend: TilesLegendResponse;
+  // Labels the range in teehr's units; the legend itself is in the variable's stored units
+  mapping?: TeehrMapping | null;
 };
 
 // Bar and label sizes are fixed in GriddedColorBar.module.css
@@ -21,8 +24,10 @@ const formatTick = (value: number): string =>
     ? value.toExponential(2)
     : Number(value.toPrecision(3)).toString();
 
-const GriddedColorBar = ({ legend }: GriddedColorBarProps) => {
+const GriddedColorBar = ({ legend, mapping }: GriddedColorBarProps) => {
   const [min, max] = legend.colorscalerange;
+  const units = mapping?.units ?? legend.units;
+  const shown = (value: number) => (mapping ? mapping.toDisplay(value) : value);
   const { stops } = legend;
   // Unset or 'extend' draws values above the max in the top color
   const topIsOpenEnded = legend.abovemaxcolor == null || legend.abovemaxcolor === 'extend';
@@ -42,9 +47,9 @@ const GriddedColorBar = ({ legend }: GriddedColorBarProps) => {
 
   return (
     <div className={styles.root}>
-      {legend.units && (
+      {units && (
         <Text size="xs" fw={600} mb={6}>
-          {legend.units}
+          {units}
         </Text>
       )}
       <div className={styles.scale}>
@@ -57,8 +62,8 @@ const GriddedColorBar = ({ legend }: GriddedColorBarProps) => {
               style={{ bottom: `${(i / (TICK_COUNT - 1)) * 100}%` }}
             >
               {i === TICK_COUNT - 1 && topIsOpenEnded
-                ? `≥ ${formatTick(value)}`
-                : formatTick(value)}
+                ? `≥ ${formatTick(shown(value))}`
+                : formatTick(shown(value))}
             </span>
           ))}
         </div>
