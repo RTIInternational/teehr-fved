@@ -246,7 +246,7 @@ deployments:
     parameters: {
       "temp_dir_path": *temp_dir_path
     }
-    work_pool: *work_pool_medium
+    work_pool: *work_pool_small
     schedule: 
       cron: "0 9 1,15 * *"
       active: true
