@@ -75,8 +75,8 @@ deployments:
   - name: ingest-usgs-streamflow-obs
     version:
     tags: []
-    description: Ingest USGS streamflow data from NWIS
-    entrypoint: workflows/ingests/usgs_streamflow_obs.py:ingest_usgs_streamflow_obs
+    description: Ingest USGS streamflow data from NWIS (both 'iv' and 'dv' services)
+    entrypoint: workflows/ingests/usgs_streamflow_obs.py:ingest_usgs_streamflow_obs_all_services
     parameters: {"temp_dir_path": *temp_dir_path, "start_spark_cluster": false}
     work_pool: *work_pool
 
