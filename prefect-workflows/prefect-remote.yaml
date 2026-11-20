@@ -217,6 +217,23 @@ deployments:
       cron: "29 * * * *"
       active: false
 
+  # CDEC Ingest
+  - name: ingest-cdec-water-supply
+    version:
+    tags: []
+    concurrency_limit:
+      limit: 1
+      collision_strategy: "CANCEL_NEW"
+    description: Ingest CDEC water supply forecasts and observations; upserts the previous and current water years
+    entrypoint: workflows/ingests/cdec_water_supply.py:ingest_cdec_water_supply
+    parameters: {
+      "temp_dir_path": *temp_dir_path
+    }
+    work_pool: *work_pool_small
+    schedule:
+      cron: "0 15 * * 3"
+      active: false
+
   # Gridded Data Ingests
   - name: ingest-ua-4km-grids
     version:
@@ -282,7 +299,8 @@ deployments:
     entrypoint: workflows/ingests/build_overviews.py:build_overviews
     parameters: {
       "args": {
-        "configuration_name": "ua_swann_4km",
+        # The source names the repo and its overview packing
+        "source": {"type": "ua-swann-4km"},
         "overview_factors": [2, 4]
       }
     }
@@ -313,7 +331,7 @@ deployments:
         "temp_dir_path": *temp_dir_path,
         "configuration_name": "ua_swann_4km",
         "location_id_prefix": "usgsbasin",
-        "grid_variable_name": "swe_daily_inst"
+        "grid_variable_name": "SWE"
       }
     }
     work_pool: *work_pool_large

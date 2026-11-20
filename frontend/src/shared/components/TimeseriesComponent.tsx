@@ -1,10 +1,13 @@
+import { Group, Loader, SegmentedControl, Stack, Text } from '@mantine/core';
+import { IconChartLine, IconDatabaseOff, IconFilter, IconMapPin } from '@tabler/icons-react';
 import React, { useState } from 'react';
-import { Card, Spinner, ButtonGroup, Button } from 'react-bootstrap';
 
 import type { TimeseriesRequestFilters } from '@/shared/api/timeseries';
 import PlotlyChart from '@/shared/components/PlotlyChart';
 import { usePrimaryTimeseries, useSecondaryTimeseries } from '@/shared/queries/timeseries';
 import type { TimeseriesState } from '@/shared/types/timeseries';
+
+import styles from './TimeseriesComponent.module.css';
 
 type TimeseriesControlInjectedProps = {
   setRequestFilters: (filters: TimeseriesRequestFilters) => void;
@@ -23,6 +26,27 @@ type TimeseriesComponentProps<TControlsProps extends object> = {
    */
   autoRequestFilters?: TimeseriesRequestFilters | null;
 };
+
+const VIEW_OPTIONS = [
+  {
+    value: 'filters',
+    label: (
+      <Group gap={6} wrap="nowrap">
+        <IconFilter size={14} />
+        <span>Filters</span>
+      </Group>
+    ),
+  },
+  {
+    value: 'plot',
+    label: (
+      <Group gap={6} wrap="nowrap">
+        <IconChartLine size={14} />
+        <span>Plot</span>
+      </Group>
+    ),
+  },
+];
 
 const TimeseriesComponent = <TControlsProps extends object>({
   state,
@@ -46,88 +70,76 @@ const TimeseriesComponent = <TControlsProps extends object>({
 
   const hasData = primaryData.length > 0 || secondaryData.length > 0;
 
+  if (!state.selectedLocation) {
+    return (
+      <Stack h="100%" align="center" justify="center" gap="xs">
+        <IconMapPin size={32} stroke={1.5} color="var(--mantine-color-dimmed)" />
+        <Text fw={600} c="dimmed">
+          Select a Location
+        </Text>
+        <Text size="sm" c="dimmed" ta="center">
+          Click on a location on the map to view its time series data.
+        </Text>
+      </Stack>
+    );
+  }
+
+  let plotBody;
+  if (primary.isLoading || secondary.isLoading) {
+    plotBody = (
+      <Stack h="100%" align="center" justify="center" gap="xs">
+        <Loader />
+        <Text size="sm" c="dimmed">
+          Loading timeseries data...
+        </Text>
+      </Stack>
+    );
+  } else if (!hasData) {
+    plotBody = (
+      <Stack h="100%" align="center" justify="center" gap="xs">
+        <IconDatabaseOff size={32} stroke={1.5} color="var(--mantine-color-dimmed)" />
+        <Text fw={600} c="dimmed">
+          No Data Available
+        </Text>
+        <Text size="sm" c="dimmed" ta="center">
+          Try switching to Filters to adjust the time range or check if data exists for this
+          location.
+        </Text>
+      </Stack>
+    );
+  } else {
+    plotBody = (
+      <div className={styles.plot}>
+        <PlotlyChart
+          primaryData={primaryData}
+          secondaryData={secondaryData}
+          selectedLocation={state.selectedLocation}
+          filters={state.timeseriesFilters}
+          height="100%"
+        />
+      </div>
+    );
+  }
+
   return (
-    <Card className="shadow-lg h-100 d-flex flex-column" style={{ borderRadius: '8px' }}>
-      <Card.Header className="py-2 d-flex justify-content-between align-items-center flex-shrink-0">
-        <div className="d-flex align-items-center gap-2">
-          <Card.Title as="h6" className="mb-0">
-            📈 Time Series
-          </Card.Title>
-          {state.selectedLocation && (
-            <ButtonGroup size="sm">
-              <Button
-                variant={viewMode === 'filters' ? 'primary' : 'outline-primary'}
-                onClick={() => setViewMode('filters')}
-                style={{ fontSize: '11px' }}
-              >
-                🔍 Filters
-              </Button>
-              <Button
-                variant={viewMode === 'plot' ? 'primary' : 'outline-primary'}
-                onClick={() => setViewMode('plot')}
-                style={{ fontSize: '11px' }}
-              >
-                📈 Plot
-              </Button>
-            </ButtonGroup>
-          )}
-        </div>
-      </Card.Header>
-      <Card.Body className="p-0 d-flex flex-column flex-grow-1 overflow-hidden">
-        {!state.selectedLocation ? (
-          <div className="d-flex align-items-center justify-content-center flex-grow-1 text-muted">
-            <div className="text-center">
-              <div style={{ fontSize: '3rem' }}>📍</div>
-              <h5>Select a Location</h5>
-              <p>Click on a location on the map to view its time series data.</p>
-            </div>
-          </div>
-        ) : primary.isLoading || secondary.isLoading ? (
-          <div className="d-flex justify-content-center align-items-center flex-grow-1">
-            <div className="text-center">
-              <Spinner animation="border" variant="primary" />
-              <div className="mt-2 small text-muted">Loading timeseries data...</div>
-            </div>
-          </div>
+    <div className={styles.panel}>
+      <Group justify="flex-end" className={styles.toolbar}>
+        <SegmentedControl size="xs" value={viewMode} onChange={setViewMode} data={VIEW_OPTIONS} />
+      </Group>
+      <div className={styles.body}>
+        {viewMode === 'plot' ? (
+          plotBody
         ) : (
-          <>
-            {/* Show content based on view mode */}
-            {viewMode === 'plot' ? (
-              hasData ? (
-                <div className="flex-grow-1 p-2" style={{ overflow: 'hidden', minHeight: 0 }}>
-                  <PlotlyChart
-                    primaryData={primaryData}
-                    secondaryData={secondaryData}
-                    selectedLocation={state.selectedLocation}
-                    filters={state.timeseriesFilters}
-                    height="100%"
-                  />
-                </div>
-              ) : (
-                <div className="d-flex align-items-center justify-content-center flex-grow-1">
-                  <div className="text-center text-muted">
-                    <div style={{ fontSize: '2rem' }}>📊</div>
-                    <h6>No Data Available</h6>
-                    <p className="small">
-                      Try switching to Filters to adjust the time range or check if data exists for
-                      this location.
-                    </p>
-                  </div>
-                </div>
-              )
-            ) : (
-              <div className="p-3 flex-grow-1 overflow-auto">
-                <Controls
-                  {...controlsProps}
-                  setRequestFilters={setRequestFilters}
-                  onViewModeChange={setViewMode}
-                />
-              </div>
-            )}
-          </>
+          <div className={styles.filters}>
+            <Controls
+              {...controlsProps}
+              setRequestFilters={setRequestFilters}
+              onViewModeChange={setViewMode}
+            />
+          </div>
         )}
-      </Card.Body>
-    </Card>
+      </div>
+    </div>
   );
 };
 

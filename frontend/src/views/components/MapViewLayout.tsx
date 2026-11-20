@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { MapLoadingBar, MapLoadingLabel, useMapLoadingStatus } from './MapLoadingIndicator';
+import { MapLoadingBar, MapLoadingLabel } from './MapLoadingIndicator';
+import { useMapLoadingStatus } from './useMapLoadingStatus';
 
 import styles from './MapViewLayout.module.css';
 

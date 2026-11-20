@@ -1,5 +1,6 @@
+import { Button, Popover, Select, Stack } from '@mantine/core';
+import { IconAdjustmentsHorizontal } from '@tabler/icons-react';
 import { useState } from 'react';
-import { Dropdown, Form } from 'react-bootstrap';
 
 import { useDistinctValues } from '@/shared/queries/distinctValues';
 import { useTableProperties } from '@/shared/queries/queryables';
@@ -13,108 +14,76 @@ type MapFilterButtonProps = {
 };
 
 const MapFilterButton = ({ tables, mapFilters, updateMapFilters }: MapFilterButtonProps) => {
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [opened, setOpened] = useState(false);
 
   const configurations = useDistinctValues(tables[0], 'configuration_name');
   const variables = useDistinctValues(tables[0], 'variable_name');
   const tableProperties = useTableProperties(tables);
 
-  const handleMapFilterChange = <K extends keyof MapFilters>(
-    filterType: K,
-    value: MapFilters[K]
-  ) => {
-    updateMapFilters({ [filterType]: value } as Partial<MapFilters>);
-  };
+  // Unique map-colorable metrics across every table, so single- and multi-table
+  // dashboards both work
+  const metrics = [
+    ...new Set(
+      Object.values(tableProperties.data ?? {}).flatMap((tableProps) =>
+        Array.isArray(tableProps?.metrics) ? tableProps.metrics : []
+      )
+    ),
+  ].filter(isMapMetric);
 
   return (
-    <div>
-      <Dropdown show={showDropdown} onToggle={setShowDropdown}>
-        <Dropdown.Toggle variant="light" className="shadow-sm">
-          🗺️ Map Display Settings
-        </Dropdown.Toggle>
-
-        <Dropdown.Menu style={{ minWidth: '300px' }}>
-          <div className="p-3">
-            {/* Configuration Filter */}
-            <Form.Group className="mb-3">
-              <Form.Label className="small fw-bold">Configuration</Form.Label>
-              <Form.Select
-                size="sm"
-                value={mapFilters.configuration || ''}
-                onChange={(e) => handleMapFilterChange('configuration', e.target.value || null)}
-              >
-                <option value="">Select Configuration...</option>
-                {Array.isArray(configurations.data) &&
-                  configurations.data.map((config) => (
-                    <option key={config} value={config}>
-                      {config}
-                    </option>
-                  ))}
-              </Form.Select>
-            </Form.Group>
-
-            {/* Variable Filter */}
-            <Form.Group className="mb-3">
-              <Form.Label className="small fw-bold">Variable</Form.Label>
-              <Form.Select
-                size="sm"
-                value={mapFilters.variable || ''}
-                onChange={(e) => handleMapFilterChange('variable', e.target.value || null)}
-              >
-                <option value="">Select Variable...</option>
-                {Array.isArray(variables.data) &&
-                  variables.data.map((variable) => (
-                    <option key={variable} value={variable}>
-                      {variable}
-                    </option>
-                  ))}
-              </Form.Select>
-            </Form.Group>
-
-            {/* Metric Filter */}
-            <Form.Group className="mb-0">
-              <Form.Label className="small fw-bold">Color By Metric</Form.Label>
-              <Form.Select
-                size="sm"
-                value={mapFilters.metricName || ''}
-                onChange={(e) => {
-                  const selectedMetric = e.target.value;
-                  handleMapFilterChange(
-                    'metricName',
-                    selectedMetric && isMapMetric(selectedMetric) ? selectedMetric : undefined
-                  );
-                }}
-              >
-                <option value="">Select Metric...</option>
-                {(() => {
-                  // Try to find metrics from any available table in the batch response
-                  // This works for both single-table and multi-table dashboards
-                  const allTableProps = tableProperties.data || {};
-                  const allMetrics: string[] = [];
-
-                  // Collect all unique metrics from all tables
-                  Object.values(allTableProps).forEach((tableProps) => {
-                    if (Array.isArray(tableProps?.metrics)) {
-                      tableProps.metrics.forEach((metric) => {
-                        if (!allMetrics.includes(metric)) {
-                          allMetrics.push(metric);
-                        }
-                      });
-                    }
-                  });
-
-                  return allMetrics.filter(isMapMetric).map((metricName) => (
-                    <option key={metricName} value={metricName}>
-                      {metricName}
-                    </option>
-                  ));
-                })()}
-              </Form.Select>
-            </Form.Group>
-          </div>
-        </Dropdown.Menu>
-      </Dropdown>
-    </div>
+    <Popover
+      opened={opened}
+      onChange={setOpened}
+      position="bottom-end"
+      // Fixed so the dropdown never extends the page while it is being positioned
+      floatingStrategy="fixed"
+      width={300}
+      shadow="md"
+      radius="md"
+      // Stays open while the map is used, so changes can be watched as they apply
+      closeOnClickOutside={false}
+    >
+      <Popover.Target>
+        <Button
+          variant="default"
+          leftSection={<IconAdjustmentsHorizontal size={16} />}
+          onClick={() => setOpened((value) => !value)}
+          aria-expanded={opened}
+        >
+          Display
+        </Button>
+      </Popover.Target>
+      <Popover.Dropdown>
+        <Stack gap="sm">
+          <Select
+            label="Configuration"
+            placeholder="Select configuration..."
+            data={Array.isArray(configurations.data) ? configurations.data : []}
+            value={mapFilters.configuration}
+            onChange={(configuration) => configuration && updateMapFilters({ configuration })}
+            allowDeselect={false}
+          />
+          <Select
+            label="Variable"
+            placeholder="Select variable..."
+            data={Array.isArray(variables.data) ? variables.data : []}
+            value={mapFilters.variable}
+            onChange={(variable) => variable && updateMapFilters({ variable })}
+            allowDeselect={false}
+          />
+          <Select
+            label="Color By Metric"
+            placeholder="Select metric..."
+            data={metrics}
+            value={mapFilters.metricName ?? null}
+            onChange={(metricName) =>
+              metricName && isMapMetric(metricName) && updateMapFilters({ metricName })
+            }
+            allowDeselect={false}
+          />
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   );
 };
 

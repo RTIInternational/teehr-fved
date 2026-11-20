@@ -24,7 +24,7 @@ environments:
         region: us-east-1
       hostname: teehr.local.app.garden
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 991900deeda31ab60f02aebb45edbd67c9180386
+      devTeehrVersion: 62d62cac1ad78e823e736e9d2fa2eee33ca849b2
       stableTeehrVersion: place-holder # Needed for sync to work for some reason.
       previousTeehrVersion: place-holder
       polaris:
@@ -35,9 +35,13 @@ environments:
         catalogType: rest
         catalogUri: http://polaris:8181/api/catalog
         catalogWarehouse: s3://warehouse/
-        catalogRoleArn: "" # local S3 has no real STS; Polaris can't assume a role against it
-        skipCredentialSubscopingIndirection: "true"
-        storageStsUnavailable: "true"
+        # Polaris vends per-table, prefix-scoped credentials via STS, as on remote.
+        # RustFS implements STS AssumeRole with session policies (it is also the STS
+        # endpoint, since stsEndpoint defaults to the S3 endpoint). No role ARN:
+        # RustFS ignores it, and Polaris won't add one to an existing catalog.
+        catalogRoleArn: ""
+        skipCredentialSubscopingIndirection: "false"
+        storageStsUnavailable: "false"
         defaultRealm: teehr
         realmsCsv: teehr
         oauthServerUri: http://keycloak-service:8080/realms/teehr/protocol/openid-connect/token
@@ -65,6 +69,11 @@ environments:
           default: ["icechunk-read-only"]
           repos:
             authz_test_restricted: ["admin"] # for the xpublish-access-enforcement test
+      # Nightly Postgres dumps to S3 (teehr-cloud-core/db-backups, #173).
+      dbBackups:
+        bucket: db-backups
+        endpoint: http://local-s3:9000
+        credentialsSecret: local-s3-secrets
   - name: remote
     defaultNamespace: ${project.name}
     # Cluster-specific values (region, cluster, ECR, EFS, IRSA roles, buckets,
@@ -74,7 +83,7 @@ environments:
     varfile: deploy-targets/${local.env.DEPLOY_TARGET || "use1"}.yml
     variables:
       certificateIssuerName: letsencrypt-prod
-      devTeehrVersion: 991900deeda31ab60f02aebb45edbd67c9180386
+      devTeehrVersion: 62d62cac1ad78e823e736e9d2fa2eee33ca849b2
       stableTeehrVersion: v0.8.0
       previousTeehrVersion: v0.7.0
       polaris:

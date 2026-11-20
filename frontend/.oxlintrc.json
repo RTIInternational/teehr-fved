@@ -10,7 +10,9 @@
   "categories": {
     "correctness": "error"
   },
-  "rules": {},
+  "rules": {
+    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+  },
   "env": {
     "builtin": true
   },
