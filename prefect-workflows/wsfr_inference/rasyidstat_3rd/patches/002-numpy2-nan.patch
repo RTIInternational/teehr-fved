@@ -1,0 +1,53 @@
+--- a/src/data/base.py
++++ b/src/data/base.py
+@@ -209,7 +209,7 @@
+     if is_preprocess:
+         df_swe["parameter"] = df_swe["parameter"].map(_cdec_params)
+         df_swe = df_swe[df_swe["parameter"].isin(_cdec_params.values())]
+-        df_swe["value"] = df_swe["value"].mask(df_swe["value"] < -99, np.NaN)
++        df_swe["value"] = df_swe["value"].mask(df_swe["value"] < -99, np.nan)
+         df_swe["value"] = df_swe["value"].clip(lower=0)
+         df_swe = df_swe.pivot(index=["cdec_id", "date"], columns="parameter", values="value").reset_index()
+         df_swe = df_swe.rename_axis(None, axis=1)
+--- a/src/features/volume_obs.py
++++ b/src/features/volume_obs.py
+@@ -84,7 +84,7 @@
+         lag_list=[1],
+     )
+     df_volume_obs_filtered = df_volume_obs_filtered.drop(columns=["wyear"])
+-    df_volume_obs_filtered.loc[df_volume_obs_filtered["day"] == 1, "volume_obs_month_cml_lag1"] = np.NaN
++    df_volume_obs_filtered.loc[df_volume_obs_filtered["day"] == 1, "volume_obs_month_cml_lag1"] = np.nan
+ 
+     return df_volume_obs_filtered
+ 
+--- a/src/forecast.py
++++ b/src/forecast.py
+@@ -129,7 +129,7 @@
+     ]
+     for col in swe_lag_features:
+         df_swe_features[col] = np.where(
+-            df_swe_features[col + "__count"] / df_swe_features["n_sites"] < comp_thr, np.NaN, df_swe_features[col]
++            df_swe_features[col + "__count"] / df_swe_features["n_sites"] < comp_thr, np.nan, df_swe_features[col]
+         )
+     df_swe_features = df_swe_features.drop(
+         columns=["n_sites"] + [x for x in df_swe_features.columns if "__count" in x]
+--- a/src/models/postprocess.py
++++ b/src/models/postprocess.py
+@@ -82,7 +82,7 @@
+     """
+     df = df.copy()
+     for col in cols:
+-        df[col] = np.where((df["month"].isin(months)) & (df["day"].isin(days)), np.NaN, df[col])
++        df[col] = np.where((df["month"].isin(months)) & (df["day"].isin(days)), np.nan, df[col])
+     df = df.ffill()
+ 
+     return df
+@@ -99,7 +99,7 @@
+     df.loc[
+         (~df["site_id"].isin(excluded_sites)) & (df["month"].isin(months)) & (df["day"].isin(days)),
+         cols,
+-    ] = np.NaN
++    ] = np.nan
+     df = forward_fill(df, groupby_cols=["site_id", "year"])
+ 
+     return df

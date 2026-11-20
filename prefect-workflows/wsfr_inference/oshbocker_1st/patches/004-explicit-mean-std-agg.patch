@@ -1,0 +1,64 @@
+--- a/features/acis.py
++++ b/features/acis.py
+@@ -113,7 +113,7 @@
+     acis_precip['precip'] = acis_precip['precip'].replace('T', 0).replace('M', np.nan)
+     acis_precip['precip'] = acis_precip['precip'].astype(float)
+     precip_grouped = acis_precip.groupby(["site_id", "station", "month_day"])["precip"].agg(
+-        [np.mean, np.std]).reset_index()
++        ['mean', 'std']).reset_index()
+     acis_precip = pd.merge(acis_precip, precip_grouped, on=["site_id", "station", "month_day"])
+     acis_precip['precip_deviation'] = (acis_precip['precip'] - acis_precip['mean']) / acis_precip['std']
+     acis_precip['precip_deviation'] = acis_precip['precip_deviation'].replace(np.inf, np.nan).replace(-np.inf, np.nan)
+@@ -142,7 +142,7 @@
+     acis_temp['date'] = pd.to_datetime(acis_temp['date'])
+     acis_temp["month_day"] = acis_temp["date"].dt.strftime("%m%d")
+     temp_grouped = acis_temp.groupby(["site_id", "station", "month_day"])[["maxt"]].agg(
+-        [np.mean, np.std]).reset_index()
++        ['mean', 'std']).reset_index()
+     temp_grouped.columns = ['site_id', 'station', 'month_day', 'maxt_mean', 'maxt_std']
+     acis_temp = pd.merge(acis_temp, temp_grouped, on=["site_id", "station", "month_day"])
+     acis_temp['maxt_deviation'] = (acis_temp['maxt'] - acis_temp['maxt_mean']) / acis_temp['maxt_std']
+--- a/features/cdec_deviation.py
++++ b/features/cdec_deviation.py
+@@ -43,7 +43,7 @@
+             ['station_id']]
+         cdec = pd.merge(all_cdec, relevant_stations, on='station_id')
+         cdec["month_day"] = pd.to_datetime(cdec["date"]).dt.strftime("%m%d")
+-        cdec_grouped = cdec.groupby(["month_day", "station_id"])["value"].agg([np.mean, np.std]).reset_index()
++        cdec_grouped = cdec.groupby(["month_day", "station_id"])["value"].agg(['mean', 'std']).reset_index()
+         cdec_grouped.columns = ['month_day', 'station_id', 'cdec_mean', 'cdec_std']
+         cdec = pd.merge(cdec, cdec_grouped, on=["month_day", "station_id"])
+         cdec['cdec_deviation'] = (cdec['value'] - cdec['cdec_mean']) / cdec['cdec_std']
+--- a/features/snotel_deviation.py
++++ b/features/snotel_deviation.py
+@@ -36,7 +36,7 @@
+         snotel = pd.merge(all_snotel, relevant_stations, on='station_triplet')
+         snotel["month_day"] = pd.to_datetime(snotel["date"]).dt.strftime("%m%d")
+         snotel_grouped = snotel.groupby(["month_day", "station_triplet"])[['WTEQ_DAILY']].agg(
+-            [np.mean, np.std]).reset_index()
++            ['mean', 'std']).reset_index()
+         snotel_grouped.columns = ['month_day', 'station_triplet', 'wteq_mean', 'wteq_std']
+         snotel = pd.merge(snotel, snotel_grouped, on=["month_day", "station_triplet"])
+         snotel['snotel_wteq_deviation'] = (snotel['WTEQ_DAILY'] - snotel['wteq_mean']) / snotel['wteq_std']
+--- a/features/streamflow_deviation.py
++++ b/features/streamflow_deviation.py
+@@ -51,7 +51,7 @@
+     logger.info(f"Streamflow max date: {streamflow_max_date}")
+     streamflow_deviation['month_day'] = streamflow_deviation['datetime'].dt.strftime("%m%d")
+     grouped_streamflow = streamflow_deviation.groupby(['site_id', 'month_day'])['discharge_cfs_mean'].agg(
+-        [np.mean, np.std]).reset_index()
++        ['mean', 'std']).reset_index()
+     grouped_streamflow.columns = ['site_id', 'month_day', 'discharge_mean', 'discharge_std']
+     streamflow_deviation = pd.merge(streamflow_deviation, grouped_streamflow, on=['site_id', 'month_day'])
+ 
+--- a/features/ua_swann_deviation.py
++++ b/features/ua_swann_deviation.py
+@@ -68,7 +68,7 @@
+     logger.info(f"Max UA Swann date: {ua_swann_max_date}")
+     ua_swann_deviation['month_day'] = ua_swann_deviation['date'].dt.strftime("%m%d")
+     grouped_ua_swann = ua_swann_deviation.groupby(['site_id', 'month_day'])[['acc_water', 'ua_swe']].agg(
+-        [np.mean, np.std]).reset_index()
++        ['mean', 'std']).reset_index()
+     grouped_ua_swann.columns = ['site_id', 'month_day', 'acc_water_mean', 'acc_water_std', 'ua_swe_mean', 'ua_swe_std']
+     ua_swann_deviation = pd.merge(ua_swann_deviation, grouped_ua_swann, on=['site_id', 'month_day'])
+ 

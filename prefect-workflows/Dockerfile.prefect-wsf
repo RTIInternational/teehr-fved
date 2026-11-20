@@ -1,0 +1,27 @@
+ARG PREFECT_BASE_IMAGE=teehr-prefect:latest
+FROM ${PREFECT_BASE_IMAGE}
+
+USER root
+ARG TARGETARCH
+ARG UV_VERSION=0.13.7
+
+RUN test "${TARGETARCH}" = "amd64" \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends git patch \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --no-cache-dir "uv==${UV_VERSION}"
+COPY wsfr_inference/pyproject.toml wsfr_inference/uv.lock /opt/wsfr-inference/
+RUN uv export --project /opt/wsfr-inference --locked --no-dev \
+    --no-emit-project --emit-index-url --format requirements-txt \
+        --output-file /tmp/wsfr-requirements.txt \
+    && uv pip install --system --no-cache --index-strategy unsafe-best-match \
+        --requirements /tmp/wsfr-requirements.txt \
+    && rm /tmp/wsfr-requirements.txt
+
+RUN python -m pip install --no-cache-dir "boto3>=1.35,<2"
+COPY wsfr_inference/ /teehr/wsfr_inference/
+RUN mkdir -p /data/wsf && chown prefect:prefect /data/wsf
+
+USER prefect
+WORKDIR /teehr

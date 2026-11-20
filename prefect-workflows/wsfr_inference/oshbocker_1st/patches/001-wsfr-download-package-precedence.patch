@@ -1,0 +1,4 @@
+--- a/wsfr_download/__init__.py
++++ b/wsfr_download/__init__.py
+@@ -0,0 +1 @@
++# Marks the bundled wsfr_download (alternative USGS download) as a package so it takes precedence over the pip-installed wsfr_download, which lacks download_alternative_usgs_streamflow.
