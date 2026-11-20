@@ -1,0 +1,20 @@
+/* Matches MapViewChooserModal: fixed over the map area, beside the navbar. */
+.overlay {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inset-inline-start: var(--app-shell-navbar-offset, 0rem);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mantine-spacing-md);
+  pointer-events: auto;
+  backdrop-filter: blur(4px);
+}
+
+.dialog {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+}

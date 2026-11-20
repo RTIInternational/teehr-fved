@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
-import { App } from '@/app/App';
+import { AppLayout } from '@/app/AppLayout';
 import AdminHome from '@/pages/admin/AdminHome';
 import AdminLayout from '@/pages/admin/AdminLayout';
 import ApiKeysAdmin from '@/pages/admin/ApiKeysAdmin';
@@ -22,7 +22,7 @@ const MapRoute = () => (
 export const AppRouter = () => (
   <BrowserRouter>
     <Routes>
-      <Route path="/" element={<App />}>
+      <Route path="/" element={<AppLayout />}>
         <Route index element={<MapRoute />} />
         <Route path="/about" element={<Home />} />
         <Route path="/map" element={<MapRoute />} />

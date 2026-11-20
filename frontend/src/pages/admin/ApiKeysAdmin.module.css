@@ -1,0 +1,6 @@
+/* Long keys wrap anywhere so the copy button stays beside them. */
+.key {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
