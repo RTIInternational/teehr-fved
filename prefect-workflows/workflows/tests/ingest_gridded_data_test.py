@@ -19,10 +19,10 @@ rasterio = pytest.importorskip("rasterio")
 from prefect.testing.utilities import prefect_test_harness  # noqa: E402
 from rasterio.transform import from_origin  # noqa: E402
 
-import build_overviews as bo  # noqa: E402
 import ingest_gridded_data as ing  # noqa: E402
+from teehr_icechunk import grid_utils as gu  # noqa: E402
 from workflows.models import gridded_sources as gs  # noqa: E402
-from workflows.models.ingest_gridded_data_input import BuildOverviewsDataInput, IngestGriddedDataInput  # noqa: E402
+from workflows.models.ingest_gridded_data_input import IngestGriddedDataInput  # noqa: E402
 
 ORIGIN = pd.Timestamp("1981-10-01")
 DAYS = pd.date_range(ORIGIN, periods=90, freq="D")
@@ -48,9 +48,9 @@ def _local_repo(tmp_path, src, monkeypatch):
             return icechunk.Repository.open(storage, config=config, authorize_virtual_chunk_access=access)
         return icechunk.Repository.create(storage, config=config, authorize_virtual_chunk_access=access)
 
-    monkeypatch.setattr(ing.gu, "configure_icechunk_s3_repo", open_repo)
-    monkeypatch.setattr(bo.gu, "build_icechunk_s3_storage", lambda **_: storage)
-    monkeypatch.setattr(bo.gu, "open_repo_for_reading", open_repo)
+    monkeypatch.setattr(ing, "configure_icechunk_s3_repo", open_repo)
+    monkeypatch.setattr(gu, "build_icechunk_s3_storage", lambda **_: storage)
+    monkeypatch.setattr(gu, "open_repo_for_reading", open_repo)
     return open_repo
 
 
@@ -77,7 +77,7 @@ def ua(tmp_path, monkeypatch):
         published[day] = {"time": day, "url": f"{prefix}{name}", "status": status, "last_modified": pd.Timestamp(modified)}
 
     def list_files(self, start_dt, end_dt):
-        return gs._listing([r for d, r in published.items() if start_dt.date() <= d.date() <= end_dt.date()])
+        return gs.listing_frame([r for d, r in published.items() if start_dt.date() <= d.date() <= end_dt.date()])
 
     monkeypatch.setattr(gs.UASwan4km, "source_bucket", prefix.rstrip("/"))
     monkeypatch.setattr(gs.UASwan4km, "list_files", list_files)
@@ -321,33 +321,6 @@ def test_switching_to_materialized_with_no_new_files(harness, ua):
     data = _groups(open_repo)["data"]
     assert float(data.SWE.isel(time=3, lat=0, lon=0)) == DAYS[3].dayofyear
 
-
-@pytest.mark.parametrize("factors", [[2, 4, 8], [3, 9]])
-def test_overview_levels_match_xarray_coarsen(factors):
-    """Levels built from the previous one match averaging full resolution, skipping NaN; partial edge blocks drop."""
-    rng = np.random.default_rng(0)
-    values = rng.random((3, 41, 59)).astype("float32")
-    values[:, :7, :11] = np.nan  # a fully missing corner
-    values[rng.random(values.shape) < 0.2] = np.nan  # and scattered gaps
-    ds = xr.Dataset(
-        {"v": (("time", "y", "x"), values, {"units": "mm"})},
-        coords={"time": DAYS[:3], "y": np.arange(41) * 1000.0, "x": np.arange(59) * 1000.0},
-        attrs={"spatial:dimensions": ["y", "x"]},
-    )
-    levels = bo._overview_levels(ds, factors)
-    for factor in factors:
-        expected = ds.coarsen(y=factor, x=factor, boundary="trim").mean()
-        level = levels[factor]
-        np.testing.assert_allclose(level.v.values, expected.v.values, rtol=1e-6)
-        np.testing.assert_allclose(level.x.values, expected.x.values)
-        assert level.attrs["spatial:transform"][0] == 1000.0 * factor and level.v.attrs["units"] == "mm"
-
-
-def test_overview_factors_each_a_multiple_of_the_previous():
-    BuildOverviewsDataInput(configuration_name="r", overview_factors=[3, 9])
-    for bad in ([2, 3], [4, 2], [1, 2], []):
-        with pytest.raises(ValueError):
-            BuildOverviewsDataInput(configuration_name="r", overview_factors=bad)
 
 @pytest.mark.parametrize("source_scale", [None, 0.5])
 def test_integer_source_stored_losslessly(harness, ua, source_scale):
