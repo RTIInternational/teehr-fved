@@ -213,6 +213,15 @@ deployments:
     }
     work_pool: *work_pool
 
+  - name: process-gridded-unit
+    version:
+    tags: []
+    description: >-
+      One unit of a gridded ingest that fans out (max_child_runs > 0), started by ingest-gridded-data with
+      run_deployment. Not run on its own.
+    entrypoint: workflows/ingests/process_gridded_unit.py:process_gridded_unit
+    work_pool: *work_pool
+
   # Create Vector Tiles
   - name: create-vector-tiles
     version:
