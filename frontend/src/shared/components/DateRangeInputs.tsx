@@ -11,7 +11,11 @@ type DateRangeInputsProps = {
   error?: string | null;
 };
 
-/** Start/end `datetime-local` inputs, side by side from the `sm` breakpoint up. */
+/**
+ * Start/end `datetime-local` inputs, side by side once their container is wide
+ * enough for both (it sizes to its container, not the viewport, so it also fits
+ * narrow sidebars).
+ */
 const DateRangeInputs = ({
   start,
   end,
@@ -21,7 +25,7 @@ const DateRangeInputs = ({
   endLabel = 'End Date',
   error,
 }: DateRangeInputsProps) => (
-  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm" verticalSpacing="sm">
+  <SimpleGrid type="container" cols={{ base: 1, '448px': 2 }} spacing="sm" verticalSpacing="sm">
     <TextInput
       type="datetime-local"
       label={startLabel}

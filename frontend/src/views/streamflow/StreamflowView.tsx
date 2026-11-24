@@ -162,7 +162,6 @@ const StreamflowContent = () => {
                         key={selectedLocation.primary_location_id}
                         state={state}
                         Controls={TimeseriesControls}
-                        initialViewMode="plot"
                         autoRequestFilters={autoRequestFilters}
                         controlsProps={{
                           table: TABLES[0],

@@ -1,3 +1,31 @@
+/* Fills the sidebar: the fields scroll, the Load button below them doesn't. */
+.controls {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fields {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Each fieldset's legend is a full-width section heading with its own rule.
+   (A border on the fieldset itself would be drawn through the legend.) */
+.legend {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--mantine-spacing-xs);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 700;
+}
+
 .footer {
+  flex: 0 0 auto;
+  padding: var(--mantine-spacing-sm) 0;
   border-top: 1px solid var(--mantine-color-default-border);
 }

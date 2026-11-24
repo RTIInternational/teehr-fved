@@ -1,9 +1,11 @@
-import { Group, Loader, SegmentedControl, Stack, Text } from '@mantine/core';
-import { IconChartLine, IconDatabaseOff, IconFilter, IconMapPin } from '@tabler/icons-react';
+import { Loader, Stack, Text } from '@mantine/core';
+import { IconDatabaseOff, IconMapPin } from '@tabler/icons-react';
 import React, { useState } from 'react';
 
 import type { TimeseriesRequestFilters } from '@/shared/api/timeseries';
+import FilterSidebarLayout from '@/shared/components/FilterSidebarLayout';
 import PlotlyChart from '@/shared/components/PlotlyChart';
+import { useFilterSidebar } from '@/shared/hooks/useFilterSidebar';
 import { usePrimaryTimeseries, useSecondaryTimeseries } from '@/shared/queries/timeseries';
 import type { TimeseriesState } from '@/shared/types/timeseries';
 
@@ -11,14 +13,14 @@ import styles from './TimeseriesComponent.module.css';
 
 type TimeseriesControlInjectedProps = {
   setRequestFilters: (filters: TimeseriesRequestFilters) => void;
-  onViewModeChange: (viewMode: string) => void;
+  /** Called once the filters are submitted. */
+  onLoad: () => void;
 };
 
 type TimeseriesComponentProps<TControlsProps extends object> = {
   state: TimeseriesState;
   Controls: React.ComponentType<TControlsProps & TimeseriesControlInjectedProps>;
   controlsProps: TControlsProps;
-  initialViewMode?: 'filters' | 'plot';
   /**
    * Request issued without submitting the filters form. The first non-null value
    * is kept until the user submits the form; key the component by location to
@@ -27,35 +29,13 @@ type TimeseriesComponentProps<TControlsProps extends object> = {
   autoRequestFilters?: TimeseriesRequestFilters | null;
 };
 
-const VIEW_OPTIONS = [
-  {
-    value: 'filters',
-    label: (
-      <Group gap={6} wrap="nowrap">
-        <IconFilter size={14} />
-        <span>Filters</span>
-      </Group>
-    ),
-  },
-  {
-    value: 'plot',
-    label: (
-      <Group gap={6} wrap="nowrap">
-        <IconChartLine size={14} />
-        <span>Plot</span>
-      </Group>
-    ),
-  },
-];
-
 const TimeseriesComponent = <TControlsProps extends object>({
   state,
   Controls,
   controlsProps,
-  initialViewMode = 'filters',
   autoRequestFilters = null,
 }: TimeseriesComponentProps<TControlsProps>) => {
-  const [viewMode, setViewMode] = useState<string>(initialViewMode);
+  const sidebar = useFilterSidebar();
   const [requestFilters, setRequestFilters] = useState<TimeseriesRequestFilters>();
   const [autoFilters, setAutoFilters] = useState(autoRequestFilters ?? undefined);
   if (!autoFilters && autoRequestFilters) {
@@ -102,8 +82,7 @@ const TimeseriesComponent = <TControlsProps extends object>({
           No Data Available
         </Text>
         <Text size="sm" c="dimmed" ta="center">
-          Try switching to Filters to adjust the time range or check if data exists for this
-          location.
+          Adjust the filters or check if data exists for this location.
         </Text>
       </Stack>
     );
@@ -122,24 +101,19 @@ const TimeseriesComponent = <TControlsProps extends object>({
   }
 
   return (
-    <div className={styles.panel}>
-      <Group justify="flex-end" className={styles.toolbar}>
-        <SegmentedControl size="xs" value={viewMode} onChange={setViewMode} data={VIEW_OPTIONS} />
-      </Group>
-      <div className={styles.body}>
-        {viewMode === 'plot' ? (
-          plotBody
-        ) : (
-          <div className={styles.filters}>
-            <Controls
-              {...controlsProps}
-              setRequestFilters={setRequestFilters}
-              onViewModeChange={setViewMode}
-            />
-          </div>
-        )}
-      </div>
-    </div>
+    <FilterSidebarLayout
+      opened={sidebar.opened}
+      onOpenedChange={sidebar.setOpened}
+      filters={
+        <Controls
+          {...controlsProps}
+          setRequestFilters={setRequestFilters}
+          onLoad={sidebar.closeIfOverlay}
+        />
+      }
+    >
+      {plotBody}
+    </FilterSidebarLayout>
   );
 };
 

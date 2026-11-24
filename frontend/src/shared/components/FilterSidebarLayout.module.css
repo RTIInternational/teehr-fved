@@ -1,0 +1,63 @@
+.layout {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.sidebar {
+  display: flex;
+  flex: 0 0 20rem;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--mantine-color-default-border);
+}
+
+/* `display: flex` above would otherwise override the `hidden` attribute. */
+.sidebar[hidden] {
+  display: none;
+}
+
+.header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+}
+
+/* A flex column so filters can fill it exactly (`flex: 1; min-height: 0`) and
+   keep actions like a Load button outside their own scrolling area. Taller
+   content that doesn't do that just scrolls here. */
+.filters {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 var(--mantine-spacing-sm);
+}
+
+.rail {
+  flex: 0 0 auto;
+  padding: var(--mantine-spacing-xs);
+  border-right: 1px solid var(--mantine-color-default-border);
+}
+
+.content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Narrow screens: the filters cover the content rather than squeezing it. */
+@media (max-width: $mantine-breakpoint-sm) {
+  .sidebar {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-right: 0;
+    background: var(--mantine-color-body);
+  }
+}
