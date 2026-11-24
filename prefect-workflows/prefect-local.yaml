@@ -217,8 +217,8 @@ deployments:
     version:
     tags: []
     description: >-
-      One unit of a gridded ingest that fans out (max_child_runs > 0), started by ingest-gridded-data with
-      run_deployment. Not run on its own.
+      One unit of a gridded run that fans out (max_child_runs > 0): references or overviews, started by
+      ingest-gridded-data with run_deployment. Not run on its own.
     entrypoint: workflows/ingests/process_gridded_unit.py:process_gridded_unit
     work_pool: *work_pool
 
