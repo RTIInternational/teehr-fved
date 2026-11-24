@@ -1,5 +1,5 @@
 import { Alert } from '@mantine/core';
-import { IconAlertTriangle } from '@tabler/icons-react';
+import { IconAlertTriangle, IconChartLine, IconListDetails } from '@tabler/icons-react';
 
 import { MapDataDock, type MapDataDockSection } from '@/views/components/MapDataDock';
 import { MapViewLayout } from '@/views/components/MapViewLayout';
@@ -25,12 +25,18 @@ const SnowContent = () => {
   const loading = useSnowLoading();
 
   const sections: MapDataDockSection[] = [
-    { value: 'timeseries', label: 'Time Series', content: <GriddedTimeseriesPanel /> },
+    {
+      value: 'timeseries',
+      label: 'Time Series',
+      icon: <IconChartLine size={16} />,
+      content: <GriddedTimeseriesPanel />,
+    },
   ];
   if (hasAttributes) {
     sections.unshift({
       value: 'attributes',
       label: 'Polygon Attributes',
+      icon: <IconListDetails size={16} />,
       content: <GriddedPolygonPanel />,
     });
   }

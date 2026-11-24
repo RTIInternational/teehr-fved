@@ -1,5 +1,11 @@
 import { Alert } from '@mantine/core';
-import { IconAlertTriangle, IconInfoCircle, IconMapPin } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconChartLine,
+  IconInfoCircle,
+  IconMapPin,
+  IconTable,
+} from '@tabler/icons-react';
 import { useCallback, useMemo } from 'react';
 
 import { useMap } from '@/core/map';
@@ -150,6 +156,7 @@ const StreamflowContent = () => {
                   {
                     value: 'timeseries',
                     label: 'Time Series',
+                    icon: <IconChartLine size={16} />,
                     content: (
                       <TimeseriesComponent
                         key={selectedLocation.primary_location_id}
@@ -170,6 +177,7 @@ const StreamflowContent = () => {
                   {
                     value: 'metrics',
                     label: 'Metrics',
+                    icon: <IconTable size={16} />,
                     content: (
                       <LocationMetrics
                         key={selectedLocation.primary_location_id}

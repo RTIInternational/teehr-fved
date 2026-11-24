@@ -1,13 +1,4 @@
-import {
-  ActionIcon,
-  Box,
-  CloseButton,
-  Group,
-  Paper,
-  SegmentedControl,
-  Text,
-  Tooltip,
-} from '@mantine/core';
+import { ActionIcon, Box, CloseButton, Group, Paper, Tabs, Text, Tooltip } from '@mantine/core';
 import { useUncontrolled } from '@mantine/hooks';
 import {
   IconArrowsMaximize,
@@ -22,6 +13,8 @@ import styles from './MapDataDock.module.css';
 export type MapDataDockSection = {
   value: string;
   label: string;
+  /** Shown before the label in the section's tab. */
+  icon?: ReactNode;
   content: ReactNode;
 };
 
@@ -95,68 +88,78 @@ export const MapDataDock = ({
       withBorder
       className={styles.dock}
       data-expanded={(expanded && !collapsed) || undefined}
+      data-collapsed={collapsed || undefined}
     >
-      <div className={styles.header}>
-        <Group gap="xs" wrap="nowrap" className={styles.title}>
-          {icon}
-          {(title || subtitle) && (
-            <Box miw={0}>
-              {title && (
-                <Text size="sm" fw={600} truncate>
-                  {title}
-                </Text>
-              )}
-              {subtitle && (
-                <Text size="xs" c="dimmed" truncate>
-                  {subtitle}
-                </Text>
-              )}
-            </Box>
-          )}
-        </Group>
+      <Tabs
+        value={activeSection}
+        onChange={(value) => value && setActiveSection(value)}
+        keepMounted
+        className={styles.tabs}
+      >
+        <div className={styles.header}>
+          <Group gap="xs" wrap="nowrap" className={styles.title}>
+            {icon}
+            {(title || subtitle) && (
+              <Box miw={0}>
+                {title && (
+                  <Text size="sm" fw={600} truncate>
+                    {title}
+                  </Text>
+                )}
+                {subtitle && (
+                  <Text size="xs" c="dimmed" truncate>
+                    {subtitle}
+                  </Text>
+                )}
+              </Box>
+            )}
+          </Group>
 
-        <Group gap="xs" wrap="nowrap" className={styles.controls}>
           {sections.length > 1 && (
-            <SegmentedControl
-              size="xs"
-              data={sections.map(({ value, label }) => ({ value, label }))}
-              value={activeSection}
-              onChange={setActiveSection}
-            />
+            <Tabs.List className={styles.tabList}>
+              {sections.map(({ value, label, icon: tabIcon }) => (
+                <Tabs.Tab key={value} value={value} leftSection={tabIcon}>
+                  {label}
+                </Tabs.Tab>
+              ))}
+            </Tabs.List>
           )}
-          {!collapsed && (
-            <Tooltip label={expanded ? 'Restore size' : 'Expand'}>
+
+          <Group gap="xs" wrap="nowrap" className={styles.controls}>
+            {!collapsed && (
+              <Tooltip label={expanded ? 'Restore size' : 'Expand'}>
+                <ActionIcon
+                  variant="subtle"
+                  aria-label={expanded ? 'Restore panel size' : 'Expand panel'}
+                  aria-pressed={expanded}
+                  onClick={() => setExpanded((value) => !value)}
+                >
+                  {expanded ? <IconArrowsMinimize size={18} /> : <IconArrowsMaximize size={18} />}
+                </ActionIcon>
+              </Tooltip>
+            )}
+            <Tooltip label={collapsed ? 'Show panel' : 'Hide panel'}>
               <ActionIcon
                 variant="subtle"
-                aria-label={expanded ? 'Restore panel size' : 'Expand panel'}
-                aria-pressed={expanded}
-                onClick={() => setExpanded((value) => !value)}
+                aria-label={collapsed ? 'Show panel' : 'Hide panel'}
+                aria-expanded={!collapsed}
+                onClick={() => setCollapsed((value) => !value)}
               >
-                {expanded ? <IconArrowsMinimize size={18} /> : <IconArrowsMaximize size={18} />}
+                {collapsed ? <IconChevronUp size={18} /> : <IconChevronDown size={18} />}
               </ActionIcon>
             </Tooltip>
-          )}
-          <Tooltip label={collapsed ? 'Show panel' : 'Hide panel'}>
-            <ActionIcon
-              variant="subtle"
-              aria-label={collapsed ? 'Show panel' : 'Hide panel'}
-              aria-expanded={!collapsed}
-              onClick={() => setCollapsed((value) => !value)}
-            >
-              {collapsed ? <IconChevronUp size={18} /> : <IconChevronDown size={18} />}
-            </ActionIcon>
-          </Tooltip>
-          {onClose && <CloseButton aria-label={closeLabel} onClick={onClose} />}
-        </Group>
-      </div>
+            {onClose && <CloseButton aria-label={closeLabel} onClick={onClose} />}
+          </Group>
+        </div>
 
-      <div className={styles.body} hidden={collapsed}>
-        {sections.map(({ value, content }) => (
-          <div key={value} className={styles.section} hidden={value !== activeSection}>
-            {content}
-          </div>
-        ))}
-      </div>
+        <div className={styles.body} hidden={collapsed}>
+          {sections.map(({ value, content }) => (
+            <Tabs.Panel key={value} value={value} className={styles.section}>
+              {content}
+            </Tabs.Panel>
+          ))}
+        </div>
+      </Tabs>
     </Paper>
   );
 };

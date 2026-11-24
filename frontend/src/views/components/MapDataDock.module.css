@@ -9,12 +9,37 @@
   pointer-events: auto;
 }
 
+.tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The section tabs sit on the header's bottom rule, so the active one reads as
+   the label of the panel beneath it. */
 .header {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
-  gap: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
-  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+  gap: var(--mantine-spacing-xs) var(--mantine-spacing-lg);
+  padding: 0 var(--mantine-spacing-md);
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.title,
+.controls {
+  padding-block: var(--mantine-spacing-xs);
+}
+
+/* The header draws the rule; the list's own would double it. */
+.tabList {
+  flex-wrap: nowrap;
+  align-self: flex-end;
+  margin-bottom: -1px;
+}
+
+.tabList::before {
+  display: none;
 }
 
 .title {
@@ -30,7 +55,12 @@
 .body {
   height: 40dvh;
   min-height: 0;
-  padding: 0 var(--mantine-spacing-xs) var(--mantine-spacing-xs);
+  padding: var(--mantine-spacing-xs);
+}
+
+/* Nothing below the header to separate it from. */
+.dock[data-collapsed] .header {
+  border-bottom: 0;
 }
 
 .section {
@@ -45,6 +75,12 @@
 @media (max-width: $mantine-breakpoint-sm) {
   .header {
     flex-wrap: wrap;
+  }
+
+  /* Tabs move to their own row under the title and controls. */
+  .tabList {
+    order: 1;
+    flex-basis: 100%;
   }
 
   /* Leave room for the taller, two-row header. */
