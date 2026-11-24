@@ -41,10 +41,16 @@ SEASONAL_PERIODS = {
     ("january", "may"): ("volume_0105_sum", 1),
 }
 
+# Variable name to description mapping (forecast and observed cumsum)
 CBRFC_SEASONAL_VARIABLE_MAPPING: dict[str, str] = {
-    'volume_0407_sum': 'Seasonal summed water supply volume (Apr-Jul)',
-    'volume_0106_sum': 'Seasonal summed water supply volume (Jan-Jun)',
-    'volume_0105_sum': 'Seasonal summed water supply volume (Jan-May)',
+    # Forecast variables
+    "volume_0407_sum": "Seasonal summed water supply volume (Apr-Jul)",
+    "volume_0106_sum": "Seasonal summed water supply volume (Jan-Jun)",
+    "volume_0105_sum": "Seasonal summed water supply volume (Jan-May)",
+    # Observed cumsum variables (new naming convention)
+    "volume_0407_cumsum": "Seasonal summed water supply volume (Apr-Jul) (cumsum)",
+    "volume_0106_cumsum": "Seasonal summed water supply volume (Jan-Jun) (cumsum)",
+    "volume_0105_cumsum": "Seasonal summed water supply volume (Jan-May) (cumsum)",
 }
 
 

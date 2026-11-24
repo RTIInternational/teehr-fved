@@ -34,7 +34,7 @@ logging.getLogger("teehr").setLevel(logging.INFO)
 
 
 def _get_all_cbrfc_locations(ev) -> list[str]:
-    """Get list of all CBRFC locations from warehouse configuration.
+    """Get list of all CBRFC locations from warehouse.
 
     Parameters
     ----------
@@ -46,24 +46,10 @@ def _get_all_cbrfc_locations(ev) -> list[str]:
     list[str]
         List of CBRFC location IDs (e.g., ['cbrfc-OAWU1', 'cbrfc-GRNU1', ...])
     """
-    # This would typically read from the warehouse or configuration
-    # For now, we'll hardcode the known locations
-    return [
-        "cbrfc-DIRC2",
-        "cbrfc-DLAC2",
-        "cbrfc-DRGC2",
-        "cbrfc-GBRW4",
-        "cbrfc-GJNC2",
-        "cbrfc-GLDA3",
-        "cbrfc-GRNU1",
-        "cbrfc-MBLC2",
-        "cbrfc-NVRN5",
-        "cbrfc-OAWU1",
-        "cbrfc-RURC2",
-        "cbrfc-TPIC2",
-        "cbrfc-VIRU1",
-        "cbrfc-YDLC2",
-    ]
+    sdf = ev.location_id_aliases.filter("location_id_alias LIKE 'cbrfc-%'").to_sdf()
+    locs = [row["location_id_alias"] for row in sdf.select("location_id_alias").collect()]
+
+    return locs
 
 
 @task(name="fetch-cbrfc-data")
@@ -318,27 +304,6 @@ def ingest_cbrfc_seasonal_wsv_forecasts(
         start_spark_cluster=start_spark_cluster,
         update_configs={"spark.sql.shuffle.partitions": "4"},
     )
-
-    # Ensure configurations exist
-    if not ev.fetch._configuration_name_exists(SIM_CONFIGURATION_NAME):
-        ev.configurations.add(
-            Configuration(
-                name=SIM_CONFIGURATION_NAME,
-                type="secondary",
-                description="CBRFC unregulated official forecast",
-            )
-        )
-        logger.info(f"Added configuration: {SIM_CONFIGURATION_NAME}")
-
-    if not ev.fetch._configuration_name_exists(OBS_CONFIGURATION_NAME):
-        ev.configurations.add(
-            Configuration(
-                name=OBS_CONFIGURATION_NAME,
-                type="primary",
-                description="CBRFC unregulated observed",
-            )
-        )
-        logger.info(f"Added configuration: {OBS_CONFIGURATION_NAME}")
 
     # Get location IDs
     if location_ids is None:
