@@ -3,6 +3,7 @@ import os
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from pydantic.json_schema import SkipJsonSchema
 from teehr_icechunk import models as ic_models
 from teehr_icechunk.models import OVERVIEW_CHUNK_SIZE, ParserType  # noqa: F401 (used by the flows and tests)
 
@@ -63,3 +64,7 @@ class IngestGriddedDataInput(BuildOverviewsDataInput, ic_models.IngestGriddedDat
         ...,
         description="The gridded data source, e.g. {'type': 'ua-swann-4km'}"
     )
+    # Hidden again here: pydantic takes inherited fields from the first base, which shows them, and the
+    # Prefect UI would send their defaults
+    configuration_name: SkipJsonSchema[Optional[str]] = None
+    append_dim: SkipJsonSchema[Optional[str]] = None

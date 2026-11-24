@@ -17,6 +17,7 @@ pytest.importorskip("h5netcdf")
 icechunk = pytest.importorskip("icechunk")
 rasterio = pytest.importorskip("rasterio")
 from prefect.testing.utilities import prefect_test_harness  # noqa: E402
+from prefect.utilities.callables import parameter_schema  # noqa: E402
 from rasterio.transform import from_origin  # noqa: E402
 
 import ingest_gridded_data as ing  # noqa: E402
@@ -254,6 +255,13 @@ def test_geotiff_values_match_source(harness, cu):
     assert (data.SWE.attrs["teehr:unit_name"], data.SWE.attrs["teehr:scale"]) == ("mm", 1000.0)
     np.testing.assert_allclose(float(overview.isel(time=0).mean()), float(data.SWE.isel(time=0).mean()), rtol=0.05)
 
+
+
+def test_derived_fields_hidden_from_the_flow_form():
+    """A UI run sends every field the form shows, so the fields derived from the source stay off it."""
+    schema = parameter_schema(ing.ingest_gridded_data).model_dump()
+    shown = schema["definitions"]["IngestGriddedDataInput"]["properties"]
+    assert not {"configuration_name", "variable_names", "append_dim"} & shown.keys()
 
 
 def test_write_materialized_defaults_to_the_source():
