@@ -20,6 +20,9 @@ icechunk:
   accessRoleArn: arn:aws:iam::794457362858:role/fved-icechunk-s3-warehouse-access
 pmtiles:
   bucket: dev-fved-icechunk-warehouse-rti-use1
+wsf:
+  assetsS3Uri: s3://dev-fved-wsfr-rti-use1/wsf/assets
+  outputS3Uri: s3://dev-fved-wsfr-rti-use1/wsf/outputs
 deploy:
   clusterName: fved-cluster
   # The action role has cluster admin through its EKS access entry.
