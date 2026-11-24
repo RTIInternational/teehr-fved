@@ -138,7 +138,6 @@ deployments:
     entrypoint: workflows/ingests/cbrfc_seasonal_wsv_forecast.py:ingest_cbrfc_seasonal_wsv_forecasts
     parameters: {
       "temp_dir_path": *temp_dir_path,
-      "end_WY": 2025,
       "start_spark_cluster": false
     }
     work_pool: *work_pool

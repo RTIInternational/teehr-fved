@@ -242,7 +242,7 @@ def _write_to_warehouse(
 
 @flow(
     name="ingest-cbrfc-seasonal-wsv-forecasts",
-    flow_run_name="ingest-cbrfc-seasonal-wsv-forecasts-{water_year}",
+    flow_run_name="ingest-cbrfc-seasonal-wsv-forecasts",
     timeout_seconds=60 * 60,
 )
 def ingest_cbrfc_seasonal_wsv_forecasts(
