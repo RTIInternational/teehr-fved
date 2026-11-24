@@ -1,10 +1,12 @@
-import { Center, Group, List, Loader, SegmentedControl, Stack, Text } from '@mantine/core';
-import { IconChartLine, IconDatabaseOff, IconFilter } from '@tabler/icons-react';
+import { Center, List, Loader, Stack, Text } from '@mantine/core';
+import { IconDatabaseOff } from '@tabler/icons-react';
 import { useQueries } from '@tanstack/react-query';
 import Plotly from 'plotly.js-dist-min';
 import { useEffect, useRef, useState } from 'react';
 
 import { teehrMapping } from '@/shared/api/gridded/variableAttrs';
+import FilterSidebarLayout from '@/shared/components/FilterSidebarLayout';
+import { useFilterSidebar } from '@/shared/hooks/useFilterSidebar';
 import { usePlotResize } from '@/shared/hooks/usePlotResize';
 import { useEdrTimeseries } from '@/shared/queries/gridded/edr';
 import { usePolygonTimeseries } from '@/shared/queries/gridded/polygonTimeseries';
@@ -49,14 +51,14 @@ const GriddedTimeseriesPanel = () => {
   const { state, dispatch } = useDashboard();
   const { mapFilters, clickedPoint, polygonQuery, timeseriesFilters } = state;
   const plotRef = useRef<HTMLDivElement>(null);
-  const [viewMode, setViewMode] = useState('plot');
+  const sidebar = useFilterSidebar();
 
-  // A new map click or polygon load shows its plot
+  // A new map click or polygon load shows its plot, even where the filters cover it
   const request = clickedPoint ?? polygonQuery;
   const [lastRequest, setLastRequest] = useState(request);
   if (request !== lastRequest) {
     setLastRequest(request);
-    if (request) setViewMode('plot');
+    if (request) sidebar.closeIfOverlay();
   }
 
   const datasets = timeseriesDatasets(timeseriesFilters, mapFilters.dataset);
@@ -122,7 +124,7 @@ const GriddedTimeseriesPanel = () => {
         ),
         isLoading: series.some((s) => s.isLoading),
       };
-  usePlotResize(plotRef, viewMode === 'plot' && !!request && !isLoading && plotted.length > 0);
+  usePlotResize(plotRef, !!request && !isLoading && plotted.length > 0);
 
   useEffect(() => {
     if (!plotRef.current || !request || plotted.length === 0) return;
@@ -191,7 +193,7 @@ const GriddedTimeseriesPanel = () => {
           No Data Available
         </Text>
         <Text size="sm" c="dimmed" ta="center">
-          Try switching to Filters to adjust the datasets or time span.
+          Adjust the datasets or time span in the filters.
         </Text>
         {notesList}
       </Stack>
@@ -207,50 +209,21 @@ const GriddedTimeseriesPanel = () => {
   }
 
   return (
-    <div className={styles.panel}>
-      <Group justify="flex-end" className={styles.toolbar}>
-        <SegmentedControl
-          size="xs"
-          value={viewMode}
-          onChange={setViewMode}
-          data={[
-            {
-              value: 'filters',
-              label: (
-                <Group gap={6} wrap="nowrap">
-                  <IconFilter size={14} />
-                  <span>Filters</span>
-                </Group>
-              ),
-            },
-            {
-              value: 'plot',
-              label: (
-                <Group gap={6} wrap="nowrap">
-                  <IconChartLine size={14} />
-                  <span>Plot</span>
-                </Group>
-              ),
-            },
-          ]}
+    <FilterSidebarLayout
+      opened={sidebar.opened}
+      onOpenedChange={sidebar.setOpened}
+      filters={
+        <GriddedTimeseriesControls
+          timeseriesFilters={timeseriesFilters}
+          updateTimeseriesFilters={(patch) =>
+            dispatch({ type: ActionTypes.UPDATE_TIMESERIES_FILTERS, payload: patch })
+          }
+          activeDataset={mapFilters.dataset}
         />
-      </Group>
-      <div className={styles.body}>
-        {viewMode === 'filters' ? (
-          <div className={styles.filters}>
-            <GriddedTimeseriesControls
-              timeseriesFilters={timeseriesFilters}
-              updateTimeseriesFilters={(patch) =>
-                dispatch({ type: ActionTypes.UPDATE_TIMESERIES_FILTERS, payload: patch })
-              }
-              activeDataset={mapFilters.dataset}
-            />
-          </div>
-        ) : (
-          plotBody
-        )}
-      </div>
-    </div>
+      }
+    >
+      {plotBody}
+    </FilterSidebarLayout>
   );
 };
 

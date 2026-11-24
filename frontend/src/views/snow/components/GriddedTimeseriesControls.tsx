@@ -1,4 +1,4 @@
-import { Button, Group, Stack, Text } from '@mantine/core';
+import { Button, Stack, Text } from '@mantine/core';
 
 import DateRangeInputs from '@/shared/components/DateRangeInputs';
 import MultiSelectDropdown from '@/shared/components/MultiSelectDropdown';
@@ -29,8 +29,8 @@ const GriddedTimeseriesControls = ({
       : null;
 
   return (
-    <Stack h="100%" justify="space-between">
-      <Stack gap="sm">
+    <div className={styles.controls}>
+      <Stack gap="sm" className={styles.fields}>
         <MultiSelectDropdown
           label="Datasets"
           loading={datasets.isLoading}
@@ -48,21 +48,22 @@ const GriddedTimeseriesControls = ({
           onEndChange={(value) => updateTimeseriesFilters({ end_date: value })}
           error={rangeError}
         />
-      </Stack>
-
-      <Group justify="space-between" pt="xs" className={styles.footer}>
-        <Text size="sm" c="dimmed">
+        <Text size="xs" c="dimmed">
           Leave dates empty for up to 3 years before the map&apos;s date (max span 20 years).
         </Text>
+      </Stack>
+
+      <div className={styles.footer}>
         <Button
+          fullWidth
           variant="default"
           size="sm"
           onClick={() => updateTimeseriesFilters(DEFAULT_TIMESERIES_FILTERS)}
         >
           Reset
         </Button>
-      </Group>
-    </Stack>
+      </div>
+    </div>
   );
 };
 

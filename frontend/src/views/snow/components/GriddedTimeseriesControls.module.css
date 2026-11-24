@@ -1,3 +1,19 @@
+/* Fills the sidebar: the fields scroll, the Reset button below them doesn't. */
+.controls {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fields {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
 .footer {
+  flex: 0 0 auto;
+  padding: var(--mantine-spacing-sm) 0;
   border-top: 1px solid var(--mantine-color-default-border);
 }
