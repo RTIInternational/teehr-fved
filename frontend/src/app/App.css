@@ -10,14 +10,20 @@ body {
   height: 100vh;
 }
 
-/* MapLibre popups (built from HTML strings, so not Mantine-styled) */
+/* MapLibre popup frame; MapPopup renders the content inside it. */
 .maplibregl-popup {
   max-width: 300px;
 }
 
 .maplibregl-popup-content {
-  padding: 8px;
-  border-radius: 6px;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-sm);
+  box-shadow: var(--mantine-shadow-md);
+}
+
+/* Keep the close button (top-right corner) clear of the title. */
+.maplibregl-popup-content:has(> .maplibregl-popup-close-button) {
+  padding-right: calc(var(--mantine-spacing-sm) + 16px);
 }
 
 /* Plotly modebar: blend into the chart instead of a solid bar */

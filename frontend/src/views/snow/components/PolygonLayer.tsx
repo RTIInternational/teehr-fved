@@ -1,13 +1,24 @@
-import maplibregl, { type FilterSpecification, type MapLayerMouseEvent } from 'maplibre-gl';
+import { Text } from '@mantine/core';
+import maplibregl, {
+  type FilterSpecification,
+  type LngLatLike,
+  type MapLayerMouseEvent,
+} from 'maplibre-gl';
 import { FetchSource, PMTiles } from 'pmtiles';
-import { useEffect, useEffectEvent } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
-import { pmtilesProtocol, useMap } from '@/core/map';
+import {
+  MapPopup,
+  MapPopupNote,
+  MapPopupTitle,
+  pmtilesProtocol,
+  useMap,
+  type MapPopupHandle,
+} from '@/core/map';
 import { buildPmtilesUrl } from '@/shared/api/gridded/tiles';
 import { ensureFreshToken } from '@/shared/auth/keycloak';
 import { usePolygonLayers } from '@/shared/queries/gridded/tiles';
 import type { PolygonFeatureProps, PolygonFeatures } from '@/shared/types/gridded/tiles';
-import { escapeHtml } from '@/shared/utils/html';
 
 import { ActionTypes, useDashboard } from '../DashboardContext';
 import {
@@ -48,25 +59,35 @@ const dedupePolygonFeatures = (features: maplibregl.MapGeoJSONFeature[] = []) =>
   }, []);
 };
 
-const hoverHtml = (features: PolygonFeatures) => {
-  const rows = features
-    .map(
-      (props) => `
-        <div style="padding:1px 0;">
-          <span style="font-weight:600;">${escapeHtml(props.id ?? 'N/A')}</span>
-          <span style="opacity:0.7;"> — ${escapeHtml(props.name ?? 'Unnamed')}</span>
-        </div>`
-    )
-    .join('');
-  return `
-    <div style="padding:8px; font-size:0.8rem;">
-      <div style="font-weight:600; margin-bottom:4px;">
-        ${features.length} polygon${features.length === 1 ? '' : 's'} here
-      </div>
-      ${rows}
-      <div style="margin-top:4px; font-size:0.7rem; opacity:0.7;">Click to list attributes</div>
-    </div>`;
+type HoveredPolygons = {
+  /** The hovered polygons' ids, to tell a new set from the same one. */
+  key: string;
+  features: PolygonFeatures;
+  lngLat: LngLatLike;
 };
+
+const polygonsKey = (features: PolygonFeatures) =>
+  features.map((props) => String(props.id ?? '')).join('|');
+
+const PolygonHoverContent = ({ features }: { features: PolygonFeatures }) => (
+  <>
+    <MapPopupTitle>
+      {features.length} polygon{features.length === 1 ? '' : 's'} here
+    </MapPopupTitle>
+    {features.map((props, index) => (
+      <Text key={`${String(props.id)}-${index}`} size="xs">
+        <Text span inherit fw={600}>
+          {String(props.id ?? 'N/A')}
+        </Text>
+        <Text span inherit c="dimmed">
+          {' '}
+          — {String(props.name ?? 'Unnamed')}
+        </Text>
+      </Text>
+    ))}
+    <MapPopupNote>Click to list attributes</MapPopupNote>
+  </>
+);
 
 /**
  * The selected polygon archive (pmtiles) with hover and click. A click sends
@@ -83,6 +104,9 @@ export const PolygonLayer = () => {
 
   const currentSelectedId = useEffectEvent(() => selectedId);
 
+  const [hovered, setHovered] = useState<HoveredPolygons | null>(null);
+  const hoverPopupRef = useRef<MapPopupHandle>(null);
+
   useEffect(() => {
     if (!map || !layerMeta) return;
 
@@ -90,22 +114,21 @@ export const PolygonLayer = () => {
     let fetchSource: FetchSource | null = null;
     let cancelled = false;
 
-    const hoverPopup = new maplibregl.Popup({
-      closeButton: false,
-      closeOnClick: false,
-      maxWidth: '280px',
-    });
-
+    // The popup follows the cursor imperatively; state (and a render) changes
+    // only when the set of polygons under it does.
     const onHover = (event: MapLayerMouseEvent) => {
       const features = dedupePolygonFeatures(event.features);
       if (features.length === 0) return;
       map.getCanvas().style.cursor = 'pointer';
-      hoverPopup.setLngLat(event.lngLat).setHTML(hoverHtml(features)).addTo(map);
+      const key = polygonsKey(features);
+      const { lngLat } = event;
+      setHovered((current) => (current?.key === key ? current : { key, features, lngLat }));
+      hoverPopupRef.current?.setLngLat(lngLat);
     };
 
     const onLeave = () => {
       map.getCanvas().style.cursor = '';
-      hoverPopup.remove();
+      setHovered(null);
     };
 
     const onClick = (event: MapLayerMouseEvent) => {
@@ -175,7 +198,7 @@ export const PolygonLayer = () => {
       map.off('mousemove', POLYGON_FILL_LAYER_ID, onHover);
       map.off('mouseleave', POLYGON_FILL_LAYER_ID, onLeave);
       map.off('click', POLYGON_FILL_LAYER_ID, onClick);
-      hoverPopup.remove();
+      setHovered(null);
       map.getCanvas().style.cursor = '';
       removeMapResources(map, POLYGON_LAYER_IDS, [POLYGON_SOURCE_ID]);
     };
@@ -187,5 +210,11 @@ export const PolygonLayer = () => {
     map.setFilter(POLYGON_SELECTED_LAYER_ID, selectedFilter(selectedId));
   }, [map, layerMeta, selectedId]);
 
-  return null;
+  return (
+    hovered && (
+      <MapPopup ref={hoverPopupRef} lngLat={hovered.lngLat} maxWidth="280px">
+        <PolygonHoverContent features={hovered.features} />
+      </MapPopup>
+    )
+  );
 };

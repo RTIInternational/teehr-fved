@@ -1,7 +1,7 @@
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 
 import { MAX_TIMESERIES_POINTS } from '@/shared/api/gridded/client';
-import { fetchGriddedEdrTimeseries } from '@/shared/api/gridded/edr';
+import { fetchGriddedEdrPoint, fetchGriddedEdrTimeseries } from '@/shared/api/gridded/edr';
 import type { DatasetTimeseries } from '@/shared/types/gridded/edr';
 import type { GriddedTimeseriesFilters } from '@/shared/types/gridded/timeseries';
 
@@ -108,3 +108,20 @@ export const useEdrTimeseries = ({
     isLoading: variables[i].isLoading || timesteps[i].isLoading || series[i].isLoading,
   }));
 };
+
+export type EdrPointArgs = {
+  dataset: string;
+  variable: string;
+  timestep: string;
+  lon: number;
+  lat: number;
+};
+
+/** The gridded value at one point and timestep, in the variable's stored units. */
+export const useEdrPointValue = ({ dataset, variable, timestep, lon, lat }: EdrPointArgs) =>
+  useQuery({
+    queryKey: ['gridded', 'edrPoint', dataset, variable, timestep, lon, lat],
+    queryFn: () => fetchGriddedEdrPoint(dataset, variable, timestep, lon, lat),
+    // Shown in a popup the user is waiting on; fail fast rather than retry for seconds.
+    retry: 1,
+  });

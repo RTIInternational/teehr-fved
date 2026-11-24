@@ -1,11 +1,10 @@
 import type { Feature, FeatureCollection, Point } from 'geojson';
 import maplibregl, { type MapLayerMouseEvent, type MapMouseEvent } from 'maplibre-gl';
-import { useEffect, useEffectEvent, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
-import { useMap } from '@/core/map';
+import { MapPopup, MapPopupField, MapPopupNote, MapPopupTitle, useMap } from '@/core/map';
 import type { MapLocation } from '@/shared/types/locations';
 import type { MapMetric } from '@/shared/types/maps';
-import { escapeHtml } from '@/shared/utils/html';
 import { getMetricColorExpression, getMetricLabel, isLngLatTuple } from '@/shared/utils/mapMetrics';
 
 import { sanitizeLocationFeatures, toMapLocation } from '../utils/locationFeatures';
@@ -22,6 +21,35 @@ const selectedFilter = (locationId: string | null): maplibregl.FilterSpecificati
   ['get', 'primary_location_id'],
   locationId ?? '',
 ];
+
+type HoveredLocation = {
+  location: MapLocation;
+  /** The feature's properties, where its metric values are. */
+  properties: Record<string, unknown>;
+};
+
+const LocationHoverContent = ({
+  hovered: { location, properties },
+  metric,
+}: {
+  hovered: HoveredLocation;
+  metric: MapMetric;
+}) => {
+  const [lon, lat] = location.coordinates;
+  const value = properties[metric];
+  return (
+    <>
+      <MapPopupTitle>{location.name}</MapPopupTitle>
+      <MapPopupField label="ID">{location.primary_location_id}</MapPopupField>
+      <MapPopupField label="Lat">{lat.toFixed(4)}</MapPopupField>
+      <MapPopupField label="Lon">{lon.toFixed(4)}</MapPopupField>
+      <MapPopupField label={getMetricLabel(metric)}>
+        {value !== null && value !== undefined ? Number(value).toFixed(3) : 'N/A'}
+      </MapPopupField>
+      <MapPopupNote>Click to select</MapPopupNote>
+    </>
+  );
+};
 
 type StreamflowMapLayersProps = {
   locations: FeatureCollection<Point> | undefined;
@@ -48,24 +76,10 @@ export const StreamflowMapLayers = ({
 }: StreamflowMapLayersProps) => {
   const map = useMap();
   const metric = metricName ?? DEFAULT_METRIC;
+  const [hovered, setHovered] = useState<HoveredLocation | null>(null);
 
   const handleSelect = useEffectEvent((location: MapLocation | null) => onSelect(location));
   const handleError = useEffectEvent((message: string) => onError(message));
-  const hoverHtml = useEffectEvent((feature: Feature<Point>) => {
-    const properties = feature.properties ?? {};
-    const [lon, lat] = feature.geometry.coordinates;
-    const value = properties[metric];
-    const formatted = value !== null && value !== undefined ? Number(value).toFixed(3) : 'N/A';
-    return `
-      <div style="padding: 8px; font-size: 0.85rem;">
-        <div style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(properties.name)}</div>
-        <div><strong>ID:</strong> ${escapeHtml(properties.primary_location_id)}</div>
-        <div><strong>Lat:</strong> ${lat.toFixed(4)}</div>
-        <div><strong>Lon:</strong> ${lon.toFixed(4)}</div>
-        <div><strong>${escapeHtml(getMetricLabel(metric))}:</strong> ${formatted}</div>
-        <div style="margin-top: 4px; font-size: 0.75rem; opacity: 0.7;">Click to select</div>
-      </div>`;
-  });
 
   // Source, layers and interaction handlers live as long as the map does.
   useEffect(() => {
@@ -99,12 +113,6 @@ export const StreamflowMapLayers = ({
       filter: selectedFilter(null),
     });
 
-    const popup = new maplibregl.Popup({
-      closeButton: false,
-      closeOnClick: false,
-      maxWidth: '300px',
-    });
-
     const onLocationClick = (event: MapLayerMouseEvent) => {
       const feature = event.features?.[0] as Feature<Point> | undefined;
       if (!feature) return;
@@ -112,16 +120,24 @@ export const StreamflowMapLayers = ({
       if (location) handleSelect(location);
     };
 
-    const onLocationEnter = (event: MapLayerMouseEvent) => {
+    // mousemove rather than mouseenter, so moving straight onto an overlapping
+    // neighbour updates the popup. Same feature, same state: no re-render.
+    const onLocationMove = (event: MapLayerMouseEvent) => {
       map.getCanvas().style.cursor = 'pointer';
       const feature = event.features?.[0] as Feature<Point> | undefined;
       if (!feature || !isLngLatTuple(feature.geometry.coordinates)) return;
-      popup.setLngLat(feature.geometry.coordinates).setHTML(hoverHtml(feature)).addTo(map);
+      const location = toMapLocation(feature);
+      if (!location) return;
+      setHovered((current) =>
+        current?.location.primary_location_id === location.primary_location_id
+          ? current
+          : { location, properties: feature.properties ?? {} }
+      );
     };
 
     const onLocationLeave = () => {
       map.getCanvas().style.cursor = '';
-      popup.remove();
+      setHovered(null);
     };
 
     // A click away from every location clears the selection.
@@ -136,18 +152,17 @@ export const StreamflowMapLayers = ({
     };
 
     map.on('click', LAYER_ID, onLocationClick);
-    map.on('mouseenter', LAYER_ID, onLocationEnter);
+    map.on('mousemove', LAYER_ID, onLocationMove);
     map.on('mouseleave', LAYER_ID, onLocationLeave);
     map.on('click', onMapClick);
     map.on('error', onMapError);
 
     return () => {
       map.off('click', LAYER_ID, onLocationClick);
-      map.off('mouseenter', LAYER_ID, onLocationEnter);
+      map.off('mousemove', LAYER_ID, onLocationMove);
       map.off('mouseleave', LAYER_ID, onLocationLeave);
       map.off('click', onMapClick);
       map.off('error', onMapError);
-      popup.remove();
       map.getCanvas().style.cursor = '';
       // The map may already be gone when the whole app unmounts.
       try {
@@ -211,5 +226,11 @@ export const StreamflowMapLayers = ({
     }
   }, [map, locations, locationsKey]);
 
-  return null;
+  return (
+    hovered && (
+      <MapPopup lngLat={hovered.location.coordinates}>
+        <LocationHoverContent hovered={hovered} metric={metric} />
+      </MapPopup>
+    )
+  );
 };

@@ -1,25 +1,63 @@
-import maplibregl, { type MapMouseEvent } from 'maplibre-gl';
-import { useEffect, useEffectEvent, useRef } from 'react';
+import { Group, Loader, Text } from '@mantine/core';
+import type { MapMouseEvent } from 'maplibre-gl';
+import { useEffect, useEffectEvent, useState } from 'react';
 
-import { useMap } from '@/core/map';
-import { fetchGriddedEdrPoint } from '@/shared/api/gridded/edr';
+import { MapPopup, MapPopupField, MapPopupNote, MapPopupTitle, useMap } from '@/core/map';
 import { teehrMapping } from '@/shared/api/gridded/variableAttrs';
+import { useEdrPointValue, type EdrPointArgs } from '@/shared/queries/gridded/edr';
 import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
-import { escapeHtml } from '@/shared/utils/html';
 
 import { ActionTypes, useDashboard } from '../DashboardContext';
 import { useCurrentTimestep } from '../hooks/useCurrentTimestep';
 import { POLYGON_FILL_LAYER_ID } from '../utils/layerOrder';
+
+type ClickedPoint = EdrPointArgs & { lngLat: [number, number] };
 
 const formatValue = (
   value: unknown,
   toDisplay: (value: number) => number,
   units: string | null
 ) => {
-  if (typeof value === 'number')
-    return `${toDisplay(value).toFixed(2)}${units ? ` ${escapeHtml(units)}` : ''}`;
-  if (typeof value === 'string') return escapeHtml(value);
+  if (typeof value === 'number') return `${toDisplay(value).toFixed(2)}${units ? ` ${units}` : ''}`;
+  if (typeof value === 'string') return value;
   return 'N/A';
+};
+
+/** The value at a clicked point, shown the teehr way (the repo stores other units). */
+const PointValueContent = ({ point }: { point: EdrPointArgs }) => {
+  const value = useEdrPointValue(point);
+  const variableAttrs = useVariableAttrs(point.dataset);
+
+  if (value.isPending) {
+    return (
+      <Group gap="xs" wrap="nowrap">
+        <Loader size={14} />
+        <Text size="xs" c="dimmed">
+          Loading…
+        </Text>
+      </Group>
+    );
+  }
+  if (value.isError) {
+    return (
+      <Text size="xs" c="red">
+        Failed to retrieve value.
+      </Text>
+    );
+  }
+
+  const mapping = teehrMapping(point.variable, variableAttrs.data?.[point.variable]);
+  return (
+    <>
+      <MapPopupTitle>{mapping.variable}</MapPopupTitle>
+      <MapPopupField label="Value">
+        {formatValue(value.data, mapping.toDisplay, mapping.units)}
+      </MapPopupField>
+      <MapPopupField label="Lat">{point.lat.toFixed(4)}</MapPopupField>
+      <MapPopupField label="Lon">{point.lon.toFixed(4)}</MapPopupField>
+      <MapPopupNote>{point.timestep}</MapPopupNote>
+    </>
+  );
 };
 
 /**
@@ -31,16 +69,15 @@ export const PointValueQuery = () => {
   const { state, dispatch } = useDashboard();
   const { dataset, variable } = state.mapFilters;
   const timestep = useCurrentTimestep();
-  const variableAttrs = useVariableAttrs(dataset);
-  // Only the latest click may write its result into the popup.
-  const latestRequestRef = useRef(0);
+  // The popup keeps showing the dataset, variable and timestep it was opened for.
+  const [point, setPoint] = useState<ClickedPoint | null>(null);
 
-  const queryPoint = useEffectEvent(async (event: MapMouseEvent, popup: maplibregl.Popup) => {
+  const onMapClick = useEffectEvent((event: MapMouseEvent) => {
     if (!map) return;
     if (map.getLayer(POLYGON_FILL_LAYER_ID)) {
       const hits = map.queryRenderedFeatures(event.point, { layers: [POLYGON_FILL_LAYER_ID] });
       if (hits.length > 0) {
-        popup.remove();
+        setPoint(null);
         return;
       }
     }
@@ -48,52 +85,23 @@ export const PointValueQuery = () => {
 
     const { lng, lat } = event.lngLat;
     dispatch({ type: ActionTypes.SET_CLICKED_POINT, payload: { lon: lng, lat, time: timestep } });
-
-    const requestId = ++latestRequestRef.current;
-    popup
-      .setLngLat([lng, lat])
-      .setHTML('<div style="padding:6px; font-size:0.8rem;">Loading…</div>')
-      .addTo(map);
-
-    let html: string;
-    try {
-      const value = await fetchGriddedEdrPoint(dataset, variable, timestep, lng, lat);
-      // Shown the teehr way: the point value comes from the repo in its stored units
-      const mapping = teehrMapping(variable, variableAttrs.data?.[variable]);
-      html = `
-        <div style="padding:8px; font-size:0.85rem;">
-          <div style="font-weight:600; margin-bottom:4px;">${escapeHtml(mapping.variable)}</div>
-          <div><strong>Value:</strong> ${formatValue(value, mapping.toDisplay, mapping.units)}</div>
-          <div><strong>Lat:</strong> ${lat.toFixed(4)}</div>
-          <div><strong>Lon:</strong> ${lng.toFixed(4)}</div>
-          <div style="margin-top:4px; font-size:0.75rem; opacity:0.7;">${escapeHtml(timestep)}</div>
-        </div>`;
-    } catch (error) {
-      console.error('Snow: EDR point query failed', error);
-      html =
-        '<div style="padding:6px; font-size:0.8rem; color:#dc3545;">Failed to retrieve value.</div>';
-    }
-
-    if (requestId !== latestRequestRef.current) return;
-    popup.setHTML(html);
+    setPoint({ dataset, variable, timestep, lon: lng, lat, lngLat: [lng, lat] });
   });
 
   useEffect(() => {
     if (!map) return;
-
-    const popup = new maplibregl.Popup({
-      closeButton: true,
-      closeOnClick: false,
-      maxWidth: '280px',
-    });
-    const onClick = (event: MapMouseEvent) => void queryPoint(event, popup);
+    const onClick = (event: MapMouseEvent) => onMapClick(event);
     map.on('click', onClick);
-
     return () => {
       map.off('click', onClick);
-      popup.remove();
     };
   }, [map]);
 
-  return null;
+  return (
+    point && (
+      <MapPopup lngLat={point.lngLat} closeButton onClose={() => setPoint(null)} maxWidth="280px">
+        <PointValueContent point={point} />
+      </MapPopup>
+    )
+  );
 };
