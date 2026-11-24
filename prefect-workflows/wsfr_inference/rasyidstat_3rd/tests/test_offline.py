@@ -5,6 +5,7 @@ from datetime import date
 
 import pandas as pd
 import pytest
+import requests
 
 from rasyidstat_infer import build, download, monthly_flow, schema, solution
 from rasyidstat_infer.paths import MODEL_VERSION, Paths
@@ -159,3 +160,20 @@ def test_predict_does_not_rebuild_existing_build(tmp_path, monkeypatch):
     monkeypatch.setattr(solution, "predict", lambda *a, **k: (pd.DataFrame(), [], []))
     monkeypatch.setattr(cli.schema, "validate", lambda df: [])
     cli.cmd_predict(paths, date(2026, 3, 1), None, tmp_path / "o.csv", True, False)
+
+
+def test_snotel_outage_is_fatal_even_when_tolerant(tmp_path, monkeypatch):
+    class Mod:
+        @staticmethod
+        def download_station_data(*a, **kw):
+            raise requests.HTTPError("502 Bad Gateway")
+
+    monkeypatch.setattr(download, "_wsfr", lambda name: Mod)
+    monkeypatch.setattr(download.time, "sleep", lambda s: None)
+    with pytest.raises(download.SourceUnavailable, match="stations failed"):
+        download.snotel(Paths(tmp_path), date(2026, 4, 1), workers=1)
+    monkeypatch.setitem(download.SOURCES, "snotel", lambda paths, issue: download.snotel(paths, issue, workers=1))
+    monkeypatch.setattr(download, "setup_data_dir", lambda paths: None)
+    monkeypatch.setattr(download.engine, "bootstrap", lambda src: None)
+    with pytest.raises(download.SourceUnavailable):
+        download.download(Paths(tmp_path), date(2026, 4, 1), sources=["snotel"], strict=False)

@@ -161,7 +161,8 @@ Skip this if you only run models 1 and 2. Never commit the file.
 
 ### 3.2 S3 locations
 
-In `project.garden.yml` (local edit, don't commit):
+In `project.garden.yml` (local edit, don't commit), replace the empty `wsf`
+defaults:
 
 ```yaml
 variables:

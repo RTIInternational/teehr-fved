@@ -15,9 +15,7 @@ spec:
 kind: Build
 type: container
 name: wsf-prefect-image
-description: Prefect runtime with the shared Python 3.13 Rodeo inference environment
-dependencies:
-  - build.teehr-prefect-image
+description: Prefect runtime with an isolated venv for the Rodeo inference models
 environments:
   - local
   - remote
@@ -25,8 +23,6 @@ spec:
   dockerfile: Dockerfile.prefect-wsf
   localId: wsf-prefect
   publishId: wsf-prefect:${var.devTeehrVersion}
-  buildArgs:
-    PREFECT_BASE_IMAGE: ${actions.build.teehr-prefect-image.outputs.deploymentImageId}
 ---
 kind: Deploy
 type: kubernetes

@@ -25,6 +25,7 @@ import json
 import os
 import shutil
 import sys
+import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
@@ -37,10 +38,15 @@ from . import engine, monthly_flow
 from .paths import PKG_DIR, Paths
 
 STATIC = PKG_DIR / "static"
+SNOTEL_MAX_FAILED_FRACTION = 0.5  # more station failures than this means the source is down, not that a few stations are missing
 SWANN_TIERS = ["stable", "provisional", "early"]  # best first
 SWANN_URL = "https://climate.arizona.edu/data/UA_SWE/DailyData_4km/WY{wy}/UA_SWE_Depth_4km_v1_{day}_{tier}.nc"
 SNOWVIEW_URL = "https://snowview.arizona.edu/csv/Download/Watersheds/{huc}.csv"
 HUC_RENAME = {"overall_mean_swe_in": "Average SWE (in)", "overall_cumulative_precip_in": "Average Accumulated Water Year PPT (in)"}
+
+
+class SourceUnavailable(RuntimeError):
+    """A required source is effectively down; fatal even when download() is otherwise tolerant."""
 
 
 def check_issue_date(issue_date: date) -> None:
@@ -89,16 +95,19 @@ def snotel(paths: Paths, issue_date: date, workers: int = 8) -> list[str]:
     begin, end = pd.Timestamp(_fy_start(issue_date)), pd.Timestamp(issue_date)
 
     def one(t):
-        for _ in range(3):
+        for attempt in range(3):
             try:
                 download_station_data(t, begin_date=begin, end_date=end, out_dir=out, skip_existing=False)
                 return None
             except Exception as e:  # noqa: BLE001
                 err = repr(e)
+                time.sleep(2 * (attempt + 1))
         return f"{t}: {err}"
 
     with ThreadPoolExecutor(workers) as pool:
         failed = [r for r in pool.map(one, triplets) if r]
+    if len(failed) > SNOTEL_MAX_FAILED_FRACTION * len(triplets):
+        raise SourceUnavailable(f"SNOTEL: {len(failed)} of {len(triplets)} stations failed (e.g. {failed[:2]})")
     return [f"SNOTEL: {len(failed)} of {len(triplets)} stations failed (e.g. {failed[:2]})"] if failed else []
 
 
@@ -313,6 +322,8 @@ def download(paths: Paths, issue_date: date, sources: list[str] | None = None, s
         print(f"download {name}", flush=True)
         try:
             warnings += SOURCES[name](paths, issue_date)
+        except SourceUnavailable:
+            raise
         except Exception as e:  # noqa: BLE001
             if strict:
                 raise

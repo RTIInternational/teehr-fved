@@ -24,7 +24,7 @@ MODEL_PACKAGES = {
     "ckua_2nd": "ckua_infer",
     "rasyidstat_3rd": "rasyidstat_infer",
 }
-MODEL_PYTHON = sys.executable
+MODEL_PYTHON = os.environ.get("WSF_MODEL_PYTHON") or sys.executable
 QUANTILES = (10, 50, 90)
 
 

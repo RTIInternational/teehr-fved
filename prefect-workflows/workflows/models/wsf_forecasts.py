@@ -70,7 +70,7 @@ def run_wsf_inference(
     wsf.s3_location(assets_uri)
     wsf.s3_location(output_uri)
     if not Path(model_python).is_file():
-        raise ValueError(f"Shared wsf_py313 interpreter not found: {model_python}")
+        raise ValueError(f"Model interpreter not found: {model_python}")
     if download_timeout_seconds <= 0 or stage_timeout_seconds <= 0:
         raise ValueError("Stage timeouts must be positive")
     env = model_environment(solution, strict_ensemble)
