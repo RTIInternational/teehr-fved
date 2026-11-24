@@ -36,15 +36,15 @@ RAW_KEYS_TO_TEEHR_VARIABLES = {
 }
 
 SEASONAL_PERIODS = {
-    ("april", "july"): ("volume_amjj_sum", 4),
-    ("january", "june"): ("volume_jfmamj_sum", 1),
-    ("january", "may"): ("volume_jfmam_sum", 1),
+    ("april", "july"): ("volume_0407_sum", 4),
+    ("january", "june"): ("volume_0106_sum", 1),
+    ("january", "may"): ("volume_0105_sum", 1),
 }
 
 CBRFC_SEASONAL_VARIABLE_MAPPING: dict[str, str] = {
-    'volume_amjj_sum': 'Seasonal summed water supply volume (Apr-Jul)',
-    'volume_jfmamj_sum': 'Seasonal summed water supply volume (Jan-Jun)',
-    'volume_jfmam_sum': 'Seasonal summed water supply volume (Jan-May)',
+    'volume_0407_sum': 'Seasonal summed water supply volume (Apr-Jul)',
+    'volume_0106_sum': 'Seasonal summed water supply volume (Jan-Jun)',
+    'volume_0105_sum': 'Seasonal summed water supply volume (Jan-May)',
 }
 
 
