@@ -6,8 +6,8 @@ defaultEnvironment: local
 variables:
   # Empty defaults keep every environment deployable; override per environment
   wsf:
-    assetsS3Uri: "s3://warehouse/wsf/assets"
-    outputS3Uri: "s3://warehouse/wsf/outputs"
+    assetsS3Uri: ""
+    outputS3Uri: ""
   smtp:
     host: smtp.gmail.com
     port: "587"
