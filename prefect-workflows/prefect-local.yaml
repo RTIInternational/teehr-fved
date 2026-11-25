@@ -35,7 +35,7 @@ definitions:
         PREFECT_LOGGING_LEVEL: *log_level
         TEEHR_SPARK_IMAGE: "{{ $TEEHR_SPARK_IMAGE }}"
         TEEHR_NAMESPACE: "{{ $TEEHR_NAMESPACE }}"
-        PREFECT_LOGGING_EXTRA_LOGGERS: teehr
+        PREFECT_LOGGING_EXTRA_LOGGERS: teehr,teehr_icechunk
         # Concurrent chunk reads/writes per zarr call (default 10)
         ZARR_ASYNC__CONCURRENCY: "128"
         # Start Local Only
@@ -220,9 +220,18 @@ deployments:
         "temp_dir_path": *temp_dir_path,
         "configuration_name": "ua_swann_4km",
         "location_id_prefix": "usgsbasin",
-        "grid_variable_name": "swe_daily_inst"
+        "grid_variable_name": "SWE"
       }
     }
+    work_pool: *work_pool
+
+  - name: process-gridded-unit
+    version:
+    tags: []
+    description: >-
+      One unit of a gridded run that fans out (max_child_runs > 0): references or overviews, started by
+      ingest-gridded-data with run_deployment. Not run on its own.
+    entrypoint: workflows/ingests/process_gridded_unit.py:process_gridded_unit
     work_pool: *work_pool
 
   # Create Vector Tiles

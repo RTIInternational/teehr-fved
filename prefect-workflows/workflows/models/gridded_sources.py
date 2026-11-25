@@ -1,7 +1,6 @@
 """Gridded data sources for the ingest_gridded_data Prefect flow, selected by their ``type``."""
 import os
 import re
-from abc import ABC, abstractmethod
 from datetime import date, datetime
 from typing import Annotated, ClassVar, Literal, Union
 
@@ -11,99 +10,31 @@ import requests
 import xarray as xr
 from obstore.store import from_url
 from prefect.blocks.system import Secret
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, Field
 from teehr.fetching.utils import REMOTE_RETRY_CONFIG
 
-from workflows.utils.data_status import with_status
-from workflows.utils.repo_const import LEAD_TIME, MEMBER, REFERENCE_TIME, STATUS_COORD, STATUS_MEANINGS
+from teehr_icechunk import sources as ic_sources
+from teehr_icechunk.packed_encoding import PackedEncoding
+from teehr_icechunk.sources import listing_frame
+from teehr_icechunk.data_status import with_status
+from teehr_icechunk.repo_const import STATUS_COORD, STATUS_MEANINGS
+from workflows.utils.teehr_mapping import DEPTH_DAILY_INST, MM, SWE_DAILY_INST, TeehrMapping
 
-# Columns of a source listing, indexed by each file's timestamp (or forecast step)
-LISTING_COLUMNS = ["url", STATUS_COORD, "last_modified"]
 
+class GriddedSource(ic_sources.GriddedSource):
+    """A gridded source of this deployment: teehr-icechunk's interface plus the teehr names of its variables."""
 
-class GriddedSource(BaseModel, ABC):
-    """A gridded source: its files, its time grid, and its IceChunk repository."""
+    def teehr_mappings(self) -> dict[str, TeehrMapping]:
+        """teehr variable, unit and conversion of each ingested variable, keyed by its own name.
 
-    source_bucket: ClassVar[str]
-    # Source-specific obstore kwargs; deployment obstore_kwargs override them
-    store_kwargs: ClassVar[dict] = {}
-    # Options for the IceChunk virtual chunk container's object store, e.g. region
-    virtual_store_kwargs: ClassVar[dict] = {}
-    # Source-specific kwargs for the reference parser, e.g. the HDF5 reader's block size
-    parser_kwargs: ClassVar[dict] = {}
-    # Ingest's write_materialized when a run doesn't set it
-    materialize_by_default: ClassVar[bool] = True
-    time_step: ClassVar[pd.Timedelta]
-
-    @abstractmethod
-    def list_files(self, start_dt: datetime, end_dt: datetime) -> pd.DataFrame:
-        """Files published for the range, one per step: ``LISTING_COLUMNS`` indexed by time.
-
-        Forecast sources index by step, (``reference_time``, [``member``], ``lead_time``), selecting
-        cycles by reference time.
-        """
-
-    @abstractmethod
-    def time_origin(self) -> pd.Timestamp:
-        """First step of the source's record; the repo's time grid starts here."""
-
-    @abstractmethod
-    def repository_name(self) -> str:
-        """IceChunk repository (configuration) name; teehr-valid (letters, digits, underscores)."""
-
-    @abstractmethod
-    def ingest_variables(self) -> list[str]:
-        """Source variables to materialize."""
-
-    def grid_name(self) -> str:
-        """Grid (CRS, pixel size, extent) the source's data is on; sources sharing a grid share a name."""
-        return self.repository_name()
-
-    def lead_times(self) -> list[int] | None:
-        """Forecast lead times in hours, fixed when the repo is created; None for analysis sources."""
-        return None
-
-    def members(self) -> list[int] | None:
-        """Ensemble members, fixed when the repo is created; None for sources without members."""
-        return None
-
-    def fixed_axes(self) -> dict[str, list[int]]:
-        """The repo's axes after its append axis, in order; empty for analysis sources."""
-        axes = {MEMBER: self.members(), LEAD_TIME: self.lead_times()}
-        return {name: values for name, values in axes.items() if values is not None}
-
-    def append_dim(self) -> str:
-        """The repo's append axis: cycles for forecast sources, valid times otherwise."""
-        return REFERENCE_TIME if self.lead_times() is not None else "time"
-
-    def timeseries_type(self) -> str:
-        """teehr's timeseries table for the source's values."""
-        return "secondary" if self.lead_times() is not None else "primary"
-
-    def credentials(self) -> dict:
-        """Source access keys, for obstore and the virtual chunk container; empty means anonymous.
-
-        Both take the same dict, so use keys they share: S3 ``access_key_id``, ``secret_access_key``,
-        ``session_token``; GCS ``service_account_key``, ``application_credentials``, ``bearer_token``.
-        Keys are read once per run, so they must outlive it.
+        Ingest stamps them on the repo as ``teehr:*`` attributes, which the dashboard and mean areal values read.
         """
         return {}
-
-    def preprocess(self, ds: xr.Dataset, url: str) -> xr.Dataset:
-        """Adjust one file's virtual dataset before concatenation."""
-        return ds
 
 
 def _water_year(dt: date) -> int:
     """Water years start October 1."""
     return dt.year + 1 if dt.month >= 10 else dt.year
-
-
-def _listing(rows: list[dict], index: tuple[str, ...] = ("time",)) -> pd.DataFrame:
-    df = pd.DataFrame(rows, columns=[*index, *LISTING_COLUMNS])
-    if len(index) == 1:
-        return df.set_index(pd.DatetimeIndex(df.pop(index[0]), name=index[0])).sort_index()
-    return df.set_index(list(index)).sort_index()
 
 
 def _known_status(v: str) -> str:
@@ -166,7 +97,7 @@ class UASwan4km(GriddedSource):
                         STATUS_COORD: status,
                         "last_modified": pd.Timestamp(modified),
                     }
-        return _listing(list(best.values()))
+        return listing_frame(list(best.values()))
 
     def time_origin(self) -> pd.Timestamp:
         # The archive starts with WY1982
@@ -177,6 +108,18 @@ class UASwan4km(GriddedSource):
 
     def ingest_variables(self) -> list[str]:
         return list(self.variables)
+
+    def teehr_mappings(self) -> dict[str, TeehrMapping]:
+        return {
+            "SWE": TeehrMapping(MM, SWE_DAILY_INST, source_units="millimeters h20"),
+            "DEPTH": TeehrMapping(MM, DEPTH_DAILY_INST, source_units="millimeters snow thickness"),
+        }
+
+    def overview_encoding(self) -> dict[str, PackedEncoding]:
+        return {
+            "SWE": PackedEncoding(dtype="uint16", max_value=10000, units="millimeters h20"),
+            "DEPTH": PackedEncoding(dtype="uint16", max_value=8000, units="millimeters snow thickness"),
+        }
 
     def preprocess(self, ds: xr.Dataset, url: str) -> xr.Dataset:
         return with_status(ds, url.rsplit("_", 1)[-1].removesuffix(".nc"))
@@ -214,7 +157,7 @@ class ISnobal(GriddedSource):
                             STATUS_COORD: self.status,
                             "last_modified": pd.Timestamp(obj["last_modified"]).tz_convert(None),
                         })
-        return _listing(rows)
+        return listing_frame(rows)
 
     def time_origin(self) -> pd.Timestamp:
         """Start of the domain's first water year in the bucket; domains start in different years."""
@@ -230,6 +173,14 @@ class ISnobal(GriddedSource):
 
     def ingest_variables(self) -> list[str]:
         return [self.variable]
+
+    def teehr_mappings(self) -> dict[str, TeehrMapping]:
+        # 1 kg m-2 of water is 1 mm deep
+        return {"specific_mass": TeehrMapping(MM, SWE_DAILY_INST, source_units=self.units["specific_mass"])}
+
+    def overview_encoding(self) -> dict[str, PackedEncoding]:
+        # Peaks near 7,700 kg m-2 (willamette_extended)
+        return {"specific_mass": PackedEncoding(dtype="uint16", max_value=10000, units=self.units["specific_mass"])}
 
     def credentials(self) -> dict:
         return _secret_credentials("m3works")
@@ -255,7 +206,7 @@ class CUSwe(GriddedSource):
     store_kwargs: ClassVar[dict] = {"region": "us-east-2", "retry_config": REMOTE_RETRY_CONFIG}
     virtual_store_kwargs: ClassVar[dict] = {"region": "us-east-2"}
     time_step: ClassVar[pd.Timedelta] = pd.Timedelta("1D")
-    # The files carry no units tag; m is unconfirmed. Ingest converts to mm.
+    # The files carry no units tag; m is unconfirmed
     units: ClassVar[str] = "m"
     file_pattern: ClassVar[re.Pattern] = re.compile(r"/WW_phvrcn_(\d{8})_fscamsk_clp\.tif$")
 
@@ -271,7 +222,7 @@ class CUSwe(GriddedSource):
 
     def list_files(self, start_dt: datetime, end_dt: datetime) -> pd.DataFrame:
         start, end = start_dt.date(), end_dt.date()
-        return _listing([
+        return listing_frame([
             {
                 "time": day,
                 "url": f"{self.source_bucket}/{obj['path']}",
@@ -293,6 +244,13 @@ class CUSwe(GriddedSource):
 
     def ingest_variables(self) -> list[str]:
         return [self.variable]
+
+    def teehr_mappings(self) -> dict[str, TeehrMapping]:
+        return {self.variable: TeehrMapping(MM, SWE_DAILY_INST, scale=1000.0, source_units=self.units)}
+
+    def overview_encoding(self) -> dict[str, PackedEncoding]:
+        # About 0.15 mm steps
+        return {self.variable: PackedEncoding(dtype="uint16", max_value=10, units=self.units)}
 
     def credentials(self) -> dict:
         return _secret_credentials("cu-swe")

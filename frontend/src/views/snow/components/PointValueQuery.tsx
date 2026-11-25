@@ -3,14 +3,21 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 
 import { useMap } from '@/core/map';
 import { fetchGriddedEdrPoint } from '@/shared/api/gridded/edr';
+import { teehrMapping } from '@/shared/api/gridded/variableAttrs';
+import { useVariableAttrs } from '@/shared/queries/gridded/variableAttrs';
 import { escapeHtml } from '@/shared/utils/html';
 
 import { ActionTypes, useDashboard } from '../DashboardContext';
 import { useCurrentTimestep } from '../hooks/useCurrentTimestep';
 import { POLYGON_FILL_LAYER_ID } from '../utils/layerOrder';
 
-const formatValue = (value: unknown) => {
-  if (typeof value === 'number') return value.toFixed(2);
+const formatValue = (
+  value: unknown,
+  toDisplay: (value: number) => number,
+  units: string | null
+) => {
+  if (typeof value === 'number')
+    return `${toDisplay(value).toFixed(2)}${units ? ` ${escapeHtml(units)}` : ''}`;
   if (typeof value === 'string') return escapeHtml(value);
   return 'N/A';
 };
@@ -24,6 +31,7 @@ export const PointValueQuery = () => {
   const { state, dispatch } = useDashboard();
   const { dataset, variable } = state.mapFilters;
   const timestep = useCurrentTimestep();
+  const variableAttrs = useVariableAttrs(dataset);
   // Only the latest click may write its result into the popup.
   const latestRequestRef = useRef(0);
 
@@ -50,10 +58,12 @@ export const PointValueQuery = () => {
     let html: string;
     try {
       const value = await fetchGriddedEdrPoint(dataset, variable, timestep, lng, lat);
+      // Shown the teehr way: the point value comes from the repo in its stored units
+      const mapping = teehrMapping(variable, variableAttrs.data?.[variable]);
       html = `
         <div style="padding:8px; font-size:0.85rem;">
-          <div style="font-weight:600; margin-bottom:4px;">${escapeHtml(variable)}</div>
-          <div><strong>Value:</strong> ${formatValue(value)}</div>
+          <div style="font-weight:600; margin-bottom:4px;">${escapeHtml(mapping.variable)}</div>
+          <div><strong>Value:</strong> ${formatValue(value, mapping.toDisplay, mapping.units)}</div>
           <div><strong>Lat:</strong> ${lat.toFixed(4)}</div>
           <div><strong>Lon:</strong> ${lng.toFixed(4)}</div>
           <div style="margin-top:4px; font-size:0.75rem; opacity:0.7;">${escapeHtml(timestep)}</div>

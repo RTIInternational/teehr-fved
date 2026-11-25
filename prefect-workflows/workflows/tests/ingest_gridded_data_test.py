@@ -4,6 +4,9 @@ Uses the UA SWANN source pointed at local netCDF files named like UA's, and the 
 at local GeoTIFFs named like CU's. Needs teehr and Prefect.
 """
 
+import json
+from types import SimpleNamespace
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -17,12 +20,13 @@ pytest.importorskip("h5netcdf")
 icechunk = pytest.importorskip("icechunk")
 rasterio = pytest.importorskip("rasterio")
 from prefect.testing.utilities import prefect_test_harness  # noqa: E402
+from prefect.utilities.callables import parameter_schema  # noqa: E402
 from rasterio.transform import from_origin  # noqa: E402
 
-import build_overviews as bo  # noqa: E402
 import ingest_gridded_data as ing  # noqa: E402
+from teehr_icechunk import grid_utils as gu  # noqa: E402
 from workflows.models import gridded_sources as gs  # noqa: E402
-from workflows.models.ingest_gridded_data_input import BuildOverviewsDataInput, IngestGriddedDataInput  # noqa: E402
+from workflows.models.ingest_gridded_data_input import IngestGriddedDataInput  # noqa: E402
 
 ORIGIN = pd.Timestamp("1981-10-01")
 DAYS = pd.date_range(ORIGIN, periods=90, freq="D")
@@ -48,9 +52,9 @@ def _local_repo(tmp_path, src, monkeypatch):
             return icechunk.Repository.open(storage, config=config, authorize_virtual_chunk_access=access)
         return icechunk.Repository.create(storage, config=config, authorize_virtual_chunk_access=access)
 
-    monkeypatch.setattr(ing.gu, "configure_icechunk_s3_repo", open_repo)
-    monkeypatch.setattr(bo.gu, "build_icechunk_s3_storage", lambda **_: storage)
-    monkeypatch.setattr(bo.gu, "open_repo_for_reading", open_repo)
+    monkeypatch.setattr(ing, "configure_icechunk_s3_repo", open_repo)
+    monkeypatch.setattr(gu, "build_icechunk_s3_storage", lambda **_: storage)
+    monkeypatch.setattr(gu, "open_repo_for_reading", open_repo)
     return open_repo
 
 
@@ -65,24 +69,27 @@ def ua(tmp_path, monkeypatch):
     prefix = f"file://{src}/"
     published = {}
 
-    def publish(day, status, value, modified, units="millimeters h20", encoding=None):
+    def publish(day, status, value, modified, encoding=None):
         for old in src.glob(f"*_{day:%Y%m%d}_*.nc"):
             old.unlink()
         name = f"UA_SWE_Depth_4km_v1_{day:%Y%m%d}_{status}.nc"
         data = np.broadcast_to(np.asarray(value, "float32"), (40, 50))[None]
         xr.Dataset(
-            {v: (("time", "lat", "lon"), data, {"units": units}) for v in ("SWE", "DEPTH")},
+            {v: (("time", "lat", "lon"), data, {"units": units}) for v, units in UA_UNITS.items()},
             coords={"time": [day], "lat": np.linspace(40.0, 41.0, 40), "lon": np.linspace(-110.0, -108.0, 50)},
         ).to_netcdf(src / name, engine="h5netcdf", encoding={v: encoding for v in ("SWE", "DEPTH")} if encoding else None)
         published[day] = {"time": day, "url": f"{prefix}{name}", "status": status, "last_modified": pd.Timestamp(modified)}
 
     def list_files(self, start_dt, end_dt):
-        return gs._listing([r for d, r in published.items() if start_dt.date() <= d.date() <= end_dt.date()])
+        return gs.listing_frame([r for d, r in published.items() if start_dt.date() <= d.date() <= end_dt.date()])
 
     monkeypatch.setattr(gs.UASwan4km, "source_bucket", prefix.rstrip("/"))
     monkeypatch.setattr(gs.UASwan4km, "list_files", list_files)
     return publish, _local_repo(tmp_path, src, monkeypatch)
 
+
+# UA SWANN's units for each variable
+UA_UNITS = {"SWE": "millimeters h20", "DEPTH": "millimeters snow thickness"}
 
 # A small CU-SWE-like grid: NAD83, 0.05 degree pixels, 16 px tiles, CU's nodata value
 TIFF_SHAPE = (32, 48)
@@ -163,9 +170,16 @@ def test_backfill_in_any_order_then_upsert(harness, ua):
         assert list(np.flatnonzero(ds.status.values >= 0)) == expected
     data = g["data"]
     for i in expected:
-        assert float(data.swe_daily_inst.isel(time=i, lat=3, lon=4)) == DAYS[i].dayofyear
-    assert abs(float(g["overviews/2"].swe_daily_inst.isel(time=55).max()) - DAYS[55].dayofyear) < 0.2
-    assert np.isnan(float(g["overviews/2"].swe_daily_inst.isel(time=30).max()))  # unwritten slots are missing, not 0
+        assert float(data.SWE.isel(time=i, lat=3, lon=4)) == DAYS[i].dayofyear
+    assert abs(float(g["overviews/2"].SWE.isel(time=55).max()) - DAYS[55].dayofyear) < 0.2
+    # Native names and units, with the teehr ones in attributes for the dashboard
+    for ds in g.values():
+        for var, teehr_name in (("SWE", "swe_daily_inst"), ("DEPTH", "depth_daily_inst")):
+            attrs = ds[var].attrs
+            assert (attrs["units"], attrs["teehr:variable_name"], attrs["teehr:unit_name"]) == (
+                UA_UNITS[var], teehr_name, "mm"
+            )
+    assert np.isnan(float(g["overviews/2"].SWE.isel(time=30).max()))  # unwritten slots are missing, not 0
 
     before = {k: v.updated_at.values.copy() for k, v in g.items()}
     _run("1981-10-03", "1981-11-29")  # nothing new
@@ -187,8 +201,8 @@ def test_backfill_in_any_order_then_upsert(harness, ua):
     for k in GROUPS:
         assert list(g[k].status.values[70:80]) == [2] * 5 + [1] * 5
     data = g["data"]
-    assert float(data.swe_daily_inst.isel(time=71, lat=0, lon=0)) == DAYS[71].dayofyear
-    assert float(data.swe_daily_inst.isel(time=76, lat=0, lon=0)) == 1000 + DAYS[76].dayofyear
+    assert float(data.SWE.isel(time=71, lat=0, lon=0)) == DAYS[71].dayofyear
+    assert float(data.SWE.isel(time=76, lat=0, lon=0)) == 1000 + DAYS[76].dayofyear
     assert data.created_at.values[70] == created and data.updated_at.values[70] > created
 
     root = zarr.open_group(open_repo().readonly_session("main").store, mode="r", zarr_format=3).attrs
@@ -203,7 +217,7 @@ def test_backfill_in_any_order_then_upsert(harness, ua):
     store = open_repo().readonly_session("main").store
     data_transform = zarr.open_group(store, path="data", mode="r", zarr_format=3).attrs["spatial:transform"]
     assert overview.attrs["spatial:transform"][0] == pytest.approx(2 * data_transform[0]) and "proj:wkt2" in overview.attrs
-    assert zarr.open_array(store, path="overviews/2/swe_daily_inst", mode="r").dtype == "uint16"
+    assert zarr.open_array(store, path="overviews/2/SWE", mode="r").dtype == "uint16"
 
 
 def test_geotiff_values_match_source(harness, cu):
@@ -227,24 +241,30 @@ def test_geotiff_values_match_source(harness, cu):
     np.testing.assert_allclose(data.x.values, x0 + (np.arange(TIFF_SHAPE[1]) + 0.5) * TIFF_RES)
     np.testing.assert_allclose(data.y.values, y0 - (np.arange(TIFF_SHAPE[0]) + 0.5) * TIFF_RES)
     assert CRS.from_wkt(data.spatial_ref.attrs["crs_wkt"]).to_epsg() == 4269
-    # /data holds plain mm; /references keeps the source m and decodes to mm
-    assert {k: data.swe_daily_inst.attrs[k] for k in ("units", "source_units")} == {"units": "mm", "source_units": "m"}
-    assert "scale_factor" not in data.swe_daily_inst.encoding and data.swe_daily_inst.dtype == "float32"
+    # Every group keeps the source's m, unconverted
+    assert data.SWE.attrs["units"] == "m" and "source_units" not in data.SWE.attrs
+    assert "scale_factor" not in data.SWE.encoding and data.SWE.dtype == "float32"
     refs = xr.open_zarr(store, group="references", consolidated=False)
-    packed = xr.open_zarr(store, group="references", consolidated=False, mask_and_scale=False).swe_daily_inst
-    assert packed.dtype == "float32" and packed.attrs["scale_factor"] == 1000
+    packed = xr.open_zarr(store, group="references", consolidated=False, mask_and_scale=False).SWE
+    assert packed.dtype == "float32" and "scale_factor" not in packed.attrs
     for d in days:
-        source_m = expected[d]
-        source_mm = source_m * np.float32(1000)
-        np.testing.assert_array_equal(data.swe_daily_inst.sel(time=d).transpose("y", "x").values, source_mm)
-        # Decoded with the JSON (float64) scale factor
-        np.testing.assert_array_equal(refs.swe_daily_inst.sel(time=d).transpose("y", "x").values.astype("float32"), source_mm)
+        np.testing.assert_array_equal(data.SWE.sel(time=d).transpose("y", "x").values, expected[d])
+        np.testing.assert_array_equal(refs.SWE.sel(time=d).transpose("y", "x").values, expected[d])
         stored_m = packed.sel(time=d).transpose("y", "x").values
-        np.testing.assert_array_equal(np.where(stored_m == TIFF_NODATA, np.nan, stored_m), source_m)
-    # Overviews are packed from the mm values
-    overview = xr.open_zarr(store, group="overviews/2", consolidated=False).swe_daily_inst
-    np.testing.assert_allclose(float(overview.isel(time=0).mean()), float(data.swe_daily_inst.isel(time=0).mean()), rtol=0.05)
+        np.testing.assert_array_equal(np.where(stored_m == TIFF_NODATA, np.nan, stored_m), expected[d])
+    # Overviews are packed in m, as the source sets; the teehr attributes convert to mm
+    overview = xr.open_zarr(store, group="overviews/2", consolidated=False).SWE
+    assert overview.attrs["units"] == "m"
+    assert (data.SWE.attrs["teehr:unit_name"], data.SWE.attrs["teehr:scale"]) == ("mm", 1000.0)
+    np.testing.assert_allclose(float(overview.isel(time=0).mean()), float(data.SWE.isel(time=0).mean()), rtol=0.05)
 
+
+
+def test_derived_fields_hidden_from_the_flow_form():
+    """A UI run sends every field the form shows, so the fields derived from the source stay off it."""
+    schema = parameter_schema(ing.ingest_gridded_data).model_dump()
+    shown = schema["definitions"]["IngestGriddedDataInput"]["properties"]
+    assert not {"configuration_name", "variable_names", "append_dim"} & shown.keys()
 
 
 def test_write_materialized_defaults_to_the_source():
@@ -280,7 +300,7 @@ def test_parse_netcdf_in_processes(harness, ua, monkeypatch):
     data = _groups(open_repo)["data"]
     assert (data.status.values == 2).all()
     for i in range(10):
-        assert float(data.swe_daily_inst.isel(time=i, lat=3, lon=4)) == DAYS[i].dayofyear
+        assert float(data.SWE.isel(time=i, lat=3, lon=4)) == DAYS[i].dayofyear
 
 
 def test_parse_geotiff_in_processes(harness, cu, monkeypatch):
@@ -296,7 +316,33 @@ def test_parse_geotiff_in_processes(harness, cu, monkeypatch):
     assert processes[0] > 1 and not fallbacks
     data = xr.open_zarr(open_repo().readonly_session("main").store, group="data", consolidated=False)
     for d in days:
-        np.testing.assert_array_equal(data.swe_daily_inst.sel(time=d).transpose("y", "x").values, expected[d] * np.float32(1000))
+        np.testing.assert_array_equal(data.SWE.sel(time=d).transpose("y", "x").values, expected[d])
+
+
+def test_overviews_fan_out_as_child_runs(harness, ua, monkeypatch):
+    """Snow references stay on the one-commit path; their overviews run in units of 30 days, as child runs of
+    process-gridded-unit from their JSON parameters."""
+    import process_gridded_unit as pgu
+    from teehr_icechunk import prefect as ic_prefect
+
+    publish, open_repo = ua
+    for d in DAYS:
+        publish(d, "stable", d.dayofyear, "2026-01-01")
+    stages = []
+
+    def run_deployment(name, parameters, job_variables, timeout, flow_run_name):
+        params = json.loads(json.dumps(parameters))
+        stages.append(params["stage"])
+        pgu.process_gridded_unit.fn(**params)
+        return SimpleNamespace(name=flow_run_name, state=SimpleNamespace(is_completed=lambda: True))
+
+    monkeypatch.setattr(ic_prefect, "run_deployment", run_deployment)
+    _run("1981-10-01", "1981-12-29", max_child_runs=2, unit_steps=30)
+    assert stages == ["overviews"] * 3
+    overview = _groups(open_repo)["overviews/2"]
+    assert (overview.status.values == 2).all()
+    for i in (0, 45, 89):
+        assert abs(float(overview.SWE.isel(time=i).max()) - DAYS[i].dayofyear) < 0.2
 
 
 def test_switching_to_materialized_with_no_new_files(harness, ua):
@@ -310,42 +356,12 @@ def test_switching_to_materialized_with_no_new_files(harness, ua):
     _run("1981-10-01", "1981-10-05", write_materialized=True)  # no new files
     assert root()["data_group"] == "/data"
     data = _groups(open_repo)["data"]
-    assert float(data.swe_daily_inst.isel(time=3, lat=0, lon=0)) == DAYS[3].dayofyear
+    assert float(data.SWE.isel(time=3, lat=0, lon=0)) == DAYS[3].dayofyear
 
 
-@pytest.mark.parametrize("factors", [[2, 4, 8], [3, 9]])
-def test_overview_levels_match_xarray_coarsen(factors):
-    """Levels built from the previous one match averaging full resolution, skipping NaN; partial edge blocks drop."""
-    rng = np.random.default_rng(0)
-    values = rng.random((3, 41, 59)).astype("float32")
-    values[:, :7, :11] = np.nan  # a fully missing corner
-    values[rng.random(values.shape) < 0.2] = np.nan  # and scattered gaps
-    ds = xr.Dataset(
-        {"v": (("time", "y", "x"), values, {"units": "mm"})},
-        coords={"time": DAYS[:3], "y": np.arange(41) * 1000.0, "x": np.arange(59) * 1000.0},
-        attrs={"spatial:dimensions": ["y", "x"]},
-    )
-    levels = bo._overview_levels(ds, factors)
-    for factor in factors:
-        expected = ds.coarsen(y=factor, x=factor, boundary="trim").mean()
-        level = levels[factor]
-        np.testing.assert_allclose(level.v.values, expected.v.values, rtol=1e-6)
-        np.testing.assert_allclose(level.x.values, expected.x.values)
-        assert level.attrs["spatial:transform"][0] == 1000.0 * factor and level.v.attrs["units"] == "mm"
-
-
-def test_overview_factors_each_a_multiple_of_the_previous():
-    BuildOverviewsDataInput(configuration_name="r", overview_factors=[3, 9])
-    for bad in ([2, 3], [4, 2], [1, 2], []):
-        with pytest.raises(ValueError):
-            BuildOverviewsDataInput(configuration_name="r", overview_factors=bad)
-
-@pytest.mark.parametrize("units, source_scale, stored_scale, mm_per_int", [
-    ("millimeters h20", None, None, 1),  # unpacked, already mm: stored as is
-    ("m", None, 1000, 1000),  # unpacked m: the conversion adds packing
-    ("m", 0.001, 1.0, 1),  # packed m: the conversion composes with the source packing
-])
-def test_integer_source_stored_losslessly(harness, ua, units, source_scale, stored_scale, mm_per_int):
+@pytest.mark.parametrize("source_scale", [None, 0.5])
+def test_integer_source_stored_losslessly(harness, ua, source_scale):
+    """Integers keep their values, the source's packing and its units."""
     publish, open_repo = ua
     rng = np.random.default_rng(0)
     ints = rng.integers(0, 3000, (40, 50)).astype("float32")
@@ -354,18 +370,18 @@ def test_integer_source_stored_losslessly(harness, ua, units, source_scale, stor
     if source_scale:
         encoding["scale_factor"] = source_scale
     for d in (DAYS[0], DAYS[2]):  # DAYS[1] stays unwritten
-        publish(d, "stable", ints * (source_scale or 1), "2026-01-01", units=units, encoding=encoding)
+        publish(d, "stable", ints * (source_scale or 1), "2026-01-01", encoding=encoding)
     _run("1981-10-01", "1981-10-03")
 
     store = open_repo().readonly_session("main").store
-    stored = xr.open_zarr(store, group="data", consolidated=False, mask_and_scale=False).swe_daily_inst
+    stored = xr.open_zarr(store, group="data", consolidated=False, mask_and_scale=False).SWE
     assert stored.dtype == "int16" and stored.attrs["_FillValue"] == -9999
-    assert stored.attrs.get("scale_factor") == stored_scale and "add_offset" not in stored.attrs
-    data = xr.open_zarr(store, group="data", consolidated=False).swe_daily_inst
-    assert data.attrs["units"] == "mm"
+    assert stored.attrs.get("scale_factor") == source_scale and "add_offset" not in stored.attrs
+    data = xr.open_zarr(store, group="data", consolidated=False).SWE
+    assert data.attrs["units"] == "millimeters h20"
     for i in (0, 2):
         np.testing.assert_array_equal(stored.isel(time=i).values, np.where(np.isnan(ints), -9999, ints))
-        np.testing.assert_array_equal(data.isel(time=i).values, ints * mm_per_int)
+        np.testing.assert_array_equal(data.isel(time=i).values, ints * (source_scale or 1))
     assert np.isnan(data.isel(time=1).values).all()  # unwritten slots are missing, not 0
 
 
@@ -378,13 +394,13 @@ def test_integer_source_without_fill_value_needs_one(harness, ua, monkeypatch):
     with pytest.raises(ValueError, match="has no _FillValue"):
         _run("1981-10-01", "1981-10-03")
     with pytest.raises(ValueError, match="outside the uint8 range"):
-        _run("1981-10-01", "1981-10-03", data_fill_values={"swe_daily_inst": 300, "depth_daily_inst": 300})
+        _run("1981-10-01", "1981-10-03", data_fill_values={"SWE": 300, "DEPTH": 300})
 
-    _run("1981-10-01", "1981-10-03", data_fill_values={"swe_daily_inst": 255, "depth_daily_inst": 255})
+    _run("1981-10-01", "1981-10-03", data_fill_values={"SWE": 255, "DEPTH": 255})
     store = open_repo().readonly_session("main").store
-    stored = xr.open_zarr(store, group="data", consolidated=False, mask_and_scale=False).swe_daily_inst
+    stored = xr.open_zarr(store, group="data", consolidated=False, mask_and_scale=False).SWE
     assert stored.dtype == "uint8" and stored.attrs["_FillValue"] == 255
-    data = xr.open_zarr(store, group="data", consolidated=False).swe_daily_inst
+    data = xr.open_zarr(store, group="data", consolidated=False).SWE
     np.testing.assert_array_equal(data.isel(time=0).values, ints)
     assert np.isnan(data.isel(time=1).values).all()  # the unwritten slot reads as the fill value, i.e. missing
 
@@ -398,23 +414,8 @@ def test_unsigned_source_stored_as_signed_keeps_its_values(harness, ua):
     _run("1981-10-01", "1981-10-03")
 
     store = open_repo().readonly_session("main").store
-    stored = xr.open_zarr(store, group="data", consolidated=False, mask_and_scale=False).swe_daily_inst
+    stored = xr.open_zarr(store, group="data", consolidated=False, mask_and_scale=False).SWE
     assert stored.dtype == "int8" and stored.attrs["_Unsigned"] == "true"
-    data = xr.open_zarr(store, group="data", consolidated=False).swe_daily_inst
+    data = xr.open_zarr(store, group="data", consolidated=False).SWE
     np.testing.assert_array_equal(data.isel(time=0).values, ints)
     assert np.isnan(data.isel(time=1).values).all()
-
-
-def test_unit_conversion_composes_with_source_packing():
-    ds = xr.Dataset({
-        "swe_daily_inst": ("x", np.arange(3, dtype="int16"), {"units": "m", "scale_factor": np.float32(0.01), "add_offset": np.float32(1)}),
-        "other": ("x", np.zeros(3, "float32"), {"units": "m"}),
-    })
-    out = ing.gu.apply_unit_conversions(ds, ing.VARIABLE_UNITS, ing.UNIT_CONVERSIONS)
-    swe = out.swe_daily_inst.attrs
-    assert (swe["units"], swe["source_units"]) == ("mm", "m")
-    assert swe["scale_factor"] == np.float32(10) and swe["add_offset"] == np.float32(1000)
-    assert swe["scale_factor"].dtype == np.float32
-    assert out.other.attrs == {"units": "m"}  # not in VARIABLE_UNITS
-    with pytest.raises(ValueError, match="No conversion"):
-        ing.gu.apply_unit_conversions(xr.Dataset({"swe_daily_inst": ("x", [1.0], {"units": "ft"})}), ing.VARIABLE_UNITS, ing.UNIT_CONVERSIONS)
