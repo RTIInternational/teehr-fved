@@ -61,38 +61,32 @@ DROP_OVERLAPPING_ASSIM_VALUES = True
 
 
 @task(cache_policy=NO_CACHE)
-def _filter_crosswalk_table(
+def _get_location_ids_for_domain(
     ev: Evaluation,
-    configuration_name: str,
     secondary_location_id_prefix: str,
-) -> ps.DataFrame:
-    """Filter the location crosswalk table for the given configuration domain."""
+) -> List[str]:
+    """Get NWM location IDs for the given domain from crosswalks.
+    
+    Uses only the location_crosswalks table, no attribute dependencies.
+    """
     logger = get_run_logger()
-    # Create the state_name filter based on configuration name
-    if "hawaii" in configuration_name.lower():
-        state_filter = f"state_name = 'Hawaii'"
-    elif "alaska" in configuration_name.lower():
-        state_filter = f"state_name = 'Alaska'"
-    elif "puertorico" in configuration_name.lower():
-        state_filter = f"state_name = 'Puerto Rico'"
-    else:
-        oconus_states = ", ".join(f"'{s}'" for s in OCONUS_STATE_NAMES)
-        state_filter = f"state_name NOT IN ({oconus_states})"
-    logger.info(f"Location crosswalk domain filter: {state_filter}")
-    # Filter by state and location ID prefix
-    filtered_crosswalks_sdf = ev.location_crosswalks.add_attributes(
-        attr_list=["state_name"]
-    ).filter(
+    # Query crosswalks without joining to location_attributes
+    filtered_crosswalks_sdf = ev.location_crosswalks.filter(
         filters=[
             {
                 "column": "secondary_location_id",
                 "operator": "like",
                 "value": f"{secondary_location_id_prefix}-%"
-            },
-            state_filter
+            }
         ]
     ).to_sdf()
-    return filtered_crosswalks_sdf
+    
+    stripped_ids = [
+        row[0].split("-")[1]
+        for row in filtered_crosswalks_sdf.select("secondary_location_id").collect()
+    ]
+    logger.info(f"Found {len(stripped_ids)} location IDs for domain")
+    return stripped_ids
 
 
 @task(cache_policy=NO_CACHE, retries=2, retry_delay_seconds=30)
@@ -280,15 +274,10 @@ def ingest_nwm_streamflow_forecasts(
         # Get the NWM IDs for the correct domain based on the configuration name
         # and prefix. The prefix is nwm_version because that is what teehr
         # prefixes the fetched secondary_location_ids with.
-        filtered_crosswalks_sdf = _filter_crosswalk_table(
+        stripped_ids = _get_location_ids_for_domain(
             ev=ev,
-            configuration_name=teehr_nwm_config["name"],
             secondary_location_id_prefix=nwm_version
         )
-        stripped_ids = [
-            row[0].split("-")[1]
-            for row in filtered_crosswalks_sdf.select("secondary_location_id").collect()
-        ]
         logger.info(f"Found {len(stripped_ids)} location IDs after filtering for the domain and NWM sites")
 
         if "hawaii" in nwm_configuration:
