@@ -1,0 +1,38 @@
+/* Fixed sizes, so the bar never shifts with the value range or label widths. */
+.root {
+  --bar-width: 14px;
+  --bar-height: 160px;
+  --label-width: 64px;
+  --bar-gap: 6px;
+
+  width: calc(var(--bar-width) + var(--bar-gap) + var(--label-width));
+  padding-block: 6px;
+  font-size: var(--mantine-font-size-xs);
+}
+
+.scale {
+  display: flex;
+  gap: var(--bar-gap);
+  height: var(--bar-height);
+}
+
+.bar {
+  flex-shrink: 0;
+  width: var(--bar-width);
+  height: var(--bar-height);
+  border: 1px solid var(--mantine-color-default-border);
+}
+
+.labels {
+  position: relative;
+  width: var(--label-width);
+  height: var(--bar-height);
+}
+
+.tick {
+  position: absolute;
+  left: 0;
+  transform: translateY(50%);
+  white-space: nowrap;
+  line-height: 1;
+}

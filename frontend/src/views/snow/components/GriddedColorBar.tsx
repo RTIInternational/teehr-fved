@@ -1,15 +1,20 @@
 // Fixed-size vertical color bar for the gridded layer, drawn from the tiles legend JSON so
 // its size and position never depend on the value range or label widths.
 
+import { Text } from '@mantine/core';
+
 import type { TilesLegendResponse } from '@/shared/api/gridded/tiles';
+import type { TeehrMapping } from '@/shared/api/gridded/variableAttrs';
+
+import styles from './GriddedColorBar.module.css';
 
 type GriddedColorBarProps = {
   legend: TilesLegendResponse;
+  // Labels the range in teehr's units; the legend itself is in the variable's stored units
+  mapping?: TeehrMapping | null;
 };
 
-const BAR_WIDTH = 14; // px
-const BAR_HEIGHT = 160; // px
-const LABEL_WIDTH = 64; // px
+// Bar and label sizes are fixed in GriddedColorBar.module.css
 const TICK_COUNT = 5;
 const GRADIENT_STOPS = 32;
 
@@ -19,8 +24,10 @@ const formatTick = (value: number): string =>
     ? value.toExponential(2)
     : Number(value.toPrecision(3)).toString();
 
-const GriddedColorBar = ({ legend }: GriddedColorBarProps) => {
+const GriddedColorBar = ({ legend, mapping }: GriddedColorBarProps) => {
   const [min, max] = legend.colorscalerange;
+  const units = mapping?.units ?? legend.units;
+  const shown = (value: number) => (mapping ? mapping.toDisplay(value) : value);
   const { stops } = legend;
   // Unset or 'extend' draws values above the max in the top color
   const topIsOpenEnded = legend.abovemaxcolor == null || legend.abovemaxcolor === 'extend';
@@ -39,34 +46,24 @@ const GriddedColorBar = ({ legend }: GriddedColorBarProps) => {
   );
 
   return (
-    <div style={{ fontSize: '0.72rem', width: BAR_WIDTH + 6 + LABEL_WIDTH, paddingBlock: '6px' }}>
-      {legend.units && <div style={{ fontWeight: 600, marginBottom: '6px' }}>{legend.units}</div>}
-      <div className="d-flex" style={{ gap: '6px', height: BAR_HEIGHT }}>
-        <div
-          style={{
-            width: BAR_WIDTH,
-            height: BAR_HEIGHT,
-            background: gradient,
-            border: '1px solid #999',
-            flexShrink: 0,
-          }}
-        />
-        <div style={{ position: 'relative', width: LABEL_WIDTH, height: BAR_HEIGHT }}>
+    <div className={styles.root}>
+      {units && (
+        <Text size="xs" fw={600} mb={6}>
+          {units}
+        </Text>
+      )}
+      <div className={styles.scale}>
+        <div className={styles.bar} style={{ background: gradient }} />
+        <div className={styles.labels}>
           {ticks.map((value, i) => (
             <span
               key={i}
-              style={{
-                position: 'absolute',
-                left: 0,
-                bottom: `${(i / (TICK_COUNT - 1)) * 100}%`,
-                transform: 'translateY(50%)',
-                whiteSpace: 'nowrap',
-                lineHeight: 1,
-              }}
+              className={styles.tick}
+              style={{ bottom: `${(i / (TICK_COUNT - 1)) * 100}%` }}
             >
               {i === TICK_COUNT - 1 && topIsOpenEnded
-                ? `≥ ${formatTick(value)}`
-                : formatTick(value)}
+                ? `≥ ${formatTick(shown(value))}`
+                : formatTick(shown(value))}
             </span>
           ))}
         </div>

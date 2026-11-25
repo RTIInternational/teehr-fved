@@ -92,7 +92,10 @@ def ingest_usgs_streamflow_obs(
                 description="USGS streamflow gauge observations"
             )
         )
-    usgs_sites = usgs_utils.get_usgs_location_ids(ev=ev)
+
+    # get usgs sites from alias table
+    df = ev.location_id_aliases.filter("location_id_alias LIKE 'usgs-%'").to_pandas()
+    usgs_sites = df['location_id_alias'].str.upper().to_list()
 
     # Break usgs_sites into chunks
     usgs_site_chunks = [
@@ -137,3 +140,52 @@ def ingest_usgs_streamflow_obs(
         drop_duplicates=drop_duplicates,
     )
     ev.spark.stop()
+
+
+@flow(
+    flow_run_name="ingest-usgs-streamflow-obs-all-services",
+    timeout_seconds=60 * 60 * 3
+)
+def ingest_usgs_streamflow_obs_all_services(
+    temp_dir_path: Union[str, Path],
+    end_dt: Union[str, datetime, pd.Timestamp, None] = None,
+    num_lookback_days: Union[int, None] = LOOKBACK_DAYS,
+    chunk_by: Union[USGSChunkByEnum, None] = "week",
+    filter_to_hourly: bool = True,
+    filter_no_data: bool = True,
+    convert_to_si: bool = True,
+    overwrite_output: Optional[bool] = True,
+    write_mode: TableWriteEnum = "append",
+    drop_duplicates: bool = True,
+    start_spark_cluster: bool = False,
+) -> None:
+    """Ingest USGS Streamflow data for all service types ('iv' and 'dv').
+
+    Calls the ingest_usgs_streamflow_obs flow for both instantaneous (hourly)
+    and daily value service data, writing both to the warehouse.
+
+    Notes
+    -----
+    - To test this locally you need to set your USGS API key in secrets.local.yaml.
+    - Sets the start date as end date minus the number of lookback days.
+    - End date defaults to current date and time.
+    """
+    logger = get_run_logger()
+
+    for service in ["iv", "dv"]:
+        logger.info(f"⏳ Starting USGS streamflow ingest for '{service}' service")
+        ingest_usgs_streamflow_obs(
+            temp_dir_path=temp_dir_path,
+            end_dt=end_dt,
+            num_lookback_days=num_lookback_days,
+            service=service,
+            chunk_by=chunk_by,
+            filter_to_hourly=filter_to_hourly,
+            filter_no_data=filter_no_data,
+            convert_to_si=convert_to_si,
+            overwrite_output=overwrite_output,
+            write_mode=write_mode,
+            drop_duplicates=drop_duplicates,
+            start_spark_cluster=start_spark_cluster,
+        )
+        logger.info(f"✅ Completed USGS streamflow ingest for '{service}' service")

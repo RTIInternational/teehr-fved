@@ -6,7 +6,7 @@ aws:
 remoteCluster:
   contextArn: arn:aws:eks:us-east-1:794457362858:cluster/fved-cluster
   ecrRegistry: 794457362858.dkr.ecr.us-east-1.amazonaws.com
-hostname: dev.low.amzifved.aws.rti.org
+hostname: fved-dev.rtiamanzi.org
 nfsServerDns: fs-0d53828f401595456.efs.us-east-1.amazonaws.com
 irsa:
   polarisRoleArn: arn:aws:iam::794457362858:role/fved-polaris-irsa
@@ -25,3 +25,8 @@ deploy:
   # The action role has cluster admin through its EKS access entry.
   clusterRoleArn: arn:aws:iam::794457362858:role/github-actions-eks-deploy-amzi-fved
   actionRoleArn: arn:aws:iam::794457362858:role/github-actions-eks-deploy-amzi-fved
+# Nightly Postgres dumps (teehr-cloud-core db-backups); bucket and write-only
+# IRSA role from aws-project-amzifved-infrastructure db-backups OpenTofu.
+dbBackups:
+  bucket: dev-fved-db-backups-rti-use1
+  roleArn: arn:aws:iam::794457362858:role/fved-db-backup-irsa
