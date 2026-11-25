@@ -54,6 +54,12 @@ RUN ARCH=$(uname -m) && \
         pip install --no-cache-dir "git+https://github.com/RTIInternational/teehr.git@${TEEHR_VERSION}"; \
     fi
 
+ARG TEEHR_ICECHUNK_VERSION
+
+# The shared gridded code (references, materialize, overviews, mean areal planning and kernel)
+RUN pip install --no-cache-dir \
+    "teehr-icechunk[hdf,tiff,mean-areal] @ git+https://github.com/RTIInternational/teehr-icechunk.git@${TEEHR_ICECHUNK_VERSION}"
+
 # Set JAVA_HOME statically based on build architecture
 ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-${TARGETARCH}
 ENV PATH=$PATH:/usr/lib/jvm/java-21-openjdk-${TARGETARCH}/bin
