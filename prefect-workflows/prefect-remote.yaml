@@ -234,6 +234,23 @@ deployments:
       cron: "0 15 * * 3"
       active: false
 
+  # CBRFC Seasonal Water Supply Ingest
+  - name: ingest-cbrfc-seasonal-wsv-forecasts
+    version:
+    tags: []
+    concurrency_limit:
+      limit: 1
+      collision_strategy: "CANCEL_NEW"
+    description: Ingest CBRFC seasonal water supply forecasts and observations by water year
+    entrypoint: workflows/ingests/cbrfc_seasonal_wsv_forecast.py:ingest_cbrfc_seasonal_wsv_forecasts
+    parameters: {
+      "temp_dir_path": *temp_dir_path
+    }
+    work_pool: *work_pool_medium
+    schedule:
+      cron: "0 6 * * *"
+      active: true
+
   # CNRFC Ingest
   - name: ingest-cnrfc-water-supply
     version:
