@@ -28,7 +28,7 @@ from workflows.ingests.utils.cbrfc_seasonal_utils import (
     rename_observed_variables,
     water_year_to_dates,
 )
-from workflows.utils.common_utils import initialize_evaluation, load_to_warehouse
+from workflows.utils.common_utils import initialize_evaluation
 
 logging.getLogger("teehr").setLevel(logging.INFO)
 
@@ -144,6 +144,7 @@ def _process_cbrfc_data(
                     forecast_period_start_date=forecast_period_start_date,
                     variable_name=variable_name,
                     location_id=location_id,
+                    sim_df=sim_df,
                     check_period_ended=True,
                 )
                 if not final_obs.empty:
@@ -166,9 +167,11 @@ def _write_to_warehouse(
     sim_df: pd.DataFrame,
     obs_df: pd.DataFrame,
     final_obs_df: pd.DataFrame,
-    temp_dir_path: Union[str, Path],
 ) -> None:
     """Write simulation, observation, and final observed data to warehouse.
+
+    Writes dataframes directly to warehouse tables without intermediate
+    parquet files, avoiding serialization issues with timezone info.
 
     Parameters
     ----------
@@ -180,26 +183,16 @@ def _write_to_warehouse(
         Observation data (cumsum)
     final_obs_df : pd.DataFrame
         Final observed (single-value) timeseries
-    temp_dir_path : Union[str, Path]
-        Path to temporary directory for parquet files
     """
     logger = get_run_logger()
 
-    temp_dir_path = Path(temp_dir_path)
-    temp_dir_path.mkdir(parents=True, exist_ok=True)
-
     # Write forecast data to secondary_timeseries
     if not sim_df.empty:
-        sim_parquet_path = temp_dir_path / "cbrfc_forecast"
-        sim_parquet_path.mkdir(parents=True, exist_ok=True)
-        sim_df.to_parquet(sim_parquet_path / "data.parquet")
         logger.info(f"Writing {len(sim_df)} forecast rows to warehouse")
-        load_to_warehouse(
-            ev=ev,
-            in_path=sim_parquet_path,
-            table_name="secondary_timeseries",
-            write_mode="upsert",
-            drop_duplicates=False,
+        ev.secondary_timeseries.load_dataframe(
+            df=sim_df,
+            write_mode='upsert',
+            drop_duplicates=True
         )
         logger.info("✅ Forecast data written to warehouse")
     else:
@@ -207,16 +200,11 @@ def _write_to_warehouse(
 
     # Write observation data to primary_timeseries
     if not obs_df.empty:
-        obs_parquet_path = temp_dir_path / "cbrfc_obs_cumsum"
-        obs_parquet_path.mkdir(parents=True, exist_ok=True)
-        obs_df.to_parquet(obs_parquet_path / "data.parquet")
         logger.info(f"Writing {len(obs_df)} observation (cumsum) rows to warehouse")
-        load_to_warehouse(
-            ev=ev,
-            in_path=obs_parquet_path,
-            table_name="primary_timeseries",
-            write_mode="upsert",
-            drop_duplicates=False,
+        ev.primary_timeseries.load_dataframe(
+            df=obs_df,
+            write_mode='upsert',
+            drop_duplicates=True
         )
         logger.info("✅ Observation (cumsum) data written to warehouse")
     else:
@@ -224,16 +212,11 @@ def _write_to_warehouse(
 
     # Write final observed data to primary_timeseries
     if not final_obs_df.empty:
-        final_obs_parquet_path = temp_dir_path / "cbrfc_obs_final"
-        final_obs_parquet_path.mkdir(parents=True, exist_ok=True)
-        final_obs_df.to_parquet(final_obs_parquet_path / "data.parquet")
         logger.info(f"Writing {len(final_obs_df)} final observed rows to warehouse")
-        load_to_warehouse(
-            ev=ev,
-            in_path=final_obs_parquet_path,
-            table_name="primary_timeseries",
-            write_mode="upsert",
-            drop_duplicates=False,
+        ev.primary_timeseries.load_dataframe(
+            df=final_obs_df,
+            write_mode='upsert',
+            drop_duplicates=True
         )
         logger.info("✅ Final observed data written to warehouse")
     else:
@@ -261,7 +244,7 @@ def ingest_cbrfc_seasonal_wsv_forecasts(
     Parameters
     ----------
     temp_dir_path : Union[str, Path]
-        Path to temporary directory for intermediate data
+        Path to temporary directory for Spark operations
     end_WY : int
         Ending water year (required)
     start_WY : Optional[int], default None
@@ -375,7 +358,6 @@ def ingest_cbrfc_seasonal_wsv_forecasts(
         sim_df=combined_sim_df,
         obs_df=combined_obs_df,
         final_obs_df=combined_final_obs_df,
-        temp_dir_path=temp_dir_path,
     )
 
     # Cleanup

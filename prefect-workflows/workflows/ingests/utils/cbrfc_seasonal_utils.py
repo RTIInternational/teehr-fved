@@ -359,9 +359,9 @@ def _format_seasonal_wsup_timeseries(
 
     formatted = pd.DataFrame(
         {
-            "reference_time": pd.to_datetime(timeseries_df[timestamp_column]),
+            "reference_time": pd.to_datetime(timeseries_df[timestamp_column], utc=True),
             "value_time": pd.Series(
-                pd.Timestamp(value_time),
+                pd.Timestamp(value_time, tz="UTC"),
                 index=timeseries_df.index,
             ),
             "value": pd.to_numeric(
@@ -375,9 +375,21 @@ def _format_seasonal_wsup_timeseries(
         }
     )
 
+    # Ensure timezone info is properly set (handle case where it might be lost)
+    if formatted["reference_time"].dt.tz is None:
+        formatted["reference_time"] = formatted["reference_time"].dt.tz_localize("UTC")
+    if formatted["value_time"].dt.tz is None:
+        formatted["value_time"] = formatted["value_time"].dt.tz_localize("UTC")
+
     if include_member:
         formatted["member"] = RAW_KEYS_TO_TEEHR_VARIABLES[raw_key]
         return formatted[SIM_SCHEMA_COLUMNS]
+
+    # For observed (cumsum) data: set reference_time to NULL and move reference_time to value_time
+    formatted["reference_time"] = pd.to_datetime([None] * len(formatted), utc=True)
+    formatted["value_time"] = pd.to_datetime(timeseries_df[timestamp_column], utc=True)
+    if formatted["value_time"].dt.tz is None:
+        formatted["value_time"] = formatted["value_time"].dt.tz_localize("UTC")
 
     return formatted[OBS_SCHEMA_COLUMNS]
 
@@ -577,6 +589,7 @@ def create_final_observed_timeseries(
     forecast_period_start_date: datetime,
     variable_name: str,
     location_id: str,
+    sim_df: pd.DataFrame = None,
     check_period_ended: bool = True,
 ) -> pd.DataFrame:
     """Create a final observed timeseries from the last cumsum value.
@@ -596,6 +609,9 @@ def create_final_observed_timeseries(
         Variable name (should be _sum format, e.g., 'volume_0407_sum')
     location_id : str
         Location ID
+    sim_df : pd.DataFrame, optional
+        Simulation/forecast dataframe to extract reference_time from.
+        If provided, uses the reference_time from the first matching forecast row.
     check_period_ended : bool, default True
         If True, only create if forecast period has ended
 
@@ -630,14 +646,33 @@ def create_final_observed_timeseries(
     # Get the last value from observation data
     last_row = obs_df.iloc[-1].copy()
     last_value = last_row["value"]
-    last_reference_time = last_row["reference_time"]
+    
+    # reference_time should be the last day of the forecast period
+    # For April-July (0407), that's July 31st
+    forecast_end_month = forecast_period_start_date.month + 3  # April -> July
+    forecast_end_day = 30
+    if forecast_end_month > 12:
+        forecast_end_month -= 12
+        forecast_end_year = forecast_period_start_date.year + 1
+    else:
+        forecast_end_year = forecast_period_start_date.year
+    
+    reference_time_value = pd.Timestamp(
+        year=forecast_end_year,
+        month=forecast_end_month,
+        day=forecast_end_day,
+        tz="UTC"
+    )
+    
+    # value_time should match the forecast data value_time (which is typically forecast_period_start_date)
+    value_time_value = pd.Timestamp(forecast_period_start_date, tz="UTC")
 
     # Create final observed row with forecast variable name (not cumsum)
     final_obs_df = pd.DataFrame(
         [
             {
-                "reference_time": last_reference_time,
-                "value_time": forecast_period_start_date,
+                "reference_time": reference_time_value,
+                "value_time": value_time_value,
                 "value": last_value,
                 "variable_name": variable_name,  # Use _sum format
                 "configuration_name": OBS_CONFIGURATION_NAME,
