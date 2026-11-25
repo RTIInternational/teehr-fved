@@ -1,0 +1,37 @@
+--- a/wsfr_download/usgs_streamflow.py
++++ b/wsfr_download/usgs_streamflow.py
+@@ -16,7 +16,7 @@
+ from pathlib import Path
+ 
+ import pandas as pd
+-from dataretrieval import nwis
++from dataretrieval import waterdata
+ from loguru import logger
+ from tqdm import tqdm
+ 
+@@ -60,13 +60,19 @@
+     """
+     start_date = f"{forecast_year - 1}-{fy_start_month:02}-{fy_start_day:02}"
+     end_date = f"{forecast_year}-{fy_end_month:02}-{fy_end_day:02}"
+-    df, _ = nwis.get_dv(
+-        sites=[usgs_id],
+-        start=start_date,
+-        end=end_date,
+-        statCd="00003",  # statCd 00003 is statistics code for "mean"
++    df, _ = waterdata.get_daily(
++        monitoring_location_id=f"USGS-{usgs_id}",
++        parameter_code="00060",
++        statistic_id="00003",
++        time=f"{start_date}/{end_date}",
+     )
+-    return df
++    if df.empty:
++        return pd.DataFrame(columns=[MEAN_DISCHARGE_RAW_COL],
++                            index=pd.DatetimeIndex([], name="datetime"))
++    df = df.rename(columns={"time": "datetime", "value": MEAN_DISCHARGE_RAW_COL})
++    df["datetime"] = pd.to_datetime(df["datetime"]).dt.tz_localize(None)
++    df[MEAN_DISCHARGE_RAW_COL] = pd.to_numeric(df[MEAN_DISCHARGE_RAW_COL], errors="coerce")
++    return df.set_index("datetime")[[MEAN_DISCHARGE_RAW_COL]].sort_index()
+ 
+ 
+ def has_discharge_col(df: pd.DataFrame) -> bool:

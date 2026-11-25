@@ -23,6 +23,12 @@ spec:
         # Pass in envs that can then be passed to the job template/job.
         - name: PREFECT_TEEHR_IMAGE
           value: ${actions.build.teehr-prefect-image.outputs.deploymentImageId}
+        - name: PREFECT_WSF_IMAGE
+          value: ${actions.build.wsf-prefect-image.outputs.deploymentImageId}
+        - name: WSF_ASSETS_S3_URI
+          value: "${var.wsf.assetsS3Uri}"
+        - name: WSF_OUTPUT_S3_URI
+          value: "${var.wsf.outputS3Uri}"
         - name: TEEHR_SPARK_IMAGE
           value: ${actions.build.teehr-spark-executor-image.outputs.deploymentImageId}
         - name: TEEHR_NAMESPACE

@@ -4,6 +4,10 @@ name: teehr-hub
 defaultEnvironment: local
 
 variables:
+  # Empty defaults keep every environment deployable; override per environment (see deploy-targets/use1.yml)
+  wsf:
+    assetsS3Uri: ""
+    outputS3Uri: ""
   smtp:
     host: smtp.gmail.com
     port: "587"

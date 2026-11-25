@@ -13,6 +13,18 @@ spec:
       TEEHR_VERSION: ${var.devTeehrVersion}
       TEEHR_ICECHUNK_VERSION: ${var.devTeehrIcechunkVersion}
 ---
+kind: Build
+type: container
+name: wsf-prefect-image
+description: Prefect runtime with an isolated venv for the Rodeo inference models
+environments:
+  - local
+  - remote
+spec:
+  dockerfile: Dockerfile.prefect-wsf
+  localId: wsf-prefect
+  publishId: wsf-prefect:${var.devTeehrVersion}
+---
 kind: Deploy
 type: kubernetes
 name: prefect-workflow-deploy
@@ -23,6 +35,7 @@ dependencies:
   - deploy.update-job-template
   - deploy.load-secrets
   - build.teehr-prefect-image
+  - build.wsf-prefect-image
   - build.teehr-spark-executor-image
 environments:
   - local

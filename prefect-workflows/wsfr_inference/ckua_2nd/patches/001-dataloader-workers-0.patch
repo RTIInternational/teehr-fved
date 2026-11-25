@@ -1,0 +1,11 @@
+--- a/configs/forecast_cv_mlp_sumres_predict.yaml
++++ b/configs/forecast_cv_mlp_sumres_predict.yaml
+@@ -5,7 +5,7 @@
+ 
+ forecast_test_data:
+   type: "timeseries"
+-  workers: 10
++  workers: 0
+   batch_size: 2048
+ 
+ model:

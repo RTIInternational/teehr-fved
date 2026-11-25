@@ -1,0 +1,9 @@
+--- a/features/streamflow_deviation.py
++++ b/features/streamflow_deviation.py
+@@ -48,3 +48,5 @@
+     streamflow_deviation = pd.concat(df_list)
+-    streamflow_deviation['datetime'] = pd.to_datetime(streamflow_deviation['datetime'])
++    streamflow_deviation['datetime'] = pd.to_datetime(
++        streamflow_deviation['datetime'].map(lambda value: pd.Timestamp(value).tz_localize(None))
++    )
+     streamflow_max_date = streamflow_deviation['datetime'].max()
