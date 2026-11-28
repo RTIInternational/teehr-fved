@@ -320,9 +320,9 @@ def test_parse_geotiff_in_processes(harness, cu, monkeypatch):
 
 
 def test_overviews_fan_out_as_child_runs(harness, ua, monkeypatch):
-    """Snow references stay on the one-commit path; their overviews run in units of 30 days, as child runs of
-    process-gridded-unit from their JSON parameters."""
-    import process_gridded_unit as pgu
+    """Snow references stay on the one-commit path; their overviews run in segments of 30 days, as child runs of
+    process-gridded-segment from their JSON parameters."""
+    import process_gridded_segment as pgu
     from teehr_icechunk import prefect as ic_prefect
 
     publish, open_repo = ua
@@ -333,11 +333,11 @@ def test_overviews_fan_out_as_child_runs(harness, ua, monkeypatch):
     def run_deployment(name, parameters, job_variables, timeout, flow_run_name):
         params = json.loads(json.dumps(parameters))
         stages.append(params["stage"])
-        pgu.process_gridded_unit.fn(**params)
+        pgu.process_gridded_segment.fn(**params)
         return SimpleNamespace(name=flow_run_name, state=SimpleNamespace(is_completed=lambda: True))
 
     monkeypatch.setattr(ic_prefect, "run_deployment", run_deployment)
-    _run("1981-10-01", "1981-12-29", max_child_runs=2, unit_steps=30)
+    _run("1981-10-01", "1981-12-29", max_child_runs=2, segment_steps=30)
     assert stages == ["overviews"] * 3
     overview = _groups(open_repo)["overviews/2"]
     assert (overview.status.values == 2).all()
