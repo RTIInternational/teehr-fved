@@ -213,14 +213,17 @@ deployments:
   - name: calculate-mean-areal-values
     version:
     tags: []
-    description: Calculate mean areal values of location polygons from a gridded IceChunk repository
+    description: >-
+      Calculate mean areal values of location polygons from a gridded IceChunk repository. Segments of a year of
+      days run as process-gridded-segment child runs, 2 at a time.
     entrypoint: workflows/ingests/mean_areal_values.py:calculate_mean_areal_values
     parameters: {
       "args": {
         "temp_dir_path": *temp_dir_path,
         "configuration_name": "ua_swann_4km",
         "location_id_prefix": "usgsbasin",
-        "grid_variable_name": "SWE"
+        "grid_variable_name": "SWE",
+        "max_child_runs": 2
       }
     }
     work_pool: *work_pool
@@ -229,8 +232,9 @@ deployments:
     version:
     tags: []
     description: >-
-      One unit of a gridded run that fans out (max_child_runs > 0): references or overviews, started by
-      ingest-gridded-data with run_deployment. Not run on its own.
+      One segment of a gridded run that fans out (max_child_runs > 0): references or overviews (started by
+      ingest-gridded-data or build-overviews), or mean areal values (started by a mean areal flow, staged on
+      /data for it to load). Not run on its own.
     entrypoint: workflows/ingests/process_gridded_segment.py:process_gridded_segment
     work_pool: *work_pool
 
